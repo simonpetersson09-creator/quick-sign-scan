@@ -73,44 +73,17 @@ function SendPage() {
       saveSettings({ ...settings, recipients: recipients.slice(0, 8) });
 
       const filename = `${(subject || "dokument").replace(/[^\w\-]+/g, "_")}.pdf`;
-      const blob = dataUrlToBlob(pdfUrl);
-      const file = new File([blob], filename, { type: "application/pdf" });
+      const pdfBase64 = pdfUrl.includes(",") ? pdfUrl.split(",")[1] : pdfUrl;
 
-      // Prefer native share (iOS/Android can attach the file to Mail directly)
-      const nav = navigator as Navigator & {
-        canShare?: (data: { files?: File[] }) => boolean;
-        share?: (data: ShareData & { files?: File[] }) => Promise<void>;
-      };
-      let shared = false;
-      if (nav.share && nav.canShare && nav.canShare({ files: [file] })) {
-        try {
-          await nav.share({
-            files: [file],
-            title: subject,
-            text: `${message}\n\nTill: ${to}`,
-          });
-          shared = true;
-        } catch (err) {
-          if ((err as DOMException)?.name === "AbortError") {
-            setSending(false);
-            return;
-          }
-          console.warn("Share failed, falling back to download + mailto", err);
-        }
-      }
-
-      if (!shared) {
-        // Fallback: download the PDF, then open the user's mail client with
-        // a prefilled draft. mailto cannot attach files — the user attaches
-        // the just-downloaded file manually.
-        downloadPdf();
-        const body = `${message}\n\nPDF:en "${filename}" har laddats ned — bifoga den till detta mail.`;
-        const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        window.location.href = mailto;
-        setInfo(
-          "PDF:en laddades ned. Om din e-postapp inte öppnades automatiskt — öppna den manuellt och bifoga filen.",
-        );
-      }
+      await sendEmailFn({
+        data: {
+          to,
+          subject: subject || "Skannat dokument",
+          message: message || "",
+          filename,
+          pdfBase64,
+        },
+      });
 
       setDone(true);
       setTimeout(() => {
@@ -120,7 +93,7 @@ function SendPage() {
     } catch (e) {
       console.error(e);
       setInfo(
-        "Kunde inte skicka automatiskt. Tryck på \"Ladda ned PDF\" och bifoga filen manuellt i din e-postapp.",
+        "Kunde inte skicka mailet. Försök igen, eller tryck \"Ladda ned PDF\" och skicka manuellt.",
       );
     } finally {
       setSending(false);
