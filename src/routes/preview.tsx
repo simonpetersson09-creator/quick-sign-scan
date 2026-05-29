@@ -18,8 +18,11 @@ export const Route = createFileRoute("/preview")({
 function PreviewPage() {
   const navigate = useNavigate();
   const [image, setImage] = useState<string | null>(null);
+  const [sourceImage, setSourceImage] = useState<string | null>(null);
+  const [detection, setDetection] = useState<ReturnType<typeof scanStore.get>["detection"]>(null);
   const [report, setReport] = useState<QualityReport | null>(null);
   const [analyzing, setAnalyzing] = useState(true);
+  const [debugOpen, setDebugOpen] = useState(false);
 
   useEffect(() => {
     const img = scanStore.get().imageDataUrl;
@@ -27,7 +30,10 @@ function PreviewPage() {
       navigate({ to: "/" });
       return;
     }
+    const session = scanStore.get();
     setImage(img);
+    setSourceImage(session.sourceDataUrl);
+    setDetection(session.detection);
     setAnalyzing(true);
     analyzeDocumentQuality(img)
       .then((r) => {
@@ -40,7 +46,7 @@ function PreviewPage() {
   }, [navigate]);
 
   function retake() {
-    scanStore.set({ imageDataUrl: null, signatureDataUrl: null, signaturePosition: null, pdfDataUrl: null });
+    scanStore.set({ imageDataUrl: null, sourceDataUrl: null, detection: null, signatureDataUrl: null, signaturePosition: null, pdfDataUrl: null });
     navigate({ to: "/scan" });
   }
 
@@ -51,6 +57,8 @@ function PreviewPage() {
   if (!image) return null;
 
   const ok = report?.verdict === "ok";
+  const canUse = !!detection && !analyzing;
+  const polygonPoints = detection?.corners.map((p) => `${p.x * 100},${p.y * 100}`).join(" ");
 
   return (
     <AppShell title="Förhandsgranska" back="/">
@@ -66,6 +74,46 @@ function PreviewPage() {
           <img src={image} alt="Skannat dokument" className="w-full h-full object-contain bg-white" />
         </div>
       </div>
+
+      {!detection && (
+        <div className="mt-4 rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm font-medium">
+          Kunde inte identifiera dokumentets kanter tillräckligt säkert.
+        </div>
+      )}
+
+      {sourceImage && detection && (
+        <div className="mt-4 rounded-2xl border border-border bg-card p-3">
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <span className="text-sm font-semibold">Identifierad polygon</span>
+            <button
+              type="button"
+              onClick={() => setDebugOpen((v) => !v)}
+              className="text-xs font-medium text-primary"
+            >
+              {debugOpen ? "Dölj debug" : "Visa debug"}
+            </button>
+          </div>
+          <div className="relative overflow-hidden rounded-xl border border-border bg-background">
+            <img src={sourceImage} alt="Originalbild med identifierad dokumentpolygon" className="block w-full h-auto" />
+            <svg className="absolute inset-0 h-full w-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
+              <polygon points={polygonPoints} fill="color-mix(in oklab, var(--success) 16%, transparent)" stroke="var(--success)" strokeWidth="0.9" vectorEffect="non-scaling-stroke" />
+              {detection.corners.map((p, i) => (
+                <circle key={i} cx={p.x * 100} cy={p.y * 100} r="1.5" fill="var(--success)" stroke="var(--background)" strokeWidth="0.45" />
+              ))}
+            </svg>
+          </div>
+          {debugOpen && (
+            <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-[12px]">
+              <Metric label="A4-ratio" ok={Math.abs(detection.a4Ratio - Math.SQRT2) < 0.18} value={detection.a4Ratio.toFixed(2)} />
+              <Metric label="Säkerhet" ok={detection.confidence >= 0.68} value={`${Math.round(detection.confidence * 100)}%`} />
+              <Metric label="Raka sidor" ok={detection.debug.sideDeviation < 0.08} value={detection.debug.sideDeviation.toFixed(3)} />
+              <Metric label="Perspektiv" ok={detection.debug.perspectiveError < 0.95} value={detection.debug.perspectiveError.toFixed(2)} />
+              <Metric label="Konturfyllnad" ok={detection.debug.polygonFill >= 0.8} value={detection.debug.polygonFill.toFixed(2)} />
+              <Metric label="Tröskel" ok value={Math.round(detection.debug.threshold)} />
+            </div>
+          )}
+        </div>
+      )}
 
 
       <div
@@ -142,7 +190,7 @@ function PreviewPage() {
       <div className="flex-1" />
 
       <div className="flex flex-col gap-3 pt-5">
-        <PrimaryButton onClick={accept} disabled={analyzing}>
+        <PrimaryButton onClick={accept} disabled={!canUse}>
           <span className="inline-flex items-center justify-center gap-2">
             Använd dokument <ArrowRight className="h-5 w-5" />
           </span>
