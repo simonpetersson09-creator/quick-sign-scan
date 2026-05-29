@@ -7,7 +7,12 @@ export interface ScanSession {
   imageDataUrl: string | null;
   sourceDataUrl: string | null;
   detection: {
-    corners: [{ x: number; y: number }, { x: number; y: number }, { x: number; y: number }, { x: number; y: number }];
+    corners: [
+      { x: number; y: number },
+      { x: number; y: number },
+      { x: number; y: number },
+      { x: number; y: number },
+    ];
     a4Ratio: number;
     confidence: number;
     debug: {

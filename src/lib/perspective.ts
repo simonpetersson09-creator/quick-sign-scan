@@ -534,7 +534,9 @@ function rdp(points: Point[], epsilon: number): Point[] {
     }
   }
   if (maxD <= epsilon) return [points[0], points[points.length - 1]];
-  return rdp(points.slice(0, index + 1), epsilon).slice(0, -1).concat(rdp(points.slice(index), epsilon));
+  return rdp(points.slice(0, index + 1), epsilon)
+    .slice(0, -1)
+    .concat(rdp(points.slice(index), epsilon));
 }
 
 function dedupeQuads(quads: [Point, Point, Point, Point][]): [Point, Point, Point, Point][] {
@@ -577,9 +579,15 @@ function evaluateEdgeQuad(args: {
   const margin = 20;
   const edgeMargin = 3;
 
-  if (minX <= edgeMargin || minY <= edgeMargin || maxX >= width - 1 - edgeMargin || maxY >= height - 1 - edgeMargin)
+  if (
+    minX <= edgeMargin ||
+    minY <= edgeMargin ||
+    maxX >= width - 1 - edgeMargin ||
+    maxY >= height - 1 - edgeMargin
+  )
     return null;
-  if (minX < margin && minY < margin && maxX > width - margin && maxY > height - margin) return null;
+  if (minX < margin && minY < margin && maxX > width - margin && maxY > height - margin)
+    return null;
 
   const area = Math.abs(polygonArea(ordered));
   const areaRatio = area / frameArea;
@@ -615,7 +623,8 @@ function evaluateEdgeQuad(args: {
   const perspectiveScore = clamp01(1 - perspectiveError / 1.6);
   const brightnessScore = clamp01((stats.mean - 105) / 105);
   const textScore = clamp01(stats.darkRatio / 0.055);
-  const areaScore = areaRatio <= 0.7 ? clamp01((areaRatio - 0.1) / 0.18) : clamp01((0.9 - areaRatio) / 0.2);
+  const areaScore =
+    areaRatio <= 0.7 ? clamp01((areaRatio - 0.1) / 0.18) : clamp01((0.9 - areaRatio) / 0.2);
   const confidence =
     0.25 * edgeScore +
     0.2 * straightScore +
@@ -717,7 +726,7 @@ function pointInPolygon(point: Point, polygon: Point[]): boolean {
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
     const a = polygon[i];
     const b = polygon[j];
-    if ((a.y > point.y) !== (b.y > point.y)) {
+    if (a.y > point.y !== b.y > point.y) {
       const x = ((b.x - a.x) * (point.y - a.y)) / Math.max(1e-6, b.y - a.y) + a.x;
       if (point.x < x) inside = !inside;
     }
@@ -876,9 +885,7 @@ function evaluateContour(
   const ratioScore = clamp01(1 - ratioError / 0.55);
   const straightScore = clamp01(1 - sideDeviation / 0.08);
   const fillScore =
-    polygonFill >= 0.85 && polygonFill <= 1.15
-      ? 1
-      : clamp01(1 - Math.abs(polygonFill - 1) / 0.45);
+    polygonFill >= 0.85 && polygonFill <= 1.15 ? 1 : clamp01(1 - Math.abs(polygonFill - 1) / 0.45);
   const perspectiveScore = clamp01(1 - perspectiveError / 1.5);
   const confidence =
     0.4 * straightScore + 0.15 * ratioScore + 0.2 * fillScore + 0.25 * perspectiveScore;
