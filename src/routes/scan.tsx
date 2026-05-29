@@ -47,6 +47,7 @@ function ScanPage() {
   const lastRawQuad = useRef<[Point, Point, Point, Point] | null>(null);
   const smoothQuad = useRef<[Point, Point, Point, Point] | null>(null); // normalized 0..1
   const stableCount = useRef(0);
+  const detectCount = useRef(0);
   const capturedRef = useRef(false);
 
   const [status, setStatus] = useState<Status>("starting");
