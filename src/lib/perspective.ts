@@ -203,7 +203,7 @@ export interface DocumentDetection {
 }
 
 const A4_RATIO = Math.SQRT2;
-const MIN_DOCUMENT_CONFIDENCE = 0.68;
+const MIN_DOCUMENT_CONFIDENCE = 0.58;
 
 // Detect the document from its contour: isolate candidate paper, extract the
 // outer boundary, reduce the convex contour to four real corners, then reject
@@ -398,16 +398,19 @@ function evaluateContour(
   const sideDeviation = contourSideDeviation(contour, ordered) / shortSide;
   const polygonFill = componentArea / Math.max(1, area);
 
-  if (ratioError > 0.24) return null;
-  if (perspectiveError > 0.95) return null;
-  if (sideDeviation > 0.08) return null;
-  if (polygonFill < 0.8 || polygonFill > 1.18) return null;
+  // A real A4 sheet can project close to square when photographed at an angle,
+  // so ratio validation must be broad. Straight contour + fill are stronger
+  // signals here; the final warp always outputs a true A4 rectangle.
+  if (ratioError > 0.48) return null;
+  if (perspectiveError > 1.25) return null;
+  if (sideDeviation > 0.1) return null;
+  if (polygonFill < 0.5 || polygonFill > 1.25) return null;
 
-  const ratioScore = clamp01(1 - ratioError / 0.24);
-  const straightScore = clamp01(1 - sideDeviation / 0.08);
-  const fillScore = clamp01((polygonFill - 0.8) / 0.18);
-  const perspectiveScore = clamp01(1 - perspectiveError / 0.95);
-  const confidence = 0.3 * straightScore + 0.25 * ratioScore + 0.25 * fillScore + 0.2 * perspectiveScore;
+  const ratioScore = clamp01(1 - ratioError / 0.48);
+  const straightScore = clamp01(1 - sideDeviation / 0.1);
+  const fillScore = polygonFill >= 0.72 ? 1 : clamp01((polygonFill - 0.5) / 0.22);
+  const perspectiveScore = clamp01(1 - perspectiveError / 1.25);
+  const confidence = 0.4 * straightScore + 0.15 * ratioScore + 0.2 * fillScore + 0.25 * perspectiveScore;
 
   return {
     corners: ordered,
