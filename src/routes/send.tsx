@@ -26,10 +26,6 @@ function SendPage() {
     const s = scanStore.get();
     if (!s.imageDataUrl) {
       navigate({ to: "/" });
-  useEffect(() => {
-    const s = scanStore.get();
-    if (!s.imageDataUrl) {
-      navigate({ to: "/" });
       return;
     }
     const imageDataUrl = s.imageDataUrl;
