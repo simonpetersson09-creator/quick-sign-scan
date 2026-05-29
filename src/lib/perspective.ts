@@ -426,7 +426,7 @@ function buildBrightPaperMask(
 ): Uint8Array {
   const mask = new Uint8Array(lum.length);
   for (let i = 0; i < lum.length; i++) mask[i] = lum[i] >= threshold ? 1 : 0;
-  let closed = mask;
+  let closed: Uint8Array<ArrayBufferLike> = mask;
   for (let i = 0; i < 3; i++) closed = dilateMask(closed, width, height);
   for (let i = 0; i < 3; i++) closed = erodeMask(closed, width, height);
   return dilateMask(erodeMask(closed, width, height), width, height);
