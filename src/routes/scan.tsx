@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { scanStore } from "@/lib/scanStore";
 import {
   detectDocumentQuad,
+  MIN_DOCUMENT_CONFIDENCE,
   Point,
   emaQuad,
   enhancePaper,
@@ -238,6 +239,12 @@ function ScanPage() {
 
   async function capture(normQuad: [Point, Point, Point, Point]) {
     if (capturedRef.current) return;
+    const meta = detectionMeta.current;
+    if (!meta || meta.confidence < MIN_DOCUMENT_CONFIDENCE) {
+      stableCount.current = 0;
+      setStatus("uncertain");
+      return;
+    }
     capturedRef.current = true;
     const video = videoRef.current;
     if (!video) return;
@@ -270,18 +277,15 @@ function ScanPage() {
 
     const dataUrl = warped.toDataURL("image/jpeg", 0.92);
     const sourceDataUrl = sourceCanvas.toDataURL("image/jpeg", 0.86);
-    const meta = detectionMeta.current;
     scanStore.set({
       imageDataUrl: dataUrl,
       sourceDataUrl,
-      detection: meta
-        ? {
-            corners: normQuad,
-            a4Ratio: meta.a4Ratio,
-            confidence: meta.confidence,
-            debug: meta.debug,
-          }
-        : null,
+      detection: {
+        corners: normQuad,
+        a4Ratio: meta.a4Ratio,
+        confidence: meta.confidence,
+        debug: meta.debug,
+      },
     });
     streamRef.current?.getTracks().forEach((t) => t.stop());
     navigate({ to: "/preview" });
@@ -291,7 +295,13 @@ function ScanPage() {
     // Require a detected document — never capture the raw camera frame,
     // otherwise the preview shows an un-cropped photo instead of a scan.
     const q = smoothQuad.current;
-    if (!q || !detectionMeta.current || detectCount.current < DETECT_FRAMES) return;
+    if (
+      !q ||
+      !detectionMeta.current ||
+      detectionMeta.current.confidence < MIN_DOCUMENT_CONFIDENCE ||
+      detectCount.current < DETECT_FRAMES
+    )
+      return;
     setStatus("capturing");
     capture(q);
   }
@@ -299,7 +309,7 @@ function ScanPage() {
   const statusText: Record<Status, string> = {
     starting: "Startar kamera…",
     searching: "Sök efter dokument",
-    uncertain: "Kunde inte identifiera dokumentets kanter tillräckligt säkert.",
+    uncertain: "Kunde inte identifiera dokumentets kanter.",
     align: "Rikta in dokumentet",
     hold: "Håll stilla…",
     ready: "Dokument hittat",
@@ -382,6 +392,7 @@ function ScanPage() {
             status === "capturing" ||
             !smoothQuad.current ||
             !detectionMeta.current ||
+            detectionMeta.current.confidence < MIN_DOCUMENT_CONFIDENCE ||
             detectCount.current < DETECT_FRAMES
           }
           className="h-16 w-16 rounded-full bg-white text-black flex items-center justify-center shadow-lg active:scale-95 disabled:opacity-40"
