@@ -65,7 +65,8 @@ function PreviewPage() {
         >
           <img src={image} alt="Skannat dokument" className="w-full h-full object-cover" />
         </div>
-      </div>
+          <img src={image} alt="Skannat dokument" className="w-full h-full object-contain bg-white" />
+
 
       <div
         className={`mt-5 rounded-2xl p-4 border transition ${
