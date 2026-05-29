@@ -288,7 +288,7 @@ function ScanPage() {
     // Require a detected document — never capture the raw camera frame,
     // otherwise the preview shows an un-cropped photo instead of a scan.
     const q = smoothQuad.current;
-    if (!q) return;
+    if (!q || !detectionMeta.current || detectCount.current < DETECT_FRAMES) return;
     setStatus("capturing");
     capture(q);
   }
@@ -382,7 +382,9 @@ function ScanPage() {
             status === "starting" ||
             status === "error" ||
             status === "capturing" ||
-            !smoothQuad.current
+            !smoothQuad.current ||
+            !detectionMeta.current ||
+            detectCount.current < DETECT_FRAMES
           }
           className="h-16 w-16 rounded-full bg-white text-black flex items-center justify-center shadow-lg active:scale-95 disabled:opacity-40"
           aria-label="Fotografera manuellt"
