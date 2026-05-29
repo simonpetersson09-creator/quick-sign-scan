@@ -418,6 +418,32 @@ function closeEdgeGaps(edges: Uint8Array, width: number, height: number): Uint8A
   return erodeMask(mask, width, height);
 }
 
+function buildBrightPaperMask(
+  lum: Uint8ClampedArray,
+  width: number,
+  height: number,
+  threshold: number,
+): Uint8Array {
+  const mask = new Uint8Array(lum.length);
+  for (let i = 0; i < lum.length; i++) mask[i] = lum[i] >= threshold ? 1 : 0;
+  let closed = mask;
+  for (let i = 0; i < 3; i++) closed = dilateMask(closed, width, height);
+  for (let i = 0; i < 3; i++) closed = erodeMask(closed, width, height);
+  return dilateMask(erodeMask(closed, width, height), width, height);
+}
+
+function maskBoundary(mask: Uint8Array, width: number, height: number): Uint8Array {
+  const out = new Uint8Array(mask.length);
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const i = y * width + x;
+      if (!mask[i]) continue;
+      if (!mask[i - 1] || !mask[i + 1] || !mask[i - width] || !mask[i + width]) out[i] = 1;
+    }
+  }
+  return out;
+}
+
 interface EdgeComponent {
   pixels: number[];
   points: Point[];
