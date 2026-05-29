@@ -369,6 +369,92 @@ function pushIf(mask: Uint8Array, visited: Uint8Array, stack: Int32Array, sp: nu
   return sp;
 }
 
+function evaluateContour(
+  contour: Point[],
+  componentArea: number,
+  frameArea: number,
+  threshold: number,
+): DocumentDetection | null {
+  if (contour.length < 24) return null;
+  const hull = convexHull(contour);
+  if (hull.length < 4) return null;
+  const quad = reduceHullToQuad(hull);
+  if (!quad || !isConvexQuad(quad)) return null;
+  const ordered = orderQuad(quad);
+  const area = Math.abs(polygonArea(ordered));
+  if (area < frameArea * 0.04) return null;
+
+  const top = dist(ordered[0], ordered[1]);
+  const right = dist(ordered[1], ordered[2]);
+  const bottom = dist(ordered[2], ordered[3]);
+  const left = dist(ordered[3], ordered[0]);
+  const avgW = (top + bottom) / 2;
+  const avgH = (left + right) / 2;
+  const shortSide = Math.max(1, Math.min(avgW, avgH));
+  const a4Ratio = Math.max(avgW, avgH) / shortSide;
+  const ratioError = Math.abs(a4Ratio - A4_RATIO) / A4_RATIO;
+  const perspectiveError = Math.max(top, bottom) / Math.max(1, Math.min(top, bottom)) - 1 +
+    Math.max(left, right) / Math.max(1, Math.min(left, right)) - 1;
+  const sideDeviation = contourSideDeviation(contour, ordered) / shortSide;
+  const polygonFill = componentArea / Math.max(1, area);
+
+  if (ratioError > 0.24) return null;
+  if (perspectiveError > 0.95) return null;
+  if (sideDeviation > 0.08) return null;
+  if (polygonFill < 0.8 || polygonFill > 1.18) return null;
+
+  const ratioScore = clamp01(1 - ratioError / 0.24);
+  const straightScore = clamp01(1 - sideDeviation / 0.08);
+  const fillScore = clamp01((polygonFill - 0.8) / 0.18);
+  const perspectiveScore = clamp01(1 - perspectiveError / 0.95);
+  const confidence = 0.3 * straightScore + 0.25 * ratioScore + 0.25 * fillScore + 0.2 * perspectiveScore;
+
+  return {
+    corners: ordered,
+    a4Ratio,
+    confidence,
+    debug: { threshold, sideDeviation, perspectiveError, polygonFill },
+  };
+}
+
+function convexHull(points: Point[]): Point[] {
+  const sorted = [...points].sort((a, b) => a.x === b.x ? a.y - b.y : a.x - b.x);
+  const lower: Point[] = [];
+  for (const p of sorted) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+    lower.push(p);
+  }
+  const upper: Point[] = [];
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const p = sorted[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+    upper.push(p);
+  }
+  lower.pop();
+  upper.pop();
+  return lower.concat(upper);
+}
+
+function reduceHullToQuad(hull: Point[]): [Point, Point, Point, Point] | null {
+  const pts = hull.slice();
+  while (pts.length > 4) {
+    let bestIndex = -1;
+    let bestLoss = Infinity;
+    for (let i = 0; i < pts.length; i++) {
+      const prev = pts[(i - 1 + pts.length) % pts.length];
+      const curr = pts[i];
+      const next = pts[(i + 1) % pts.length];
+      const loss = Math.abs(cross(prev, curr, next));
+      if (loss < bestLoss) {
+        bestLoss = loss;
+        bestIndex = i;
+      }
+    }
+    pts.splice(bestIndex, 1);
+  }
+  return pts.length === 4 ? [pts[0], pts[1], pts[2], pts[3]] : null;
+}
+
 export function emaQuad(
   prev: [Point, Point, Point, Point] | null,
   next: [Point, Point, Point, Point],
