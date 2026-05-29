@@ -26,18 +26,22 @@ function SendPage() {
     const s = scanStore.get();
     if (!s.imageDataUrl) {
       navigate({ to: "/" });
+  useEffect(() => {
+    const s = scanStore.get();
+    if (!s.imageDataUrl) {
+      navigate({ to: "/" });
       return;
     }
+    const imageDataUrl = s.imageDataUrl;
     (async () => {
       const sig = s.signatureDataUrl && s.signaturePosition
         ? { dataUrl: s.signatureDataUrl, x: s.signaturePosition.x, y: s.signaturePosition.y }
         : null;
-      const url = await buildPdf(s.imageDataUrl, sig);
+      const url = await buildPdf(imageDataUrl, sig);
       setPdfUrl(url);
       scanStore.set({ pdfDataUrl: url });
     })();
   }, [navigate]);
-
   async function send() {
     if (!pdfUrl || !to) return;
     setSending(true);
