@@ -232,31 +232,25 @@ function ScanPage() {
 
     const warped = warpQuadToRect(video, vw, vh, srcQuad, outW, outH);
 
-    // Post-process: subtle contrast/brightness for paper look
-    const post = document.createElement("canvas");
-    post.width = outW;
-    post.height = outH;
-    const pctx = post.getContext("2d")!;
-    pctx.filter = "contrast(1.2) brightness(1.06) saturate(0.92)";
-    pctx.drawImage(warped, 0, 0);
+    // Paper enhancement: normalize lighting and stretch whites so the
+    // document looks like a clean scanned A4 (white paper, dark ink).
+    enhancePaper(warped);
 
-    const dataUrl = post.toDataURL("image/jpeg", 0.92);
+    const dataUrl = warped.toDataURL("image/jpeg", 0.92);
     scanStore.set({ imageDataUrl: dataUrl });
     streamRef.current?.getTracks().forEach((t) => t.stop());
     navigate({ to: "/preview" });
   }
 
   function manualCapture() {
-    const q =
-      smoothQuad.current ?? ([
-        { x: 0.05, y: 0.05 },
-        { x: 0.95, y: 0.05 },
-        { x: 0.95, y: 0.95 },
-        { x: 0.05, y: 0.95 },
-      ] as [Point, Point, Point, Point]);
+    // Require a detected document — never capture the raw camera frame,
+    // otherwise the preview shows an un-cropped photo instead of a scan.
+    const q = smoothQuad.current;
+    if (!q) return;
     setStatus("capturing");
     capture(q);
   }
+
 
   const statusText: Record<Status, string> = {
     starting: "Startar kamera…",
