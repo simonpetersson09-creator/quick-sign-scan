@@ -250,6 +250,9 @@ export function detectDocumentQuad(
   const { edges, highThreshold } = cannyEdges(blurred, width, height);
   const connectedEdges = closeEdgeGaps(edges, width, height);
   const components = edgeComponents(connectedEdges, width, height);
+  const brightThreshold = Math.max(95, Math.min(225, otsuThreshold(hist, total) + 12));
+  const paperMask = buildBrightPaperMask(lum, width, height, brightThreshold);
+  components.push(...edgeComponents(maskBoundary(paperMask, width, height), width, height));
   let best: DocumentDetection | null = null;
   let bestScore = 0;
   let candidateCount = 0;
