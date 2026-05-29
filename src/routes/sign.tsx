@@ -76,15 +76,6 @@ function SignPage() {
     if (saveAsDefault && !useSaved) {
       saveSettings({ ...settings, savedSignature: dataUrl });
     }
-    navigate({ to: "/send" });
-  function done(saveAsDefault: boolean) {
-    const dataUrl = useSaved && settings.savedSignature
-      ? settings.savedSignature
-      : canvasRef.current!.toDataURL("image/png");
-    scanStore.set({ signatureDataUrl: dataUrl });
-    if (saveAsDefault && !useSaved) {
-      saveSettings({ ...settings, savedSignature: dataUrl });
-    }
     navigate({ to: "/review" });
   }
         <button
