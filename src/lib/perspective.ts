@@ -147,11 +147,12 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
     hist[l]++;
   }
 
-  // 2) Find black point (5th percentile) and white point (75th percentile)
-  //    Mapping 75th percentile to white aggressively whitens the paper.
+  // 2) Find black point (very low percentile — only the darkest ink becomes
+  //    truly black; spots/smudges stay gray) and white point (low percentile,
+  //    so paper turns bright white).
   let cum = 0;
   let black = 0;
-  const blackTarget = n * 0.05;
+  const blackTarget = n * 0.005; // 0.5% darkest -> black
   for (let v = 0; v < 256; v++) {
     cum += hist[v];
     if (cum >= blackTarget) {
@@ -161,7 +162,7 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
   }
   cum = 0;
   let white = 255;
-  const whiteTarget = n * 0.75;
+  const whiteTarget = n * 0.55; // 55th percentile -> white (whitens paper)
   for (let v = 0; v < 256; v++) {
     cum += hist[v];
     if (cum >= whiteTarget) {
@@ -169,32 +170,35 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
       break;
     }
   }
-  if (white - black < 30) white = Math.min(255, black + 30);
+  // Don't let black point creep too high — keeps mild spots from going dark.
+  if (black > 60) black = 60;
+  if (white - black < 40) white = Math.min(255, black + 40);
 
-  // 3) Apply per-pixel: stretch luminance, desaturate slightly toward gray
+  // 3) Apply per-pixel: stretch luminance, brighten midtones, desaturate paper
   const range = white - black;
   const lut = new Uint8ClampedArray(256);
   for (let v = 0; v < 256; v++) {
     let t = (v - black) / range;
     if (t < 0) t = 0;
     else if (t > 1) t = 1;
-    // Soft gamma for nicer midtones
-    t = Math.pow(t, 0.9);
-    lut[v] = (t * 255) | 0;
+    // Gamma > 1 brightens midtones so smudges fade toward white instead of black
+    t = Math.pow(t, 1.35);
+    // Lift the floor a touch so true black is reserved for actual ink
+    const lifted = 0.06 + t * 0.94;
+    lut[v] = Math.min(255, Math.max(0, lifted * 255)) | 0;
   }
 
   for (let i = 0, j = 0; i < d.length; i += 4, j++) {
     const oldL = lum[j];
     const newL = lut[oldL];
-    // Scale RGB proportionally; clamp.
     const k = oldL === 0 ? 1 : newL / Math.max(1, oldL);
     let r = d[i] * k;
     let g = d[i + 1] * k;
     let b = d[i + 2] * k;
-    // Desaturate slightly (pull 40% toward luminance) to neutralize paper tint
-    r = r * 0.6 + newL * 0.4;
-    g = g * 0.6 + newL * 0.4;
-    b = b * 0.6 + newL * 0.4;
+    // Desaturate strongly (pull 70% toward luminance) so paper looks neutral white
+    r = r * 0.3 + newL * 0.7;
+    g = g * 0.3 + newL * 0.7;
+    b = b * 0.3 + newL * 0.7;
     if (r > 255) r = 255;
     if (g > 255) g = 255;
     if (b > 255) b = 255;
