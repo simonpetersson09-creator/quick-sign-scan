@@ -14,6 +14,7 @@ import { Camera, X } from "lucide-react";
 type Status =
   | "starting"
   | "searching"
+  | "uncertain"
   | "align"
   | "hold"
   | "ready"
@@ -49,6 +50,7 @@ function ScanPage() {
   const detectionMeta = useRef<ReturnType<typeof detectDocumentQuad> | null>(null);
   const stableCount = useRef(0);
   const detectCount = useRef(0);
+  const missCount = useRef(0);
   const capturedRef = useRef(false);
 
   const [status, setStatus] = useState<Status>("starting");
@@ -129,16 +131,18 @@ function ScanPage() {
       stableCount.current = 0;
       detectCount.current = Math.max(0, detectCount.current - 1);
       detectionMeta.current = null;
+      missCount.current++;
       if (detectCount.current === 0) {
         smoothQuad.current = null;
         lastRawQuad.current = null;
         drawOverlay(null, false);
       }
-      setStatus((s) => (s === "starting" ? s : "searching"));
+      setStatus((s) => (s === "starting" ? s : missCount.current > 45 ? "uncertain" : "searching"));
       return;
     }
 
     detectCount.current++;
+    missCount.current = 0;
     detectionMeta.current = detection;
 
     // Normalize to 0..1
@@ -293,6 +297,7 @@ function ScanPage() {
   const statusText: Record<Status, string> = {
     starting: "Startar kamera…",
     searching: "Sök efter dokument",
+    uncertain: "Kunde inte identifiera dokumentets kanter tillräckligt säkert.",
     align: "Rikta in dokumentet",
     hold: "Håll stilla…",
     ready: "Dokument hittat",
