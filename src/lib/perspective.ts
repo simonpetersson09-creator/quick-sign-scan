@@ -258,11 +258,10 @@ export function detectDocumentQuad(
       if (x > maxX) maxX = x;
       if (y > maxY) maxY = y;
 
-      if (x > 0) pushIf(mask, visited, stack, sp++, idx - 1);
-      if (x < width - 1) pushIf(mask, visited, stack, sp++, idx + 1);
-      if (y > 0) pushIf(mask, visited, stack, sp++, idx - width);
-      if (y < height - 1) pushIf(mask, visited, stack, sp++, idx + width);
-      while (sp > 0 && visited[stack[sp - 1]] === 2) sp--;
+      if (x > 0) sp = pushIf(mask, visited, stack, sp, idx - 1);
+      if (x < width - 1) sp = pushIf(mask, visited, stack, sp, idx + 1);
+      if (y > 0) sp = pushIf(mask, visited, stack, sp, idx - width);
+      if (y < height - 1) sp = pushIf(mask, visited, stack, sp, idx + width);
     }
 
     const size = pixels.length;
@@ -303,6 +302,71 @@ export function findDocumentCorners(
   height: number,
 ): [Point, Point, Point, Point] | null {
   return detectDocumentQuad(data, width, height)?.corners ?? null;
+}
+
+function otsuThreshold(hist: Uint32Array, total: number): number {
+  let sumAll = 0;
+  for (let t = 0; t < 256; t++) sumAll += t * hist[t];
+  let wB = 0;
+  let sumB = 0;
+  let maxVar = 0;
+  let threshold = 127;
+  for (let t = 0; t < 256; t++) {
+    wB += hist[t];
+    if (wB === 0) continue;
+    const wF = total - wB;
+    if (wF === 0) break;
+    sumB += t * hist[t];
+    const mB = sumB / wB;
+    const mF = (sumAll - sumB) / wF;
+    const between = wB * wF * (mB - mF) * (mB - mF);
+    if (between > maxVar) {
+      maxVar = between;
+      threshold = t;
+    }
+  }
+  return threshold;
+}
+
+function erodeMask(mask: Uint8Array, width: number, height: number): Uint8Array {
+  const out = new Uint8Array(mask.length);
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const i = y * width + x;
+      if (
+        mask[i] && mask[i - 1] && mask[i + 1] &&
+        mask[i - width] && mask[i + width] &&
+        mask[i - width - 1] && mask[i - width + 1] &&
+        mask[i + width - 1] && mask[i + width + 1]
+      ) out[i] = 1;
+    }
+  }
+  return out;
+}
+
+function dilateMask(mask: Uint8Array, width: number, height: number): Uint8Array {
+  const out = new Uint8Array(mask.length);
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const i = y * width + x;
+      if (
+        mask[i] || mask[i - 1] || mask[i + 1] ||
+        mask[i - width] || mask[i + width] ||
+        mask[i - width - 1] || mask[i - width + 1] ||
+        mask[i + width - 1] || mask[i + width + 1]
+      ) out[i] = 1;
+    }
+  }
+  return out;
+}
+
+function pushIf(mask: Uint8Array, visited: Uint8Array, stack: Int32Array, sp: number, idx: number): number {
+  if (mask[idx] && !visited[idx]) {
+    visited[idx] = 1;
+    stack[sp] = idx;
+    return sp + 1;
+  }
+  return sp;
 }
 
 export function emaQuad(
