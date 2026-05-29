@@ -887,7 +887,19 @@ function evaluateContour(
     corners: ordered,
     a4Ratio,
     confidence,
-    debug: { threshold, sideDeviation, perspectiveError, polygonFill },
+    debug: {
+      edgeThreshold: threshold,
+      threshold,
+      candidateCount: 0,
+      a4Score: ratioScore,
+      edgeScore: 0,
+      brightnessScore: 0,
+      textScore: 0,
+      areaRatio: area / frameArea,
+      sideDeviation,
+      perspectiveError,
+      polygonFill,
+    },
   };
 }
 
