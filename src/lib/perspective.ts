@@ -198,20 +198,39 @@ export function findDocumentCorners(
   width: number,
   height: number,
 ): [Point, Point, Point, Point] | null {
-  // Compute mean luminance
-  let sum = 0;
+  // Luminance + histogram
   const total = width * height;
-  const lum = new Float32Array(total);
+  const lum = new Uint8ClampedArray(total);
+  const hist = new Uint32Array(256);
+  let sum = 0;
   for (let i = 0, j = 0; i < data.length; i += 4, j++) {
-    const l = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    const l = (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) | 0;
     lum[j] = l;
+    hist[l]++;
     sum += l;
   }
   const mean = sum / total;
-  const threshold = Math.max(135, mean + 18);
 
-  // Extremal corners in 4 directions:
-  // TL min(x+y), TR max(x-y), BR max(x+y), BL min(x-y)
+  // Otsu's threshold — adaptive separation between dark background and bright paper.
+  let sumAll = 0;
+  for (let t = 0; t < 256; t++) sumAll += t * hist[t];
+  let wB = 0, sumB = 0, maxVar = 0, otsu = 127;
+  for (let t = 0; t < 256; t++) {
+    wB += hist[t];
+    if (wB === 0) continue;
+    const wF = total - wB;
+    if (wF === 0) break;
+    sumB += t * hist[t];
+    const mB = sumB / wB;
+    const mF = (sumAll - sumB) / wF;
+    const v = wB * wF * (mB - mF) * (mB - mF);
+    if (v > maxVar) { maxVar = v; otsu = t; }
+  }
+  // Use Otsu, but never lower than mean (paper must be brighter than average)
+  // and never above 200 (so off-white paper still qualifies).
+  const threshold = Math.max(mean, Math.min(otsu, 200));
+
+  // Extremal corners (TL min x+y, TR max x-y, BR max x+y, BL min x-y)
   let tlS = Infinity, trS = -Infinity, brS = -Infinity, blS = Infinity;
   let tl: Point | null = null, tr: Point | null = null, br: Point | null = null, bl: Point | null = null;
 
@@ -236,15 +255,14 @@ export function findDocumentCorners(
     }
   }
 
-  // Require enough fill and a reasonably large bounding box
-  if (bright < total * 0.06) return null;
+  // Relaxed thresholds so off-center or smaller A4s still register.
+  if (bright < total * 0.03) return null;
   const bw = maxX - minX;
   const bh = maxY - minY;
-  if (bw < width * 0.35 || bh < height * 0.35) return null;
+  if (bw < width * 0.22 || bh < height * 0.22) return null;
   if (!tl || !tr || !br || !bl) return null;
 
-  // Sanity: corners must form a convex quad with min spacing
-  const minSide = Math.min(width, height) * 0.2;
+  const minSide = Math.min(width, height) * 0.12;
   const dist = (p: Point, q: Point) => Math.hypot(p.x - q.x, p.y - q.y);
   if (
     dist(tl, tr) < minSide ||
