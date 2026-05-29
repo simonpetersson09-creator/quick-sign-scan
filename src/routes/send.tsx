@@ -16,6 +16,7 @@ export const Route = createFileRoute("/send")({
 
 function SendPage() {
   const navigate = useNavigate();
+  const sendEmailFn = useServerFn(sendScanEmail);
   const settings = useMemo(() => loadSettings(), []);
   const [to, setTo] = useState(settings.defaultRecipient);
   const [subject, setSubject] = useState(settings.defaultSubject);
