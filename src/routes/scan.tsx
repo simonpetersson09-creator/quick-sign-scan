@@ -125,18 +125,24 @@ function ScanPage() {
 
     if (!corners) {
       stableCount.current = 0;
-      smoothQuad.current = null;
-      lastRawQuad.current = null;
-      drawOverlay(null, false);
+      detectCount.current = Math.max(0, detectCount.current - 1);
+      if (detectCount.current === 0) {
+        smoothQuad.current = null;
+        lastRawQuad.current = null;
+        drawOverlay(null, false);
+      }
       setStatus((s) => (s === "starting" ? s : "searching"));
       return;
     }
+
+    detectCount.current++;
 
     // Normalize to 0..1
     const norm = corners.map((p) => ({ x: p.x / dw, y: p.y / dh })) as
       [Point, Point, Point, Point];
 
-    const smoothed = emaQuad(smoothQuad.current, norm, 0.35);
+    // Stronger smoothing — slower lock-in, more reliable corners
+    const smoothed = emaQuad(smoothQuad.current, norm, 0.22);
     smoothQuad.current = smoothed;
 
     const last = lastRawQuad.current;
@@ -144,15 +150,22 @@ function ScanPage() {
     const delta = last ? maxCornerDelta(norm, last) : 1;
 
     if (delta < STABLE_DELTA) stableCount.current++;
-    else stableCount.current = Math.max(0, stableCount.current - 2);
+    else stableCount.current = Math.max(0, stableCount.current - 3);
+
+    // Wait for enough consecutive detections before showing anything as "found".
+    if (detectCount.current < DETECT_FRAMES) {
+      drawOverlay(smoothed, false);
+      setStatus("searching");
+      return;
+    }
 
     if (stableCount.current < HOLD_FRAMES) {
       drawOverlay(smoothed, false);
       setStatus("align");
-    } else if (stableCount.current < STABLE_FRAMES) {
+    } else if (stableCount.current < READY_FRAMES) {
       drawOverlay(smoothed, false);
       setStatus("hold");
-    } else if (stableCount.current < STABLE_FRAMES + 4) {
+    } else if (stableCount.current < STABLE_FRAMES) {
       drawOverlay(smoothed, true);
       setStatus("ready");
     } else {
@@ -161,6 +174,7 @@ function ScanPage() {
       capture(smoothed);
     }
   }
+
 
   function drawOverlay(
     quad: [Point, Point, Point, Point] | null,
