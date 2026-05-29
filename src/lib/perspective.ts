@@ -470,6 +470,86 @@ function edgeComponents(mask: Uint8Array, width: number, height: number): EdgeCo
   return components.sort((a, b) => b.pixels.length - a.pixels.length).slice(0, 24);
 }
 
+function approximateHullQuads(hull: Point[]): [Point, Point, Point, Point][] {
+  const quads: [Point, Point, Point, Point][] = [];
+  const perimeter = polygonPerimeter(hull);
+  const epsilons = [0.012, 0.02, 0.032, 0.05, 0.075, 0.1].map((v) => v * perimeter);
+
+  for (const epsilon of epsilons) {
+    const approx = approximateClosedPolygon(hull, epsilon);
+    if (approx.length === 4) quads.push(orderQuad([approx[0], approx[1], approx[2], approx[3]]));
+    else if (approx.length > 4 && approx.length <= 10) {
+      const reduced = reduceHullToQuad(approx);
+      if (reduced) quads.push(orderQuad(reduced));
+    }
+  }
+
+  const reduced = reduceHullToQuad(hull);
+  if (reduced) quads.push(orderQuad(reduced));
+  return dedupeQuads(quads);
+}
+
+function approximateClosedPolygon(points: Point[], epsilon: number): Point[] {
+  if (points.length <= 4) return points;
+  let a = 0;
+  let b = 1;
+  let best = 0;
+  for (let i = 0; i < points.length; i++) {
+    for (let j = i + 1; j < points.length; j++) {
+      const d = dist(points[i], points[j]);
+      if (d > best) {
+        best = d;
+        a = i;
+        b = j;
+      }
+    }
+  }
+  const pathA = cyclicSlice(points, a, b);
+  const pathB = cyclicSlice(points, b, a);
+  const simplifiedA = rdp(pathA, epsilon);
+  const simplifiedB = rdp(pathB, epsilon);
+  return simplifiedA.concat(simplifiedB.slice(1, -1));
+}
+
+function cyclicSlice(points: Point[], from: number, to: number): Point[] {
+  const out: Point[] = [];
+  let i = from;
+  while (true) {
+    out.push(points[i]);
+    if (i === to) break;
+    i = (i + 1) % points.length;
+  }
+  return out;
+}
+
+function rdp(points: Point[], epsilon: number): Point[] {
+  if (points.length <= 2) return points;
+  let maxD = 0;
+  let index = 0;
+  for (let i = 1; i < points.length - 1; i++) {
+    const d = pointSegmentDistance(points[i], points[0], points[points.length - 1]);
+    if (d > maxD) {
+      maxD = d;
+      index = i;
+    }
+  }
+  if (maxD <= epsilon) return [points[0], points[points.length - 1]];
+  return rdp(points.slice(0, index + 1), epsilon).slice(0, -1).concat(rdp(points.slice(index), epsilon));
+}
+
+function dedupeQuads(quads: [Point, Point, Point, Point][]): [Point, Point, Point, Point][] {
+  const keys = new Set<string>();
+  const out: [Point, Point, Point, Point][] = [];
+  for (const quad of quads) {
+    const key = quad.map((p) => `${Math.round(p.x / 2)},${Math.round(p.y / 2)}`).join("|");
+    if (!keys.has(key)) {
+      keys.add(key);
+      out.push(quad);
+    }
+  }
+  return out;
+}
+
 function otsuThreshold(hist: Uint32Array, total: number): number {
   let sumAll = 0;
   for (let t = 0; t < 256; t++) sumAll += t * hist[t];
