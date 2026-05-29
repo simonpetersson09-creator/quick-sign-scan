@@ -21,7 +21,7 @@ export const sendScanEmail = createServerFn({ method: "POST" })
     const RESEND_API_KEY = process.env.RESEND_API_KEY;
     if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY is not configured");
 
-    const from = data.from || "Skannade dokument <onboarding@resend.dev>";
+    const from = data.from || "Skannade dokument <noreply@shiningdays.se>";
 
     const response = await fetch(`${GATEWAY_URL}/emails`, {
       method: "POST",
