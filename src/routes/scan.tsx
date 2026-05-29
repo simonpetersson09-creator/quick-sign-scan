@@ -12,7 +12,6 @@ import {
 import { Camera, X } from "lucide-react";
 
 type Status =
-
   | "starting"
   | "searching"
   | "align"
