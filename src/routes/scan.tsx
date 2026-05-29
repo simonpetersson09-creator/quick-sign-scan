@@ -5,12 +5,15 @@ import {
   Point,
   emaQuad,
   findDocumentCorners,
+import {
+  Point,
+  emaQuad,
+  enhancePaper,
+  findDocumentCorners,
   maxCornerDelta,
   warpQuadToRect,
 } from "@/lib/perspective";
-import { Camera, X } from "lucide-react";
 
-type Status =
   | "starting"
   | "searching"
   | "align"
