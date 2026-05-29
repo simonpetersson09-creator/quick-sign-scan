@@ -455,6 +455,74 @@ function reduceHullToQuad(hull: Point[]): [Point, Point, Point, Point] | null {
   return pts.length === 4 ? [pts[0], pts[1], pts[2], pts[3]] : null;
 }
 
+function orderQuad(quad: [Point, Point, Point, Point]): [Point, Point, Point, Point] {
+  const cx = quad.reduce((s, p) => s + p.x, 0) / 4;
+  const cy = quad.reduce((s, p) => s + p.y, 0) / 4;
+  let ordered = [...quad].sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx));
+  if (polygonArea(ordered) < 0) ordered = ordered.reverse();
+  let tlIndex = 0;
+  let best = Infinity;
+  ordered.forEach((p, i) => {
+    const score = p.x + p.y;
+    if (score < best) {
+      best = score;
+      tlIndex = i;
+    }
+  });
+  const rotated = ordered.slice(tlIndex).concat(ordered.slice(0, tlIndex));
+  return [rotated[0], rotated[1], rotated[2], rotated[3]];
+}
+
+function isConvexQuad(quad: [Point, Point, Point, Point]): boolean {
+  const signs = quad.map((p, i) => cross(p, quad[(i + 1) % 4], quad[(i + 2) % 4]));
+  return signs.every((s) => s > 0) || signs.every((s) => s < 0);
+}
+
+function contourSideDeviation(contour: Point[], quad: [Point, Point, Point, Point]): number {
+  let sum = 0;
+  let count = 0;
+  for (const p of contour) {
+    let minD = Infinity;
+    for (let i = 0; i < 4; i++) {
+      minD = Math.min(minD, pointSegmentDistance(p, quad[i], quad[(i + 1) % 4]));
+    }
+    sum += minD * minD;
+    count++;
+  }
+  return Math.sqrt(sum / Math.max(1, count));
+}
+
+function polygonArea(points: Point[]): number {
+  let area = 0;
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    area += a.x * b.y - b.x * a.y;
+  }
+  return area / 2;
+}
+
+function pointSegmentDistance(p: Point, a: Point, b: Point): number {
+  const vx = b.x - a.x;
+  const vy = b.y - a.y;
+  const len2 = vx * vx + vy * vy;
+  if (len2 === 0) return dist(p, a);
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * vx + (p.y - a.y) * vy) / len2));
+  return Math.hypot(p.x - (a.x + t * vx), p.y - (a.y + t * vy));
+}
+
+function cross(a: Point, b: Point, c: Point): number {
+  return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+}
+
+function dist(a: Point, b: Point): number {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function clamp01(v: number): number {
+  return Math.max(0, Math.min(1, v));
+}
+
 export function emaQuad(
   prev: [Point, Point, Point, Point] | null,
   next: [Point, Point, Point, Point],
