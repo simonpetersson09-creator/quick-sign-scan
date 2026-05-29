@@ -31,7 +31,7 @@ function SignPage() {
     ctx.scale(dpr, dpr);
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    ctx.strokeStyle = "#0f172a";
+    ctx.strokeStyle = "#000000";
     ctx.lineWidth = 2.5;
   }, []);
 

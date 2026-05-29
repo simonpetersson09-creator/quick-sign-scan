@@ -89,7 +89,7 @@ function ReviewPage() {
           >
             {pdfUrl ? (
               <iframe
-                src={`${pdfUrl}#toolbar=0&navpanes=0&view=FitH`}
+                src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0&view=Fit&zoom=page-fit`}
                 title="PDF-förhandsvisning"
                 className="w-full h-full block"
               />

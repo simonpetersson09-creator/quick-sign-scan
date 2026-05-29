@@ -44,6 +44,22 @@ function SendPage() {
     })();
   }, [navigate]);
 
+  function downloadPdf(): { blob: Blob; filename: string } | null {
+    if (!pdfUrl) return null;
+    const filename = `${(subject || "dokument").replace(/[^\w\-]+/g, "_")}.pdf`;
+    const blob = dataUrlToBlob(pdfUrl);
+    const fileUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = fileUrl;
+    a.download = filename;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(fileUrl), 10000);
+    return { blob, filename };
+  }
+
   async function send() {
     if (!pdfUrl || !to) return;
     setSending(true);
@@ -57,13 +73,13 @@ function SendPage() {
       const blob = dataUrlToBlob(pdfUrl);
       const file = new File([blob], filename, { type: "application/pdf" });
 
-      // Prefer native share (iOS Safari supports sharing files — user can pick Mail)
+      // Prefer native share (iOS/Android can attach the file to Mail directly)
       const nav = navigator as Navigator & {
         canShare?: (data: { files?: File[] }) => boolean;
         share?: (data: ShareData & { files?: File[] }) => Promise<void>;
       };
       let shared = false;
-      if (nav.canShare && nav.canShare({ files: [file] }) && nav.share) {
+      if (nav.share && nav.canShare && nav.canShare({ files: [file] })) {
         try {
           await nav.share({
             files: [file],
@@ -72,46 +88,37 @@ function SendPage() {
           });
           shared = true;
         } catch (err) {
-          // User cancelled — don't fall through
           if ((err as DOMException)?.name === "AbortError") {
             setSending(false);
             return;
           }
-          console.warn("Share failed, falling back", err);
+          console.warn("Share failed, falling back to download + mailto", err);
         }
       }
 
       if (!shared) {
-        // Fallback: download PDF and open default mail client.
-        // mailto cannot attach files — user must attach manually.
-        const fileUrl = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = fileUrl;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(() => URL.revokeObjectURL(fileUrl), 5000);
-
-        const body = `${message}\n\nBifoga PDF:en "${filename}" som just laddats ned.`;
+        // Fallback: download the PDF, then open the user's mail client with
+        // a prefilled draft. mailto cannot attach files — the user attaches
+        // the just-downloaded file manually.
+        downloadPdf();
+        const body = `${message}\n\nPDF:en "${filename}" har laddats ned — bifoga den till detta mail.`;
         const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        // Use a click on an anchor — more reliable than location.href on some browsers
-        const ma = document.createElement("a");
-        ma.href = mailto;
-        ma.rel = "noopener";
-        document.body.appendChild(ma);
-        ma.click();
-        ma.remove();
+        window.location.href = mailto;
+        setInfo(
+          "PDF:en laddades ned. Om din e-postapp inte öppnades automatiskt — öppna den manuellt och bifoga filen.",
+        );
       }
 
       setDone(true);
       setTimeout(() => {
         scanStore.clear();
         navigate({ to: "/" });
-      }, 1800);
+      }, 2200);
     } catch (e) {
       console.error(e);
-      setInfo("Kunde inte skicka. Försök igen eller bifoga den nedladdade PDF:en manuellt.");
+      setInfo(
+        "Kunde inte skicka automatiskt. Tryck på \"Ladda ned PDF\" och bifoga filen manuellt i din e-postapp.",
+      );
     } finally {
       setSending(false);
     }
@@ -177,18 +184,26 @@ function SendPage() {
 
       <div className="flex-1" />
 
-      <div className="pt-5">
+      <div className="pt-5 flex flex-col gap-3">
         <PrimaryButton onClick={send} disabled={!to || !pdfUrl || sending}>
           <span className="inline-flex items-center justify-center gap-2">
             <Mail className="h-5 w-5" />
             {sending ? "Förbereder…" : "Skicka PDF"}
           </span>
         </PrimaryButton>
+        <PrimaryButton
+          variant="secondary"
+          onClick={() => downloadPdf()}
+          disabled={!pdfUrl}
+          className="h-12 text-[15px]"
+        >
+          Ladda ned PDF
+        </PrimaryButton>
         {info ? (
-          <p className="text-center text-xs text-destructive mt-3">{info}</p>
+          <p className="text-center text-xs text-destructive mt-1">{info}</p>
         ) : (
-          <p className="text-center text-xs text-muted-foreground mt-3">
-            På iPhone öppnas delningsmenyn — välj Mail. Annars laddas PDF:en ned och din e-postapp öppnas.
+          <p className="text-center text-xs text-muted-foreground mt-1">
+            På mobil öppnas delningsmenyn — välj Mail. Annars laddas PDF:en ned och din e-postapp öppnas.
           </p>
         )}
       </div>
