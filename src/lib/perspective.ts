@@ -190,31 +190,127 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
 }
 
 
-// Find the 4 extreme corners of a bright (paper-like) region in a grayscale frame.
-// Returns null if no plausible document is found.
-// Coordinates returned are in the SAME pixel space as the input data (width x height).
+export interface DocumentDetection {
+  corners: [Point, Point, Point, Point];
+  a4Ratio: number;
+  confidence: number;
+  debug: {
+    threshold: number;
+    sideDeviation: number;
+    perspectiveError: number;
+    polygonFill: number;
+  };
+}
+
+const A4_RATIO = Math.SQRT2;
+const MIN_DOCUMENT_CONFIDENCE = 0.68;
+
+// Detect the document from its contour: isolate candidate paper, extract the
+// outer boundary, reduce the convex contour to four real corners, then reject
+// shapes with curved sides, non-A4 proportions, or extreme perspective.
+export function detectDocumentQuad(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+): DocumentDetection | null {
+  const total = width * height;
+  const lum = new Uint8ClampedArray(total);
+  const hist = new Uint32Array(256);
+  for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+    const l = (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) | 0;
+    lum[j] = l;
+    hist[l]++;
+  }
+
+  const threshold = Math.max(80, Math.min(215, otsuThreshold(hist, total) + 5));
+  const raw = new Uint8Array(total);
+  let bright = 0;
+  for (let i = 0; i < total; i++) {
+    if (lum[i] > threshold) {
+      raw[i] = 1;
+      bright++;
+    }
+  }
+  if (bright < total * 0.03) return null;
+
+  const opened = dilateMask(erodeMask(raw, width, height), width, height);
+  const mask = erodeMask(dilateMask(opened, width, height), width, height);
+  const visited = new Uint8Array(total);
+  const stack = new Int32Array(total);
+  let best: DocumentDetection | null = null;
+  let bestScore = 0;
+
+  for (let start = 0; start < total; start++) {
+    if (!mask[start] || visited[start]) continue;
+    const pixels: number[] = [];
+    let sp = 0;
+    let minX = width, minY = height, maxX = -1, maxY = -1;
+    stack[sp++] = start;
+    visited[start] = 1;
+
+    while (sp > 0) {
+      const idx = stack[--sp];
+      pixels.push(idx);
+      const y = (idx / width) | 0;
+      const x = idx - y * width;
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+
+      if (x > 0) sp = pushIf(mask, visited, stack, sp, idx - 1);
+      if (x < width - 1) sp = pushIf(mask, visited, stack, sp, idx + 1);
+      if (y > 0) sp = pushIf(mask, visited, stack, sp, idx - width);
+      if (y < height - 1) sp = pushIf(mask, visited, stack, sp, idx + width);
+    }
+
+    const size = pixels.length;
+    if (size < total * 0.035) continue;
+    if (maxX - minX < width * 0.2 || maxY - minY < height * 0.2) continue;
+
+    const component = new Uint8Array(total);
+    for (const idx of pixels) component[idx] = 1;
+    const contour: Point[] = [];
+    for (const idx of pixels) {
+      const y = (idx / width) | 0;
+      const x = idx - y * width;
+      if (
+        x === 0 || y === 0 || x === width - 1 || y === height - 1 ||
+        !component[idx - 1] || !component[idx + 1] ||
+        !component[idx - width] || !component[idx + width]
+      ) {
+        contour.push({ x, y });
+      }
+    }
+
+    const detection = evaluateContour(contour, size, total, threshold);
+    if (!detection) continue;
+    const score = detection.confidence + Math.min(size / total, 0.45);
+    if (score > bestScore) {
+      bestScore = score;
+      best = detection;
+    }
+  }
+
+  return best && best.confidence >= MIN_DOCUMENT_CONFIDENCE ? best : null;
+}
+
+// Backwards-compatible API for camera overlay/capture.
 export function findDocumentCorners(
   data: Uint8ClampedArray,
   width: number,
   height: number,
 ): [Point, Point, Point, Point] | null {
-  // Luminance + histogram
-  const total = width * height;
-  const lum = new Uint8ClampedArray(total);
-  const hist = new Uint32Array(256);
-  let sum = 0;
-  for (let i = 0, j = 0; i < data.length; i += 4, j++) {
-    const l = (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) | 0;
-    lum[j] = l;
-    hist[l]++;
-    sum += l;
-  }
-  const mean = sum / total;
+  return detectDocumentQuad(data, width, height)?.corners ?? null;
+}
 
-  // Otsu's threshold — adaptive separation between dark background and bright paper.
+function otsuThreshold(hist: Uint32Array, total: number): number {
   let sumAll = 0;
   for (let t = 0; t < 256; t++) sumAll += t * hist[t];
-  let wB = 0, sumB = 0, maxVar = 0, otsu = 127;
+  let wB = 0;
+  let sumB = 0;
+  let maxVar = 0;
+  let threshold = 127;
   for (let t = 0; t < 256; t++) {
     wB += hist[t];
     if (wB === 0) continue;
@@ -223,23 +319,17 @@ export function findDocumentCorners(
     sumB += t * hist[t];
     const mB = sumB / wB;
     const mF = (sumAll - sumB) / wF;
-    const v = wB * wF * (mB - mF) * (mB - mF);
-    if (v > maxVar) { maxVar = v; otsu = t; }
+    const between = wB * wF * (mB - mF) * (mB - mF);
+    if (between > maxVar) {
+      maxVar = between;
+      threshold = t;
+    }
   }
-  // Use Otsu, but never lower than mean (paper must be brighter than average)
-  // and never above 200 (so off-white paper still qualifies).
-  const threshold = Math.max(mean, Math.min(otsu, 200));
+  return threshold;
+}
 
-  // Build binary mask of bright pixels.
-  const mask = new Uint8Array(total);
-  let bright = 0;
-  for (let i = 0; i < total; i++) {
-    if (lum[i] > threshold) { mask[i] = 1; bright++; }
-  }
-  if (bright < total * 0.03) return null;
-
-  // 3x3 erosion → strip thin bright lines (table edges, reflections, walls).
-  const eroded = new Uint8Array(total);
+function erodeMask(mask: Uint8Array, width: number, height: number): Uint8Array {
+  const out = new Uint8Array(mask.length);
   for (let y = 1; y < height - 1; y++) {
     for (let x = 1; x < width - 1; x++) {
       const i = y * width + x;
@@ -248,105 +338,189 @@ export function findDocumentCorners(
         mask[i - width] && mask[i + width] &&
         mask[i - width - 1] && mask[i - width + 1] &&
         mask[i + width - 1] && mask[i + width + 1]
-      ) eroded[i] = 1;
+      ) out[i] = 1;
     }
   }
+  return out;
+}
 
-  // Find the LARGEST 4-connected bright component (the document).
-  // We only need to track its bounding box + extremal corners, not all pixels.
-  const visited = new Uint8Array(total);
-  const stack = new Int32Array(total);
-  let bestSize = 0;
-  let best: {
-    tl: Point; tr: Point; br: Point; bl: Point;
-    minX: number; minY: number; maxX: number; maxY: number;
-  } | null = null;
-
-  for (let y0 = 0; y0 < height; y0++) {
-    for (let x0 = 0; x0 < width; x0++) {
-      const start = y0 * width + x0;
-      if (!eroded[start] || visited[start]) continue;
-
-      let sp = 0;
-      stack[sp++] = start;
-      visited[start] = 1;
-
-      let size = 0;
-      let tlS = Infinity, trS = -Infinity, brS = -Infinity, blS = Infinity;
-      let tl!: Point, tr!: Point, br!: Point, bl!: Point;
-      let minX = width, minY = height, maxX = -1, maxY = -1;
-
-      while (sp > 0) {
-        const idx = stack[--sp];
-        const y = (idx / width) | 0;
-        const x = idx - y * width;
-        size++;
-        if (x < minX) minX = x;
-        if (y < minY) minY = y;
-        if (x > maxX) maxX = x;
-        if (y > maxY) maxY = y;
-        const sPlus = x + y;
-        const sMinus = x - y;
-        if (sPlus < tlS) { tlS = sPlus; tl = { x, y }; }
-        if (sMinus > trS) { trS = sMinus; tr = { x, y }; }
-        if (sPlus > brS) { brS = sPlus; br = { x, y }; }
-        if (sMinus < blS) { blS = sMinus; bl = { x, y }; }
-
-        // 4-neighbours
-        if (x > 0) {
-          const n = idx - 1;
-          if (eroded[n] && !visited[n]) { visited[n] = 1; stack[sp++] = n; }
-        }
-        if (x < width - 1) {
-          const n = idx + 1;
-          if (eroded[n] && !visited[n]) { visited[n] = 1; stack[sp++] = n; }
-        }
-        if (y > 0) {
-          const n = idx - width;
-          if (eroded[n] && !visited[n]) { visited[n] = 1; stack[sp++] = n; }
-        }
-        if (y < height - 1) {
-          const n = idx + width;
-          if (eroded[n] && !visited[n]) { visited[n] = 1; stack[sp++] = n; }
-        }
-      }
-
-      if (size > bestSize) {
-        bestSize = size;
-        best = { tl, tr, br, bl, minX, minY, maxX, maxY };
-      }
+function dilateMask(mask: Uint8Array, width: number, height: number): Uint8Array {
+  const out = new Uint8Array(mask.length);
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const i = y * width + x;
+      if (
+        mask[i] || mask[i - 1] || mask[i + 1] ||
+        mask[i - width] || mask[i + width] ||
+        mask[i - width - 1] || mask[i - width + 1] ||
+        mask[i + width - 1] || mask[i + width + 1]
+      ) out[i] = 1;
     }
   }
+  return out;
+}
 
-  if (!best || bestSize < total * 0.04) return null;
-
-  const bw = best.maxX - best.minX;
-  const bh = best.maxY - best.minY;
-  if (bw < width * 0.22 || bh < height * 0.22) return null;
-
-  // Component must mostly fill its bounding box — paper is rectangular, not blobby.
-  const bboxArea = (bw + 1) * (bh + 1);
-  if (bestSize / bboxArea < 0.55) return null;
-
-  // Validate A4-like aspect ratio of the bounding box (works for any rotation
-  // since rotated A4 has bbox aspect between 1 and √2).
-  const longSide = Math.max(bw, bh);
-  const shortSide = Math.max(1, Math.min(bw, bh));
-  const aspect = longSide / shortSide;
-  if (aspect < 1.0 || aspect > 2.1) return null;
-
-  const minSide = Math.min(width, height) * 0.12;
-  const dist = (p: Point, q: Point) => Math.hypot(p.x - q.x, p.y - q.y);
-  if (
-    dist(best.tl, best.tr) < minSide ||
-    dist(best.tr, best.br) < minSide ||
-    dist(best.br, best.bl) < minSide ||
-    dist(best.bl, best.tl) < minSide
-  ) {
-    return null;
+function pushIf(mask: Uint8Array, visited: Uint8Array, stack: Int32Array, sp: number, idx: number): number {
+  if (mask[idx] && !visited[idx]) {
+    visited[idx] = 1;
+    stack[sp] = idx;
+    return sp + 1;
   }
+  return sp;
+}
 
-  return [best.tl, best.tr, best.br, best.bl];
+function evaluateContour(
+  contour: Point[],
+  componentArea: number,
+  frameArea: number,
+  threshold: number,
+): DocumentDetection | null {
+  if (contour.length < 24) return null;
+  const hull = convexHull(contour);
+  if (hull.length < 4) return null;
+  const quad = reduceHullToQuad(hull);
+  if (!quad || !isConvexQuad(quad)) return null;
+  const ordered = orderQuad(quad);
+  const area = Math.abs(polygonArea(ordered));
+  if (area < frameArea * 0.04) return null;
+
+  const top = dist(ordered[0], ordered[1]);
+  const right = dist(ordered[1], ordered[2]);
+  const bottom = dist(ordered[2], ordered[3]);
+  const left = dist(ordered[3], ordered[0]);
+  const avgW = (top + bottom) / 2;
+  const avgH = (left + right) / 2;
+  const shortSide = Math.max(1, Math.min(avgW, avgH));
+  const a4Ratio = Math.max(avgW, avgH) / shortSide;
+  const ratioError = Math.abs(a4Ratio - A4_RATIO) / A4_RATIO;
+  const perspectiveError = Math.max(top, bottom) / Math.max(1, Math.min(top, bottom)) - 1 +
+    Math.max(left, right) / Math.max(1, Math.min(left, right)) - 1;
+  const sideDeviation = contourSideDeviation(contour, ordered) / shortSide;
+  const polygonFill = componentArea / Math.max(1, area);
+
+  if (ratioError > 0.24) return null;
+  if (perspectiveError > 0.95) return null;
+  if (sideDeviation > 0.08) return null;
+  if (polygonFill < 0.8 || polygonFill > 1.18) return null;
+
+  const ratioScore = clamp01(1 - ratioError / 0.24);
+  const straightScore = clamp01(1 - sideDeviation / 0.08);
+  const fillScore = clamp01((polygonFill - 0.8) / 0.18);
+  const perspectiveScore = clamp01(1 - perspectiveError / 0.95);
+  const confidence = 0.3 * straightScore + 0.25 * ratioScore + 0.25 * fillScore + 0.2 * perspectiveScore;
+
+  return {
+    corners: ordered,
+    a4Ratio,
+    confidence,
+    debug: { threshold, sideDeviation, perspectiveError, polygonFill },
+  };
+}
+
+function convexHull(points: Point[]): Point[] {
+  const sorted = [...points].sort((a, b) => a.x === b.x ? a.y - b.y : a.x - b.x);
+  const lower: Point[] = [];
+  for (const p of sorted) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+    lower.push(p);
+  }
+  const upper: Point[] = [];
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const p = sorted[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+    upper.push(p);
+  }
+  lower.pop();
+  upper.pop();
+  return lower.concat(upper);
+}
+
+function reduceHullToQuad(hull: Point[]): [Point, Point, Point, Point] | null {
+  const pts = hull.slice();
+  while (pts.length > 4) {
+    let bestIndex = -1;
+    let bestLoss = Infinity;
+    for (let i = 0; i < pts.length; i++) {
+      const prev = pts[(i - 1 + pts.length) % pts.length];
+      const curr = pts[i];
+      const next = pts[(i + 1) % pts.length];
+      const loss = Math.abs(cross(prev, curr, next));
+      if (loss < bestLoss) {
+        bestLoss = loss;
+        bestIndex = i;
+      }
+    }
+    pts.splice(bestIndex, 1);
+  }
+  return pts.length === 4 ? [pts[0], pts[1], pts[2], pts[3]] : null;
+}
+
+function orderQuad(quad: [Point, Point, Point, Point]): [Point, Point, Point, Point] {
+  const cx = quad.reduce((s, p) => s + p.x, 0) / 4;
+  const cy = quad.reduce((s, p) => s + p.y, 0) / 4;
+  let ordered = [...quad].sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx));
+  if (polygonArea(ordered) < 0) ordered = ordered.reverse();
+  let tlIndex = 0;
+  let best = Infinity;
+  ordered.forEach((p, i) => {
+    const score = p.x + p.y;
+    if (score < best) {
+      best = score;
+      tlIndex = i;
+    }
+  });
+  const rotated = ordered.slice(tlIndex).concat(ordered.slice(0, tlIndex));
+  return [rotated[0], rotated[1], rotated[2], rotated[3]];
+}
+
+function isConvexQuad(quad: [Point, Point, Point, Point]): boolean {
+  const signs = quad.map((p, i) => cross(p, quad[(i + 1) % 4], quad[(i + 2) % 4]));
+  return signs.every((s) => s > 0) || signs.every((s) => s < 0);
+}
+
+function contourSideDeviation(contour: Point[], quad: [Point, Point, Point, Point]): number {
+  let sum = 0;
+  let count = 0;
+  for (const p of contour) {
+    let minD = Infinity;
+    for (let i = 0; i < 4; i++) {
+      minD = Math.min(minD, pointSegmentDistance(p, quad[i], quad[(i + 1) % 4]));
+    }
+    sum += minD * minD;
+    count++;
+  }
+  return Math.sqrt(sum / Math.max(1, count));
+}
+
+function polygonArea(points: Point[]): number {
+  let area = 0;
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    area += a.x * b.y - b.x * a.y;
+  }
+  return area / 2;
+}
+
+function pointSegmentDistance(p: Point, a: Point, b: Point): number {
+  const vx = b.x - a.x;
+  const vy = b.y - a.y;
+  const len2 = vx * vx + vy * vy;
+  if (len2 === 0) return dist(p, a);
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * vx + (p.y - a.y) * vy) / len2));
+  return Math.hypot(p.x - (a.x + t * vx), p.y - (a.y + t * vy));
+}
+
+function cross(a: Point, b: Point, c: Point): number {
+  return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+}
+
+function dist(a: Point, b: Point): number {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function clamp01(v: number): number {
+  return Math.max(0, Math.min(1, v));
 }
 
 export function emaQuad(

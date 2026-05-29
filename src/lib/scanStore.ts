@@ -5,6 +5,18 @@ type Listener = () => void;
 
 export interface ScanSession {
   imageDataUrl: string | null;
+  sourceDataUrl: string | null;
+  detection: {
+    corners: [{ x: number; y: number }, { x: number; y: number }, { x: number; y: number }, { x: number; y: number }];
+    a4Ratio: number;
+    confidence: number;
+    debug: {
+      threshold: number;
+      sideDeviation: number;
+      perspectiveError: number;
+      polygonFill: number;
+    };
+  } | null;
   pdfDataUrl: string | null;
   signatureDataUrl: string | null;
   signaturePosition: { x: number; y: number } | null; // normalized 0..1
@@ -12,6 +24,8 @@ export interface ScanSession {
 
 const initial: ScanSession = {
   imageDataUrl: null,
+  sourceDataUrl: null,
+  detection: null,
   pdfDataUrl: null,
   signatureDataUrl: null,
   signaturePosition: null,

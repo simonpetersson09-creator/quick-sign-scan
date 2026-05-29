@@ -2,10 +2,10 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { scanStore } from "@/lib/scanStore";
 import {
+  detectDocumentQuad,
   Point,
   emaQuad,
   enhancePaper,
-  findDocumentCorners,
   maxCornerDelta,
   warpQuadToRect,
 } from "@/lib/perspective";
@@ -14,6 +14,7 @@ import { Camera, X } from "lucide-react";
 type Status =
   | "starting"
   | "searching"
+  | "uncertain"
   | "align"
   | "hold"
   | "ready"
@@ -46,8 +47,10 @@ function ScanPage() {
 
   const lastRawQuad = useRef<[Point, Point, Point, Point] | null>(null);
   const smoothQuad = useRef<[Point, Point, Point, Point] | null>(null); // normalized 0..1
+  const detectionMeta = useRef<ReturnType<typeof detectDocumentQuad> | null>(null);
   const stableCount = useRef(0);
   const detectCount = useRef(0);
+  const missCount = useRef(0);
   const capturedRef = useRef(false);
 
   const [status, setStatus] = useState<Status>("starting");
@@ -121,21 +124,26 @@ function ScanPage() {
     ctx.drawImage(video, 0, 0, dw, dh);
     const { data } = ctx.getImageData(0, 0, dw, dh);
 
-    const corners = findDocumentCorners(data, dw, dh);
+    const detection = detectDocumentQuad(data, dw, dh);
+    const corners = detection?.corners ?? null;
 
     if (!corners) {
       stableCount.current = 0;
       detectCount.current = Math.max(0, detectCount.current - 1);
+      detectionMeta.current = null;
+      missCount.current++;
       if (detectCount.current === 0) {
         smoothQuad.current = null;
         lastRawQuad.current = null;
         drawOverlay(null, false);
       }
-      setStatus((s) => (s === "starting" ? s : "searching"));
+      setStatus((s) => (s === "starting" ? s : missCount.current > 45 ? "uncertain" : "searching"));
       return;
     }
 
     detectCount.current++;
+    missCount.current = 0;
+    detectionMeta.current = detection;
 
     // Normalize to 0..1
     const norm = corners.map((p) => ({ x: p.x / dw, y: p.y / dh })) as
@@ -254,8 +262,24 @@ function ScanPage() {
     // document looks like a clean scanned A4 (white paper, dark ink).
     enhancePaper(warped);
 
+    const sourceCanvas = document.createElement("canvas");
+    sourceCanvas.width = vw;
+    sourceCanvas.height = vh;
+    sourceCanvas.getContext("2d")!.drawImage(video, 0, 0, vw, vh);
+
     const dataUrl = warped.toDataURL("image/jpeg", 0.92);
-    scanStore.set({ imageDataUrl: dataUrl });
+    const sourceDataUrl = sourceCanvas.toDataURL("image/jpeg", 0.86);
+    const meta = detectionMeta.current;
+    scanStore.set({
+      imageDataUrl: dataUrl,
+      sourceDataUrl,
+      detection: meta ? {
+        corners: normQuad,
+        a4Ratio: meta.a4Ratio,
+        confidence: meta.confidence,
+        debug: meta.debug,
+      } : null,
+    });
     streamRef.current?.getTracks().forEach((t) => t.stop());
     navigate({ to: "/preview" });
   }
@@ -264,7 +288,7 @@ function ScanPage() {
     // Require a detected document — never capture the raw camera frame,
     // otherwise the preview shows an un-cropped photo instead of a scan.
     const q = smoothQuad.current;
-    if (!q) return;
+    if (!q || !detectionMeta.current || detectCount.current < DETECT_FRAMES) return;
     setStatus("capturing");
     capture(q);
   }
@@ -273,6 +297,7 @@ function ScanPage() {
   const statusText: Record<Status, string> = {
     starting: "Startar kamera…",
     searching: "Sök efter dokument",
+    uncertain: "Kunde inte identifiera dokumentets kanter tillräckligt säkert.",
     align: "Rikta in dokumentet",
     hold: "Håll stilla…",
     ready: "Dokument hittat",
@@ -357,7 +382,9 @@ function ScanPage() {
             status === "starting" ||
             status === "error" ||
             status === "capturing" ||
-            !smoothQuad.current
+            !smoothQuad.current ||
+            !detectionMeta.current ||
+            detectCount.current < DETECT_FRAMES
           }
           className="h-16 w-16 rounded-full bg-white text-black flex items-center justify-center shadow-lg active:scale-95 disabled:opacity-40"
           aria-label="Fotografera manuellt"
