@@ -230,50 +230,123 @@ export function findDocumentCorners(
   // and never above 200 (so off-white paper still qualifies).
   const threshold = Math.max(mean, Math.min(otsu, 200));
 
-  // Extremal corners (TL min x+y, TR max x-y, BR max x+y, BL min x-y)
-  let tlS = Infinity, trS = -Infinity, brS = -Infinity, blS = Infinity;
-  let tl: Point | null = null, tr: Point | null = null, br: Point | null = null, bl: Point | null = null;
-
+  // Build binary mask of bright pixels.
+  const mask = new Uint8Array(total);
   let bright = 0;
-  let minX = width, minY = height, maxX = -1, maxY = -1;
+  for (let i = 0; i < total; i++) {
+    if (lum[i] > threshold) { mask[i] = 1; bright++; }
+  }
+  if (bright < total * 0.03) return null;
 
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      if (lum[y * width + x] <= threshold) continue;
-      bright++;
-      if (x < minX) minX = x;
-      if (y < minY) minY = y;
-      if (x > maxX) maxX = x;
-      if (y > maxY) maxY = y;
-
-      const sPlus = x + y;
-      const sMinus = x - y;
-      if (sPlus < tlS) { tlS = sPlus; tl = { x, y }; }
-      if (sMinus > trS) { trS = sMinus; tr = { x, y }; }
-      if (sPlus > brS) { brS = sPlus; br = { x, y }; }
-      if (sMinus < blS) { blS = sMinus; bl = { x, y }; }
+  // 3x3 erosion → strip thin bright lines (table edges, reflections, walls).
+  const eroded = new Uint8Array(total);
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const i = y * width + x;
+      if (
+        mask[i] && mask[i - 1] && mask[i + 1] &&
+        mask[i - width] && mask[i + width] &&
+        mask[i - width - 1] && mask[i - width + 1] &&
+        mask[i + width - 1] && mask[i + width + 1]
+      ) eroded[i] = 1;
     }
   }
 
-  // Relaxed thresholds so off-center or smaller A4s still register.
-  if (bright < total * 0.03) return null;
-  const bw = maxX - minX;
-  const bh = maxY - minY;
+  // Find the LARGEST 4-connected bright component (the document).
+  // We only need to track its bounding box + extremal corners, not all pixels.
+  const visited = new Uint8Array(total);
+  const stack = new Int32Array(total);
+  let bestSize = 0;
+  let best: {
+    tl: Point; tr: Point; br: Point; bl: Point;
+    minX: number; minY: number; maxX: number; maxY: number;
+  } | null = null;
+
+  for (let y0 = 0; y0 < height; y0++) {
+    for (let x0 = 0; x0 < width; x0++) {
+      const start = y0 * width + x0;
+      if (!eroded[start] || visited[start]) continue;
+
+      let sp = 0;
+      stack[sp++] = start;
+      visited[start] = 1;
+
+      let size = 0;
+      let tlS = Infinity, trS = -Infinity, brS = -Infinity, blS = Infinity;
+      let tl!: Point, tr!: Point, br!: Point, bl!: Point;
+      let minX = width, minY = height, maxX = -1, maxY = -1;
+
+      while (sp > 0) {
+        const idx = stack[--sp];
+        const y = (idx / width) | 0;
+        const x = idx - y * width;
+        size++;
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+        const sPlus = x + y;
+        const sMinus = x - y;
+        if (sPlus < tlS) { tlS = sPlus; tl = { x, y }; }
+        if (sMinus > trS) { trS = sMinus; tr = { x, y }; }
+        if (sPlus > brS) { brS = sPlus; br = { x, y }; }
+        if (sMinus < blS) { blS = sMinus; bl = { x, y }; }
+
+        // 4-neighbours
+        if (x > 0) {
+          const n = idx - 1;
+          if (eroded[n] && !visited[n]) { visited[n] = 1; stack[sp++] = n; }
+        }
+        if (x < width - 1) {
+          const n = idx + 1;
+          if (eroded[n] && !visited[n]) { visited[n] = 1; stack[sp++] = n; }
+        }
+        if (y > 0) {
+          const n = idx - width;
+          if (eroded[n] && !visited[n]) { visited[n] = 1; stack[sp++] = n; }
+        }
+        if (y < height - 1) {
+          const n = idx + width;
+          if (eroded[n] && !visited[n]) { visited[n] = 1; stack[sp++] = n; }
+        }
+      }
+
+      if (size > bestSize) {
+        bestSize = size;
+        best = { tl, tr, br, bl, minX, minY, maxX, maxY };
+      }
+    }
+  }
+
+  if (!best || bestSize < total * 0.04) return null;
+
+  const bw = best.maxX - best.minX;
+  const bh = best.maxY - best.minY;
   if (bw < width * 0.22 || bh < height * 0.22) return null;
-  if (!tl || !tr || !br || !bl) return null;
+
+  // Component must mostly fill its bounding box — paper is rectangular, not blobby.
+  const bboxArea = (bw + 1) * (bh + 1);
+  if (bestSize / bboxArea < 0.55) return null;
+
+  // Validate A4-like aspect ratio of the bounding box (works for any rotation
+  // since rotated A4 has bbox aspect between 1 and √2).
+  const longSide = Math.max(bw, bh);
+  const shortSide = Math.max(1, Math.min(bw, bh));
+  const aspect = longSide / shortSide;
+  if (aspect < 1.0 || aspect > 2.1) return null;
 
   const minSide = Math.min(width, height) * 0.12;
   const dist = (p: Point, q: Point) => Math.hypot(p.x - q.x, p.y - q.y);
   if (
-    dist(tl, tr) < minSide ||
-    dist(tr, br) < minSide ||
-    dist(br, bl) < minSide ||
-    dist(bl, tl) < minSide
+    dist(best.tl, best.tr) < minSide ||
+    dist(best.tr, best.br) < minSide ||
+    dist(best.br, best.bl) < minSide ||
+    dist(best.bl, best.tl) < minSide
   ) {
     return null;
   }
 
-  return [tl, tr, br, bl];
+  return [best.tl, best.tr, best.br, best.bl];
 }
 
 export function emaQuad(
