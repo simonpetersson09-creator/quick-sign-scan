@@ -41,22 +41,28 @@ function Home() {
       </div>
 
       {/* Center — flow */}
-      <div className="flex-1 flex flex-col items-center justify-center">
-        <ol className="flex flex-col items-center gap-3 w-full max-w-[220px]">
+      <div className="flex-1 flex flex-col items-center justify-center py-6">
+        <ol className="flex flex-col items-center gap-2">
           {steps.map((s, i) => {
             const Icon = s.icon;
             return (
-              <li key={s.label} className="flex flex-col items-center gap-3 w-full">
-                <div className="flex items-center gap-4 w-full justify-center">
+              <li key={s.label} className="flex flex-col items-center gap-2">
+                <div className="flex items-center gap-4">
                   <div className="relative h-16 w-16 rounded-full bg-card border border-border shadow-[var(--shadow-card)] flex items-center justify-center">
+                    <span className="absolute -top-1.5 -left-1.5 h-6 w-6 rounded-full bg-primary text-primary-foreground text-[11px] font-semibold flex items-center justify-center">
+                      {i + 1}
+                    </span>
                     <Icon className="h-6 w-6 text-primary" strokeWidth={1.75} />
                   </div>
-                  <span className="text-[17px] font-medium tracking-tight w-20">
+                  <span className="text-[18px] font-medium tracking-tight w-24">
                     {s.label}
                   </span>
                 </div>
                 {i < steps.length - 1 && (
-                  <div className="h-8 w-px bg-gradient-to-b from-border to-transparent -ml-24" />
+                  <ChevronDown
+                    className="h-5 w-5 text-muted-foreground/50 -ml-28"
+                    strokeWidth={2}
+                  />
                 )}
               </li>
             );
