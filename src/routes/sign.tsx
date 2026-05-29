@@ -77,15 +77,16 @@ function SignPage() {
       saveSettings({ ...settings, savedSignature: dataUrl });
     }
     navigate({ to: "/send" });
+  function done(saveAsDefault: boolean) {
+    const dataUrl = useSaved && settings.savedSignature
+      ? settings.savedSignature
+      : canvasRef.current!.toDataURL("image/png");
+    scanStore.set({ signatureDataUrl: dataUrl });
+    if (saveAsDefault && !useSaved) {
+      saveSettings({ ...settings, savedSignature: dataUrl });
+    }
+    navigate({ to: "/review" });
   }
-
-  return (
-    <AppShell title="Signera" back="/preview">
-      <p className="text-sm text-muted-foreground mt-1">
-        Skriv din signatur med fingret i rutan nedan.
-      </p>
-
-      {settings.savedSignature && (
         <button
           onClick={() => setUseSaved((v) => !v)}
           className={`mt-4 rounded-2xl border p-3 text-left text-sm transition ${

@@ -17,7 +17,10 @@ function ReviewPage() {
 
   useEffect(() => {
     const s = scanStore.get();
-    if (!s.imageDataUrl) {
+  useEffect(() => {
+    const s = scanStore.get();
+    const img = s.imageDataUrl;
+    if (!img) {
       navigate({ to: "/" });
       return;
     }
@@ -26,7 +29,7 @@ function ReviewPage() {
         s.signatureDataUrl && s.signaturePosition
           ? { dataUrl: s.signatureDataUrl, x: s.signaturePosition.x, y: s.signaturePosition.y }
           : null;
-      const url = await buildPdf(s.imageDataUrl, sig);
+      const url = await buildPdf(img, sig);
       setPdfUrl(url);
       scanStore.set({ pdfDataUrl: url });
     })();
