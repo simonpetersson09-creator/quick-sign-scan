@@ -179,7 +179,7 @@ function SendPage() {
           <p className="text-center text-xs text-destructive mt-1">{info}</p>
         ) : (
           <p className="text-center text-xs text-muted-foreground mt-1">
-            På mobil öppnas delningsmenyn — välj Mail. Annars laddas PDF:en ned och din e-postapp öppnas.
+            PDF:en bifogas och skickas direkt från servern till mottagaren.
           </p>
         )}
       </div>
