@@ -1,10 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
 import { loadSettings, saveSettings } from "@/lib/settings";
 import { buildPdf, dataUrlToBlob } from "@/lib/pdf";
+import { sendScanEmail } from "@/lib/email.functions";
 import { Check, Mail } from "lucide-react";
 
 export const Route = createFileRoute("/send")({
