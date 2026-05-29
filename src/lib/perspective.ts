@@ -550,6 +550,103 @@ function dedupeQuads(quads: [Point, Point, Point, Point][]): [Point, Point, Poin
   return out;
 }
 
+function polygonPerimeter(points: Point[]): number {
+  let p = 0;
+  for (let i = 0; i < points.length; i++) p += dist(points[i], points[(i + 1) % points.length]);
+  return p;
+}
+
+function evaluateEdgeQuad(args: {
+  quad: [Point, Point, Point, Point];
+  hull: Point[];
+  lum: Uint8ClampedArray;
+  edges: Uint8Array;
+  width: number;
+  height: number;
+  frameArea: number;
+  edgeThreshold: number;
+  candidateCount: number;
+}): DocumentDetection | null {
+  const { hull, lum, edges, width, height, frameArea, edgeThreshold, candidateCount } = args;
+  if (!isConvexQuad(args.quad)) return null;
+  const ordered = orderQuad(args.quad);
+  const minX = Math.min(...ordered.map((p) => p.x));
+  const minY = Math.min(...ordered.map((p) => p.y));
+  const maxX = Math.max(...ordered.map((p) => p.x));
+  const maxY = Math.max(...ordered.map((p) => p.y));
+  const margin = 20;
+  const edgeMargin = 3;
+
+  if (minX <= edgeMargin || minY <= edgeMargin || maxX >= width - 1 - edgeMargin || maxY >= height - 1 - edgeMargin)
+    return null;
+  if (minX < margin && minY < margin && maxX > width - margin && maxY > height - margin) return null;
+
+  const area = Math.abs(polygonArea(ordered));
+  const areaRatio = area / frameArea;
+  if (areaRatio < 0.1 || areaRatio > 0.9) return null;
+
+  const top = dist(ordered[0], ordered[1]);
+  const right = dist(ordered[1], ordered[2]);
+  const bottom = dist(ordered[2], ordered[3]);
+  const left = dist(ordered[3], ordered[0]);
+  const avgW = (top + bottom) / 2;
+  const avgH = (left + right) / 2;
+  const shortSide = Math.max(1, Math.min(avgW, avgH));
+  const a4Ratio = Math.max(avgW, avgH) / shortSide;
+  const ratioError = Math.abs(a4Ratio - A4_RATIO) / A4_RATIO;
+  const perspectiveError =
+    Math.max(top, bottom) / Math.max(1, Math.min(top, bottom)) -
+    1 +
+    Math.max(left, right) / Math.max(1, Math.min(left, right)) -
+    1;
+  const sideDeviation = contourSideDeviation(hull, ordered) / shortSide;
+  const bboxArea = Math.max(1, (maxX - minX + 1) * (maxY - minY + 1));
+  const polygonFill = bboxArea / Math.max(1, area);
+
+  if (ratioError > 0.45) return null;
+  if (perspectiveError > 1.6) return null;
+  if (sideDeviation > 0.1) return null;
+  if (polygonFill < 0.7 || polygonFill > 1.55) return null;
+
+  const stats = polygonImageStats(ordered, lum, width, height);
+  const edgeScore = quadEdgeSupport(ordered, edges, width, height);
+  const a4Score = clamp01(1 - ratioError / 0.45);
+  const straightScore = clamp01(1 - sideDeviation / 0.1);
+  const perspectiveScore = clamp01(1 - perspectiveError / 1.6);
+  const brightnessScore = clamp01((stats.mean - 105) / 105);
+  const textScore = clamp01(stats.darkRatio / 0.055);
+  const areaScore = areaRatio <= 0.7 ? clamp01((areaRatio - 0.1) / 0.18) : clamp01((0.9 - areaRatio) / 0.2);
+  const confidence =
+    0.25 * edgeScore +
+    0.2 * straightScore +
+    0.16 * a4Score +
+    0.14 * brightnessScore +
+    0.12 * textScore +
+    0.08 * perspectiveScore +
+    0.05 * areaScore;
+
+  if (edgeScore < 0.34 || brightnessScore < 0.18) return null;
+
+  return {
+    corners: ordered,
+    a4Ratio,
+    confidence,
+    debug: {
+      edgeThreshold,
+      threshold: edgeThreshold,
+      candidateCount,
+      a4Score,
+      edgeScore,
+      brightnessScore,
+      textScore,
+      areaRatio,
+      sideDeviation,
+      perspectiveError,
+      polygonFill,
+    },
+  };
+}
+
 function otsuThreshold(hist: Uint32Array, total: number): number {
   let sumAll = 0;
   for (let t = 0; t < 256; t++) sumAll += t * hist[t];
