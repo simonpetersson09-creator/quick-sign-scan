@@ -212,7 +212,14 @@ export interface DocumentDetection {
   a4Ratio: number;
   confidence: number;
   debug: {
+    edgeThreshold: number;
     threshold: number;
+    candidateCount: number;
+    a4Score: number;
+    edgeScore: number;
+    brightnessScore: number;
+    textScore: number;
+    areaRatio: number;
     sideDeviation: number;
     perspectiveError: number;
     polygonFill: number;
@@ -220,7 +227,7 @@ export interface DocumentDetection {
 }
 
 const A4_RATIO = Math.SQRT2;
-const MIN_DOCUMENT_CONFIDENCE = 0.35;
+export const MIN_DOCUMENT_CONFIDENCE = 0.58;
 
 // Detect the document from its contour: isolate candidate paper, extract the
 // outer boundary, reduce the convex contour to four real corners, then reject
@@ -239,99 +246,37 @@ export function detectDocumentQuad(
     hist[l]++;
   }
 
+  const blurred = gaussianBlur(lum, width, height);
+  const { edges, highThreshold } = cannyEdges(blurred, width, height);
+  const connectedEdges = closeEdgeGaps(edges, width, height);
+  const components = edgeComponents(connectedEdges, width, height);
   let best: DocumentDetection | null = null;
   let bestScore = 0;
+  let candidateCount = 0;
 
-  const otsu = otsuThreshold(hist, total);
-  const thresholds = uniqueThresholds([
-    otsu,
-    otsu - 15,
-    otsu - 30,
-    otsu + 10,
-    percentileThreshold(hist, total, 0.5),
-    percentileThreshold(hist, total, 0.65),
-    percentileThreshold(hist, total, 0.8),
-  ]);
+  for (const component of components) {
+    if (component.pixels.length < total * 0.002) continue;
+    if (component.maxX - component.minX < width * 0.18) continue;
+    if (component.maxY - component.minY < height * 0.18) continue;
 
-  for (const threshold of thresholds) {
-    const raw = new Uint8Array(total);
-    let bright = 0;
-    for (let i = 0; i < total; i++) {
-      if (lum[i] > threshold) {
-        raw[i] = 1;
-        bright++;
-      }
-    }
-    if (bright < total * 0.02 || bright > total * 0.98) continue;
+    const hull = convexHull(component.points);
+    if (hull.length < 4) continue;
 
-    // Aggressive morphological closing: dilate multiple times to absorb dark
-    // text/ink holes into the paper component, then erode back. Without this
-    // the connected component fragments around every glyph and the contour
-    // becomes a jagged outline of the text instead of the paper edge.
-    let mask: Uint8Array = raw;
-    for (let k = 0; k < 3; k++) mask = dilateMask(mask, width, height);
-    for (let k = 0; k < 3; k++) mask = erodeMask(mask, width, height);
-    // Light opening to remove isolated bright noise specks
-    mask = dilateMask(erodeMask(mask, width, height), width, height);
-
-    const visited = new Uint8Array(total);
-    const stack = new Int32Array(total);
-
-    for (let start = 0; start < total; start++) {
-      if (!mask[start] || visited[start]) continue;
-      const pixels: number[] = [];
-      let sp = 0;
-      let minX = width,
-        minY = height,
-        maxX = -1,
-        maxY = -1;
-      stack[sp++] = start;
-      visited[start] = 1;
-
-      while (sp > 0) {
-        const idx = stack[--sp];
-        pixels.push(idx);
-        const y = (idx / width) | 0;
-        const x = idx - y * width;
-        if (x < minX) minX = x;
-        if (y < minY) minY = y;
-        if (x > maxX) maxX = x;
-        if (y > maxY) maxY = y;
-
-        if (x > 0) sp = pushIf(mask, visited, stack, sp, idx - 1);
-        if (x < width - 1) sp = pushIf(mask, visited, stack, sp, idx + 1);
-        if (y > 0) sp = pushIf(mask, visited, stack, sp, idx - width);
-        if (y < height - 1) sp = pushIf(mask, visited, stack, sp, idx + width);
-      }
-
-      const size = pixels.length;
-      if (size < total * 0.04) continue;
-      if (maxX - minX < width * 0.2 || maxY - minY < height * 0.2) continue;
-
-      const component = new Uint8Array(total);
-      for (const idx of pixels) component[idx] = 1;
-      const contour: Point[] = [];
-      for (const idx of pixels) {
-        const y = (idx / width) | 0;
-        const x = idx - y * width;
-        if (
-          x === 0 ||
-          y === 0 ||
-          x === width - 1 ||
-          y === height - 1 ||
-          !component[idx - 1] ||
-          !component[idx + 1] ||
-          !component[idx - width] ||
-          !component[idx + width]
-        ) {
-          contour.push({ x, y });
-        }
-      }
-
-      const bboxArea = Math.max(1, (maxX - minX + 1) * (maxY - minY + 1));
-      const detection = evaluateContour(contour, size, bboxArea, total, threshold);
+    for (const quad of approximateHullQuads(hull)) {
+      candidateCount++;
+      const detection = evaluateEdgeQuad({
+        quad,
+        hull,
+        lum,
+        edges,
+        width,
+        height,
+        frameArea: total,
+        edgeThreshold: highThreshold,
+        candidateCount,
+      });
       if (!detection) continue;
-      const score = detection.confidence + Math.min(size / total, 0.5);
+      const score = detection.confidence;
       if (score > bestScore) {
         bestScore = score;
         best = detection;
@@ -339,6 +284,9 @@ export function detectDocumentQuad(
     }
   }
 
+  if (best) {
+    best.debug.candidateCount = candidateCount;
+  }
   return best && best.confidence >= MIN_DOCUMENT_CONFIDENCE ? best : null;
 }
 
