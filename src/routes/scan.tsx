@@ -2,10 +2,10 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { scanStore } from "@/lib/scanStore";
 import {
+  detectDocumentQuad,
   Point,
   emaQuad,
   enhancePaper,
-  findDocumentCorners,
   maxCornerDelta,
   warpQuadToRect,
 } from "@/lib/perspective";
@@ -46,6 +46,7 @@ function ScanPage() {
 
   const lastRawQuad = useRef<[Point, Point, Point, Point] | null>(null);
   const smoothQuad = useRef<[Point, Point, Point, Point] | null>(null); // normalized 0..1
+  const detectionMeta = useRef<ReturnType<typeof detectDocumentQuad> | null>(null);
   const stableCount = useRef(0);
   const detectCount = useRef(0);
   const capturedRef = useRef(false);
@@ -121,11 +122,13 @@ function ScanPage() {
     ctx.drawImage(video, 0, 0, dw, dh);
     const { data } = ctx.getImageData(0, 0, dw, dh);
 
-    const corners = findDocumentCorners(data, dw, dh);
+    const detection = detectDocumentQuad(data, dw, dh);
+    const corners = detection?.corners ?? null;
 
     if (!corners) {
       stableCount.current = 0;
       detectCount.current = Math.max(0, detectCount.current - 1);
+      detectionMeta.current = null;
       if (detectCount.current === 0) {
         smoothQuad.current = null;
         lastRawQuad.current = null;
@@ -136,6 +139,7 @@ function ScanPage() {
     }
 
     detectCount.current++;
+    detectionMeta.current = detection;
 
     // Normalize to 0..1
     const norm = corners.map((p) => ({ x: p.x / dw, y: p.y / dh })) as
@@ -254,8 +258,24 @@ function ScanPage() {
     // document looks like a clean scanned A4 (white paper, dark ink).
     enhancePaper(warped);
 
+    const sourceCanvas = document.createElement("canvas");
+    sourceCanvas.width = vw;
+    sourceCanvas.height = vh;
+    sourceCanvas.getContext("2d")!.drawImage(video, 0, 0, vw, vh);
+
     const dataUrl = warped.toDataURL("image/jpeg", 0.92);
-    scanStore.set({ imageDataUrl: dataUrl });
+    const sourceDataUrl = sourceCanvas.toDataURL("image/jpeg", 0.86);
+    const meta = detectionMeta.current;
+    scanStore.set({
+      imageDataUrl: dataUrl,
+      sourceDataUrl,
+      detection: meta ? {
+        corners: normQuad,
+        a4Ratio: meta.a4Ratio,
+        confidence: meta.confidence,
+        debug: meta.debug,
+      } : null,
+    });
     streamRef.current?.getTracks().forEach((t) => t.stop());
     navigate({ to: "/preview" });
   }
