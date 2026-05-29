@@ -335,15 +335,21 @@ function ScanPage() {
         )}
         <button
           onClick={manualCapture}
-          disabled={status === "starting" || status === "error" || status === "capturing"}
+          disabled={
+            status === "starting" ||
+            status === "error" ||
+            status === "capturing" ||
+            !smoothQuad.current
+          }
           className="h-16 w-16 rounded-full bg-white text-black flex items-center justify-center shadow-lg active:scale-95 disabled:opacity-40"
           aria-label="Fotografera manuellt"
         >
           <Camera className="h-7 w-7" />
         </button>
         <p className="text-xs text-white/75 text-center max-w-[260px]">
-          Lägg A4-dokumentet på en kontrasterande yta. Bilden tas automatiskt när hörnen är stabila.
+          Lägg A4-dokumentet på en jämn, kontrasterande yta. Bilden tas automatiskt när hörnen är stabila.
         </p>
+
       </div>
     </div>
   );
