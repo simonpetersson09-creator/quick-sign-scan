@@ -28,8 +28,8 @@ export const Route = createFileRoute("/scan")({
 
 // Stability requirements — the document must be locked in on all 4 corners
 // for a sustained period before the camera captures, so we never fire too early.
-const STABLE_DELTA = 0.008; // normalized 0..1 — max corner movement to count as stable
-const DETECT_FRAMES = 8;    // consecutive detections before we even consider it found
+const STABLE_DELTA = 0.016; // normalized 0..1 — max smoothed corner movement to count as stable
+const DETECT_FRAMES = 5;    // consecutive detections before we even consider it found
 const HOLD_FRAMES = 18;     // ~0.6s — "Håll stilla" phase
 const READY_FRAMES = 45;    // ~1.5s — "Dokument hittat" lock-in
 const STABLE_FRAMES = 75;   // ~2.5s total before auto-capture
@@ -150,15 +150,16 @@ function ScanPage() {
       [Point, Point, Point, Point];
 
     // Stronger smoothing — slower lock-in, more reliable corners
+    const previousSmooth = smoothQuad.current;
     const smoothed = emaQuad(smoothQuad.current, norm, 0.22);
     smoothQuad.current = smoothed;
 
     const last = lastRawQuad.current;
     lastRawQuad.current = norm;
-    const delta = last ? maxCornerDelta(norm, last) : 1;
+    const delta = previousSmooth ? maxCornerDelta(smoothed, previousSmooth) : (last ? maxCornerDelta(norm, last) : 1);
 
     if (delta < STABLE_DELTA) stableCount.current++;
-    else stableCount.current = Math.max(0, stableCount.current - 3);
+    else stableCount.current = Math.max(0, stableCount.current - 1);
 
     // Wait for enough consecutive detections before showing anything as "found".
     if (detectCount.current < DETECT_FRAMES) {
