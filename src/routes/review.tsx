@@ -17,8 +17,6 @@ function ReviewPage() {
 
   useEffect(() => {
     const s = scanStore.get();
-  useEffect(() => {
-    const s = scanStore.get();
     const img = s.imageDataUrl;
     if (!img) {
       navigate({ to: "/" });
