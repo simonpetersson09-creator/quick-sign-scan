@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ScanLine, PenLine, Mail, CheckCircle2, ChevronRight, Settings as SettingsIcon } from "lucide-react";
+import { ScanLine, PenLine, Mail, CheckCircle2, ChevronRight, ChevronDown, Settings as SettingsIcon } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
