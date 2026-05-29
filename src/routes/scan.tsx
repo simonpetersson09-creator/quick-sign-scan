@@ -25,10 +25,13 @@ export const Route = createFileRoute("/scan")({
   component: ScanPage,
 });
 
-// Stability requirements
-const STABLE_DELTA = 0.012; // normalized 0..1 — max corner movement to count as stable
-const STABLE_FRAMES = 18; // ~0.6s at 30fps before auto-capture
-const HOLD_FRAMES = 6;
+// Stability requirements — the document must be locked in on all 4 corners
+// for a sustained period before the camera captures, so we never fire too early.
+const STABLE_DELTA = 0.008; // normalized 0..1 — max corner movement to count as stable
+const DETECT_FRAMES = 8;    // consecutive detections before we even consider it found
+const HOLD_FRAMES = 18;     // ~0.6s — "Håll stilla" phase
+const READY_FRAMES = 45;    // ~1.5s — "Dokument hittat" lock-in
+const STABLE_FRAMES = 75;   // ~2.5s total before auto-capture
 
 function ScanPage() {
   const navigate = useNavigate();
