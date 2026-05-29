@@ -24,25 +24,27 @@ function Home() {
         </p>
       </div>
 
-      <div className="flex-1 flex flex-col gap-4 justify-center">
+      <div className="flex-1" />
+
+      <div className="grid grid-cols-2 gap-3 pb-4">
         <Link to="/scan" className="block group">
-          <div className="rounded-3xl bg-primary text-primary-foreground p-7 shadow-[var(--shadow-card)] transition group-active:scale-[0.99]">
-            <ScanLine className="h-8 w-8 mb-6 opacity-90" strokeWidth={1.75} />
-            <div className="text-[22px] font-semibold tracking-tight">Skanna dokument</div>
-            <div className="text-[14px] opacity-80 mt-1">Kameran öppnas direkt</div>
+          <div className="rounded-2xl bg-primary text-primary-foreground p-4 shadow-[var(--shadow-card)] transition group-active:scale-[0.99] h-full">
+            <ScanLine className="h-5 w-5 mb-3 opacity-90" strokeWidth={1.75} />
+            <div className="text-[15px] font-semibold tracking-tight">Skanna dokument</div>
+            <div className="text-[12px] opacity-80 mt-0.5">Kameran öppnas direkt</div>
           </div>
         </Link>
 
         <Link to="/settings" className="block group">
-          <div className="rounded-3xl bg-card text-card-foreground p-7 shadow-[var(--shadow-soft)] border border-border transition group-active:scale-[0.99]">
-            <SettingsIcon className="h-7 w-7 mb-6 text-muted-foreground" strokeWidth={1.75} />
-            <div className="text-[20px] font-semibold tracking-tight">Inställningar</div>
-            <div className="text-[14px] text-muted-foreground mt-1">Mottagare, signatur och meddelande</div>
+          <div className="rounded-2xl bg-card text-card-foreground p-4 shadow-[var(--shadow-soft)] border border-border transition group-active:scale-[0.99] h-full">
+            <SettingsIcon className="h-5 w-5 mb-3 text-muted-foreground" strokeWidth={1.75} />
+            <div className="text-[15px] font-semibold tracking-tight">Inställningar</div>
+            <div className="text-[12px] text-muted-foreground mt-0.5">Mottagare och signatur</div>
           </div>
         </Link>
       </div>
 
-      <p className="text-center text-xs text-muted-foreground/80 pb-2 pt-6">
+      <p className="text-center text-xs text-muted-foreground/80 pb-2">
         Dokument sparas aldrig — allt raderas efter sändning.
       </p>
     </div>
