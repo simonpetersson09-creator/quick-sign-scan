@@ -127,9 +127,9 @@ export function warpQuadToRect(
   return out;
 }
 
-// Paper enhancement: normalize lighting and stretch whites so the document
-// looks like clean white paper with crisp dark ink (like a scanner output).
-// Operates in-place on a canvas and returns it.
+// Paper enhancement: shading-correct (remove shadows / uneven lighting),
+// then stretch whites and crisp up ink so the result looks like a clean
+// office-scanner output (white paper, dark text, no background tones).
 export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
   const w = canvas.width;
   const h = canvas.height;
@@ -138,21 +138,38 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
   const d = img.data;
   const n = w * h;
 
-  // 1) Compute luminance + histogram
-  const lum = new Uint8ClampedArray(n);
-  const hist = new Uint32Array(256);
+  // 1) Luminance plane
+  const lum = new Float32Array(n);
   for (let i = 0, j = 0; i < d.length; i += 4, j++) {
-    const l = (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) | 0;
-    lum[j] = l;
-    hist[l]++;
+    lum[j] = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
   }
 
-  // 2) Find black point (very low percentile — only the darkest ink becomes
-  //    truly black; spots/smudges stay gray) and white point (low percentile,
-  //    so paper turns bright white).
+  // 2) Estimate per-pixel background illumination with a wide separable
+  //    box blur. Radius ~ 1/14 of the long edge captures shadows/gradients
+  //    without smearing letters into the estimate.
+  const radius = Math.max(8, Math.round(Math.max(w, h) / 14));
+  const bg = boxBlur(lum, w, h, radius);
+
+  // 3) Global white reference from the upper percentile of the background.
+  const sample = new Float32Array(bg);
+  sample.sort();
+  const whiteRef = Math.max(140, sample[Math.floor(n * 0.92)] || 200);
+
+  // 4) Shading correction: per-pixel multiplier whiteRef / bg flattens
+  //    shadows and uneven lighting across the page.
+  const corrected = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const b = Math.max(40, bg[i]);
+    const c = lum[i] * (whiteRef / b);
+    corrected[i] = c > 255 ? 255 : c;
+  }
+
+  // 5) Black/white points from the corrected histogram.
+  const hist = new Uint32Array(256);
+  for (let i = 0; i < n; i++) hist[corrected[i] | 0]++;
   let cum = 0;
   let black = 0;
-  const blackTarget = n * 0.005; // 0.5% darkest -> black
+  const blackTarget = n * 0.004;
   for (let v = 0; v < 256; v++) {
     cum += hist[v];
     if (cum >= blackTarget) {
@@ -162,7 +179,7 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
   }
   cum = 0;
   let white = 255;
-  const whiteTarget = n * 0.55; // 55th percentile -> white (whitens paper)
+  const whiteTarget = n * 0.6;
   for (let v = 0; v < 256; v++) {
     cum += hist[v];
     if (cum >= whiteTarget) {
@@ -170,35 +187,34 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
       break;
     }
   }
-  // Don't let black point creep too high — keeps mild spots from going dark.
-  if (black > 60) black = 60;
-  if (white - black < 40) white = Math.min(255, black + 40);
+  if (black > 85) black = 85;
+  if (white < black + 60) white = Math.min(255, black + 60);
 
-  // 3) Apply per-pixel: stretch luminance, brighten midtones, desaturate paper
+  // 6) Tone curve: stretch, gamma (kills gray smudges), soft S-curve for ink.
   const range = white - black;
   const lut = new Uint8ClampedArray(256);
   for (let v = 0; v < 256; v++) {
     let t = (v - black) / range;
     if (t < 0) t = 0;
     else if (t > 1) t = 1;
-    // Gamma > 1 brightens midtones so smudges fade toward white instead of black
-    t = Math.pow(t, 1.35);
-    // Lift the floor a touch so true black is reserved for actual ink
-    const lifted = 0.06 + t * 0.94;
-    lut[v] = Math.min(255, Math.max(0, lifted * 255)) | 0;
+    t = Math.pow(t, 1.45);
+    t = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    lut[v] = (t * 255) | 0;
   }
 
+  // 7) Apply: shading factor × tone-curve ratio, then strong desaturation.
   for (let i = 0, j = 0; i < d.length; i += 4, j++) {
-    const oldL = lum[j];
-    const newL = lut[oldL];
-    const k = oldL === 0 ? 1 : newL / Math.max(1, oldL);
-    let r = d[i] * k;
-    let g = d[i + 1] * k;
-    let b = d[i + 2] * k;
-    // Desaturate strongly (pull 70% toward luminance) so paper looks neutral white
-    r = r * 0.3 + newL * 0.7;
-    g = g * 0.3 + newL * 0.7;
-    b = b * 0.3 + newL * 0.7;
+    const k = whiteRef / Math.max(40, bg[j]);
+    const L = corrected[j] | 0;
+    const newL = lut[L];
+    const ratio = L === 0 ? 1 : newL / Math.max(1, L);
+    const m = k * ratio;
+    let r = d[i] * m;
+    let g = d[i + 1] * m;
+    let b = d[i + 2] * m;
+    r = r * 0.15 + newL * 0.85;
+    g = g * 0.15 + newL * 0.85;
+    b = b * 0.15 + newL * 0.85;
     if (r > 255) r = 255;
     if (g > 255) g = 255;
     if (b > 255) b = 255;
@@ -209,6 +225,40 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
 
   ctx.putImageData(img, 0, 0);
   return canvas;
+}
+
+function boxBlur(src: Float32Array, w: number, h: number, r: number): Float32Array {
+  const tmp = new Float32Array(src.length);
+  const out = new Float32Array(src.length);
+  const win = 2 * r + 1;
+  for (let y = 0; y < h; y++) {
+    const base = y * w;
+    let sum = 0;
+    for (let k = -r; k <= r; k++) {
+      const x = k < 0 ? 0 : k >= w ? w - 1 : k;
+      sum += src[base + x];
+    }
+    for (let x = 0; x < w; x++) {
+      tmp[base + x] = sum / win;
+      const addX = Math.min(w - 1, x + r + 1);
+      const subX = Math.max(0, x - r);
+      sum += src[base + addX] - src[base + subX];
+    }
+  }
+  for (let x = 0; x < w; x++) {
+    let sum = 0;
+    for (let k = -r; k <= r; k++) {
+      const y = k < 0 ? 0 : k >= h ? h - 1 : k;
+      sum += tmp[y * w + x];
+    }
+    for (let y = 0; y < h; y++) {
+      out[y * w + x] = sum / win;
+      const addY = Math.min(h - 1, y + r + 1);
+      const subY = Math.max(0, y - r);
+      sum += tmp[addY * w + x] - tmp[subY * w + x];
+    }
+  }
+  return out;
 }
 
 export interface DocumentDetection {
