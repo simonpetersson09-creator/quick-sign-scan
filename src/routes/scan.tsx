@@ -1,37 +1,52 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { scanStore } from "@/lib/scanStore";
+import {
+  Point,
+  emaQuad,
+  findDocumentCorners,
+  maxCornerDelta,
+  warpQuadToRect,
+} from "@/lib/perspective";
 import { Camera, X } from "lucide-react";
 
-type Status = "starting" | "searching" | "hold" | "found" | "capturing" | "error";
-
-// Normalized bounding box in video coordinates (0..1)
-interface BBox {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
+type Status =
+  | "starting"
+  | "searching"
+  | "align"
+  | "hold"
+  | "ready"
+  | "capturing"
+  | "error";
 
 export const Route = createFileRoute("/scan")({
   head: () => ({ meta: [{ title: "Skanna dokument" }] }),
   component: ScanPage,
 });
 
+// Stability requirements
+const STABLE_DELTA = 0.012; // normalized 0..1 — max corner movement to count as stable
+const STABLE_FRAMES = 18; // ~0.6s at 30fps before auto-capture
+const HOLD_FRAMES = 6;
+
 function ScanPage() {
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const polyRef = useRef<SVGPolygonElement | null>(null);
+  const cornerRefs = useRef<SVGCircleElement[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
-  const detectCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const overlayRef = useRef<HTMLDivElement | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const detectCanvas = useRef<HTMLCanvasElement | null>(null);
+
+  const lastRawQuad = useRef<[Point, Point, Point, Point] | null>(null);
+  const smoothQuad = useRef<[Point, Point, Point, Point] | null>(null); // normalized 0..1
+  const stableCount = useRef(0);
+  const capturedRef = useRef(false);
+
   const [status, setStatus] = useState<Status>("starting");
   const [error, setError] = useState<string | null>(null);
-  const bboxRef = useRef<BBox | null>(null);
-  const smoothBboxRef = useRef<BBox | null>(null);
-  const stableTicks = useRef(0);
-  const lastBbox = useRef<BBox | null>(null);
-  const rafRef = useRef<number | null>(null);
-  const capturedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -74,12 +89,13 @@ function ScanPage() {
   function loop() {
     const tick = () => {
       detect();
-      rafRef.current = requestAnimationFrame(tick);
+      if (!capturedRef.current) {
+        rafRef.current = requestAnimationFrame(tick);
+      }
     };
     rafRef.current = requestAnimationFrame(tick);
   }
 
-  // Detect bright rectangular region (the paper) using a downscaled luminance pass.
   function detect() {
     if (capturedRef.current) return;
     const video = videoRef.current;
@@ -88,198 +104,207 @@ function ScanPage() {
     const vh = video.videoHeight;
     if (!vw || !vh) return;
 
-    if (!detectCanvasRef.current) {
-      detectCanvasRef.current = document.createElement("canvas");
-    }
-    const dc = detectCanvasRef.current;
-    const dw = 160;
+    if (!detectCanvas.current) detectCanvas.current = document.createElement("canvas");
+    const dc = detectCanvas.current;
+    const dw = 200;
     const dh = Math.round((vh / vw) * dw);
-    dc.width = dw;
-    dc.height = dh;
+    if (dc.width !== dw || dc.height !== dh) {
+      dc.width = dw;
+      dc.height = dh;
+    }
     const ctx = dc.getContext("2d", { willReadFrequently: true })!;
     ctx.drawImage(video, 0, 0, dw, dh);
     const { data } = ctx.getImageData(0, 0, dw, dh);
 
-    // Mean luminance
-    let sum = 0;
-    const lum = new Float32Array(dw * dh);
-    for (let i = 0, j = 0; i < data.length; i += 4, j++) {
-      const l = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-      lum[j] = l;
-      sum += l;
-    }
-    const mean = sum / (dw * dh);
-    // Threshold = brighter than mean + margin (paper is the brightest region)
-    const threshold = Math.max(140, mean + 20);
+    const corners = findDocumentCorners(data, dw, dh);
 
-    // Find bbox of bright-enough pixels (with column/row counts to ignore noise)
-    let minX = dw,
-      minY = dh,
-      maxX = -1,
-      maxY = -1;
-    let brightCount = 0;
-    for (let y = 0; y < dh; y++) {
-      for (let x = 0; x < dw; x++) {
-        if (lum[y * dw + x] > threshold) {
-          brightCount++;
-          if (x < minX) minX = x;
-          if (y < minY) minY = y;
-          if (x > maxX) maxX = x;
-          if (y > maxY) maxY = y;
-        }
-      }
-    }
-
-    const minFill = dw * dh * 0.05; // need at least 5% bright pixels
-    if (brightCount < minFill || maxX < 0) {
-      // No document
-      bboxRef.current = null;
-      stableTicks.current = 0;
-      smoothBboxRef.current = null;
-      updateOverlay(null, false);
+    if (!corners) {
+      stableCount.current = 0;
+      smoothQuad.current = null;
+      lastRawQuad.current = null;
+      drawOverlay(null, false);
       setStatus((s) => (s === "starting" ? s : "searching"));
       return;
     }
 
-    const bbox: BBox = {
-      x: minX / dw,
-      y: minY / dh,
-      w: (maxX - minX + 1) / dw,
-      h: (maxY - minY + 1) / dh,
-    };
+    // Normalize to 0..1
+    const norm = corners.map((p) => ({ x: p.x / dw, y: p.y / dh })) as
+      [Point, Point, Point, Point];
 
-    // Smooth bbox with EMA for stable overlay
-    const prev = smoothBboxRef.current;
-    const a = 0.35;
-    const smooth: BBox = prev
-      ? {
-          x: prev.x + (bbox.x - prev.x) * a,
-          y: prev.y + (bbox.y - prev.y) * a,
-          w: prev.w + (bbox.w - prev.w) * a,
-          h: prev.h + (bbox.h - prev.h) * a,
-        }
-      : bbox;
-    smoothBboxRef.current = smooth;
+    const smoothed = emaQuad(smoothQuad.current, norm, 0.35);
+    smoothQuad.current = smoothed;
 
-    // Stability check (relative to previous raw bbox)
-    const last = lastBbox.current;
-    const moved = last
-      ? Math.abs(bbox.x - last.x) +
-        Math.abs(bbox.y - last.y) +
-        Math.abs(bbox.w - last.w) +
-        Math.abs(bbox.h - last.h)
-      : 1;
-    lastBbox.current = bbox;
-    bboxRef.current = bbox;
+    const last = lastRawQuad.current;
+    lastRawQuad.current = norm;
+    const delta = last ? maxCornerDelta(norm, last) : 1;
 
-    // Need a reasonably large rectangle
-    const bigEnough = bbox.w > 0.35 && bbox.h > 0.35;
+    if (delta < STABLE_DELTA) stableCount.current++;
+    else stableCount.current = Math.max(0, stableCount.current - 2);
 
-    if (!bigEnough) {
-      stableTicks.current = 0;
-      updateOverlay(smooth, false);
-      setStatus("searching");
-      return;
-    }
-
-    if (moved < 0.04) stableTicks.current++;
-    else stableTicks.current = Math.max(0, stableTicks.current - 1);
-
-    if (stableTicks.current < 8) {
-      updateOverlay(smooth, false);
+    if (stableCount.current < HOLD_FRAMES) {
+      drawOverlay(smoothed, false);
+      setStatus("align");
+    } else if (stableCount.current < STABLE_FRAMES) {
+      drawOverlay(smoothed, false);
       setStatus("hold");
-    } else if (stableTicks.current < 14) {
-      updateOverlay(smooth, true);
-      setStatus("found");
+    } else if (stableCount.current < STABLE_FRAMES + 4) {
+      drawOverlay(smoothed, true);
+      setStatus("ready");
     } else {
-      updateOverlay(smooth, true);
+      drawOverlay(smoothed, true);
       setStatus("capturing");
-      capture(smooth);
+      capture(smoothed);
     }
   }
 
-  function updateOverlay(b: BBox | null, active: boolean) {
-    const el = overlayRef.current;
-    if (!el) return;
-    if (!b) {
-      el.style.opacity = "0";
+  function drawOverlay(
+    quad: [Point, Point, Point, Point] | null,
+    active: boolean,
+  ) {
+    const svg = svgRef.current;
+    const poly = polyRef.current;
+    if (!svg || !poly) return;
+
+    if (!quad) {
+      poly.setAttribute("points", "");
+      poly.style.opacity = "0";
+      cornerRefs.current.forEach((c) => c && (c.style.opacity = "0"));
       return;
     }
-    el.style.opacity = "1";
-    el.style.left = `${b.x * 100}%`;
-    el.style.top = `${b.y * 100}%`;
-    el.style.width = `${b.w * 100}%`;
-    el.style.height = `${b.h * 100}%`;
-    el.dataset.active = active ? "true" : "false";
+
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const w = rect.width;
+    const h = rect.height;
+    if (svg.getAttribute("viewBox") !== `0 0 ${w} ${h}`) {
+      svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    }
+
+    // Account for object-fit: cover scaling between video and container
+    const video = videoRef.current!;
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    const scale = Math.max(w / vw, h / vh);
+    const dispW = vw * scale;
+    const dispH = vh * scale;
+    const offX = (w - dispW) / 2;
+    const offY = (h - dispH) / 2;
+
+    const pts = quad
+      .map((p) => `${offX + p.x * dispW},${offY + p.y * dispH}`)
+      .join(" ");
+    poly.setAttribute("points", pts);
+    poly.style.opacity = "1";
+    poly.setAttribute("stroke", active ? "var(--success)" : "rgba(255,255,255,0.95)");
+    poly.setAttribute("fill", active ? "color-mix(in oklab, var(--success) 18%, transparent)" : "rgba(255,255,255,0.06)");
+
+    quad.forEach((p, i) => {
+      const c = cornerRefs.current[i];
+      if (!c) return;
+      c.setAttribute("cx", String(offX + p.x * dispW));
+      c.setAttribute("cy", String(offY + p.y * dispH));
+      c.setAttribute("fill", active ? "var(--success)" : "white");
+      c.style.opacity = "1";
+    });
   }
 
-  async function capture(bbox: BBox) {
+  async function capture(normQuad: [Point, Point, Point, Point]) {
     if (capturedRef.current) return;
     capturedRef.current = true;
     const video = videoRef.current;
     if (!video) return;
-
     const vw = video.videoWidth;
     const vh = video.videoHeight;
 
-    // Add a small margin around the detected paper
-    const margin = 0.015;
-    let bx = Math.max(0, bbox.x - margin);
-    let by = Math.max(0, bbox.y - margin);
-    let bw = Math.min(1 - bx, bbox.w + margin * 2);
-    let bh = Math.min(1 - by, bbox.h + margin * 2);
+    // Convert normalized corners to source pixel coordinates
+    const srcQuad = normQuad.map((p) => ({
+      x: p.x * vw,
+      y: p.y * vh,
+    })) as [Point, Point, Point, Point];
 
-    const sx = bx * vw;
-    const sy = by * vh;
-    const sw = bw * vw;
-    const sh = bh * vh;
+    // Output: portrait A4 aspect 1:√2
+    const outW = 1000;
+    const outH = Math.round(outW * Math.SQRT2);
 
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(sw);
-    canvas.height = Math.round(sh);
-    const ctx = canvas.getContext("2d")!;
-    ctx.filter = "contrast(1.18) brightness(1.06) saturate(0.95)";
-    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+    // Yield to UI so the "capturing" state renders
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+
+    const warped = warpQuadToRect(video, vw, vh, srcQuad, outW, outH);
+
+    // Post-process: subtle contrast/brightness for paper look
+    const post = document.createElement("canvas");
+    post.width = outW;
+    post.height = outH;
+    const pctx = post.getContext("2d")!;
+    pctx.filter = "contrast(1.2) brightness(1.06) saturate(0.92)";
+    pctx.drawImage(warped, 0, 0);
+
+    const dataUrl = post.toDataURL("image/jpeg", 0.92);
     scanStore.set({ imageDataUrl: dataUrl });
     streamRef.current?.getTracks().forEach((t) => t.stop());
     navigate({ to: "/preview" });
   }
 
   function manualCapture() {
-    const b = smoothBboxRef.current ?? { x: 0.05, y: 0.05, w: 0.9, h: 0.9 };
+    const q =
+      smoothQuad.current ?? ([
+        { x: 0.05, y: 0.05 },
+        { x: 0.95, y: 0.05 },
+        { x: 0.95, y: 0.95 },
+        { x: 0.05, y: 0.95 },
+      ] as [Point, Point, Point, Point]);
     setStatus("capturing");
-    capture(b);
+    capture(q);
   }
 
   const statusText: Record<Status, string> = {
     starting: "Startar kamera…",
-    searching: "Söker dokument…",
-    hold: "Håll stilla",
-    found: "Dokument hittat",
-    capturing: "Skannar…",
+    searching: "Sök efter dokument",
+    align: "Rikta in dokumentet",
+    hold: "Håll stilla…",
+    ready: "Dokument hittat",
+    capturing: "Skannar och rätar upp…",
     error: "Fel",
   };
 
+  const statusActive = status === "ready" || status === "capturing";
+
   return (
     <div className="fixed inset-0 bg-black text-white flex flex-col">
-      <video
-        ref={videoRef}
-        playsInline
-        muted
-        className="absolute inset-0 w-full h-full object-cover"
-      />
-      <div className="absolute inset-0 bg-black/30 pointer-events-none" />
-
-      {/* Dynamic detection overlay — sits over the entire video area */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div
-          ref={overlayRef}
-          className="absolute rounded-md transition-opacity duration-200"
-          style={{ opacity: 0 }}
+      <div ref={containerRef} className="absolute inset-0">
+        <video
+          ref={videoRef}
+          playsInline
+          muted
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-black/25 pointer-events-none" />
+        <svg
+          ref={svgRef}
+          className="absolute inset-0 w-full h-full pointer-events-none"
+          preserveAspectRatio="none"
         >
-          <DynamicCorners />
-        </div>
+          <polygon
+            ref={polyRef}
+            points=""
+            strokeWidth={3}
+            style={{ transition: "opacity 150ms, stroke 200ms, fill 200ms" }}
+            strokeLinejoin="round"
+          />
+          {[0, 1, 2, 3].map((i) => (
+            <circle
+              key={i}
+              ref={(el) => {
+                if (el) cornerRefs.current[i] = el;
+              }}
+              r={7}
+              fill="white"
+              stroke="rgba(0,0,0,0.4)"
+              strokeWidth={1.5}
+              style={{ opacity: 0, transition: "opacity 150ms, fill 200ms" }}
+            />
+          ))}
+        </svg>
       </div>
 
       {/* Top bar */}
@@ -289,16 +314,16 @@ function ScanPage() {
             streamRef.current?.getTracks().forEach((t) => t.stop());
             navigate({ to: "/" });
           }}
-          className="h-10 w-10 rounded-full bg-black/50 backdrop-blur flex items-center justify-center"
+          className="h-10 w-10 rounded-full bg-black/55 backdrop-blur flex items-center justify-center"
           aria-label="Avbryt"
         >
           <X className="h-5 w-5" />
         </button>
         <div
           className={`px-4 py-2 rounded-full text-[13px] font-medium backdrop-blur transition ${
-            status === "found" || status === "capturing"
+            statusActive
               ? "bg-success/90 text-success-foreground"
-              : "bg-black/50 text-white"
+              : "bg-black/55 text-white"
           }`}
         >
           {statusText[status]}
@@ -321,41 +346,10 @@ function ScanPage() {
         >
           <Camera className="h-7 w-7" />
         </button>
-        <p className="text-xs text-white/70">Fotograferas automatiskt när dokumentet sitter still</p>
+        <p className="text-xs text-white/75 text-center max-w-[260px]">
+          Lägg A4-dokumentet på en kontrasterande yta. Bilden tas automatiskt när hörnen är stabila.
+        </p>
       </div>
-    </div>
-  );
-}
-
-function DynamicCorners() {
-  const stroke = 3;
-  const len = 26;
-  return (
-    <div
-      className="absolute inset-0 rounded-md"
-      style={{ boxShadow: "inset 0 0 0 2px rgba(255,255,255,0.85)" }}
-    >
-      {(["tl", "tr", "bl", "br"] as const).map((p) => (
-        <span
-          key={p}
-          className="absolute"
-          style={{
-            width: len,
-            height: len,
-            borderColor: "var(--success)",
-            borderStyle: "solid",
-            borderTopWidth: p.startsWith("t") ? stroke : 0,
-            borderBottomWidth: p.startsWith("b") ? stroke : 0,
-            borderLeftWidth: p.endsWith("l") ? stroke : 0,
-            borderRightWidth: p.endsWith("r") ? stroke : 0,
-            top: p.startsWith("t") ? -1 : "auto",
-            bottom: p.startsWith("b") ? -1 : "auto",
-            left: p.endsWith("l") ? -1 : "auto",
-            right: p.endsWith("r") ? -1 : "auto",
-            borderRadius: 6,
-          }}
-        />
-      ))}
     </div>
   );
 }
