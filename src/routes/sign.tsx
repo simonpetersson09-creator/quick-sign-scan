@@ -80,7 +80,7 @@ function SignPage() {
   }
 
   return (
-    <AppShell title="Signera" back="/preview">
+    <AppShell title="Signera" back="/place">
       <p className="text-sm text-muted-foreground mt-1">
         Skriv din signatur med fingret i rutan nedan.
       </p>
