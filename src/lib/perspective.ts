@@ -299,6 +299,177 @@ export function findDocumentCorners(
   return detectDocumentQuad(data, width, height)?.corners ?? null;
 }
 
+function gaussianBlur(lum: Uint8ClampedArray, width: number, height: number): Uint8ClampedArray {
+  const out = new Uint8ClampedArray(lum.length);
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const i = y * width + x;
+      out[i] =
+        (lum[i - width - 1] +
+          2 * lum[i - width] +
+          lum[i - width + 1] +
+          2 * lum[i - 1] +
+          4 * lum[i] +
+          2 * lum[i + 1] +
+          lum[i + width - 1] +
+          2 * lum[i + width] +
+          lum[i + width + 1]) /
+        16;
+    }
+  }
+  return out;
+}
+
+function cannyEdges(
+  lum: Uint8ClampedArray,
+  width: number,
+  height: number,
+): { edges: Uint8Array; highThreshold: number } {
+  const total = width * height;
+  const mag = new Float32Array(total);
+  const dir = new Uint8Array(total);
+  const nonMax = new Float32Array(total);
+  const magnitudes: number[] = [];
+
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const i = y * width + x;
+      const gx =
+        -lum[i - width - 1] -
+        2 * lum[i - 1] -
+        lum[i + width - 1] +
+        lum[i - width + 1] +
+        2 * lum[i + 1] +
+        lum[i + width + 1];
+      const gy =
+        -lum[i - width - 1] -
+        2 * lum[i - width] -
+        lum[i - width + 1] +
+        lum[i + width - 1] +
+        2 * lum[i + width] +
+        lum[i + width + 1];
+      const m = Math.hypot(gx, gy);
+      mag[i] = m;
+      if (m > 8) magnitudes.push(m);
+      let angle = (Math.atan2(gy, gx) * 180) / Math.PI;
+      if (angle < 0) angle += 180;
+      dir[i] = angle < 22.5 || angle >= 157.5 ? 0 : angle < 67.5 ? 45 : angle < 112.5 ? 90 : 135;
+    }
+  }
+
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const i = y * width + x;
+      const m = mag[i];
+      let a = i - 1;
+      let b = i + 1;
+      if (dir[i] === 45) {
+        a = i - width + 1;
+        b = i + width - 1;
+      } else if (dir[i] === 90) {
+        a = i - width;
+        b = i + width;
+      } else if (dir[i] === 135) {
+        a = i - width - 1;
+        b = i + width + 1;
+      }
+      if (m >= mag[a] && m >= mag[b]) nonMax[i] = m;
+    }
+  }
+
+  magnitudes.sort((a, b) => a - b);
+  const highThreshold = Math.max(22, magnitudes[Math.floor(magnitudes.length * 0.78)] ?? 32);
+  const lowThreshold = highThreshold * 0.38;
+  const edges = new Uint8Array(total);
+  const seen = new Uint8Array(total);
+  const stack = new Int32Array(total);
+
+  for (let i = 0; i < total; i++) {
+    if (seen[i] || nonMax[i] < highThreshold) continue;
+    let sp = 0;
+    stack[sp++] = i;
+    seen[i] = 1;
+    while (sp > 0) {
+      const idx = stack[--sp];
+      edges[idx] = 1;
+      const y = (idx / width) | 0;
+      const x = idx - y * width;
+      for (let yy = Math.max(1, y - 1); yy <= Math.min(height - 2, y + 1); yy++) {
+        for (let xx = Math.max(1, x - 1); xx <= Math.min(width - 2, x + 1); xx++) {
+          const ni = yy * width + xx;
+          if (!seen[ni] && nonMax[ni] >= lowThreshold) {
+            seen[ni] = 1;
+            stack[sp++] = ni;
+          }
+        }
+      }
+    }
+  }
+
+  return { edges, highThreshold };
+}
+
+function closeEdgeGaps(edges: Uint8Array, width: number, height: number): Uint8Array {
+  let mask = dilateMask(edges, width, height);
+  mask = dilateMask(mask, width, height);
+  return erodeMask(mask, width, height);
+}
+
+interface EdgeComponent {
+  pixels: number[];
+  points: Point[];
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+function edgeComponents(mask: Uint8Array, width: number, height: number): EdgeComponent[] {
+  const total = width * height;
+  const visited = new Uint8Array(total);
+  const stack = new Int32Array(total);
+  const components: EdgeComponent[] = [];
+
+  for (let start = 0; start < total; start++) {
+    if (!mask[start] || visited[start]) continue;
+    const pixels: number[] = [];
+    const points: Point[] = [];
+    let minX = width,
+      minY = height,
+      maxX = -1,
+      maxY = -1,
+      sp = 0;
+    stack[sp++] = start;
+    visited[start] = 1;
+
+    while (sp > 0) {
+      const idx = stack[--sp];
+      pixels.push(idx);
+      const y = (idx / width) | 0;
+      const x = idx - y * width;
+      points.push({ x, y });
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+
+      for (let yy = Math.max(1, y - 1); yy <= Math.min(height - 2, y + 1); yy++) {
+        for (let xx = Math.max(1, x - 1); xx <= Math.min(width - 2, x + 1); xx++) {
+          const ni = yy * width + xx;
+          if (mask[ni] && !visited[ni]) {
+            visited[ni] = 1;
+            stack[sp++] = ni;
+          }
+        }
+      }
+    }
+
+    components.push({ pixels, points, minX, minY, maxX, maxY });
+  }
+
+  return components.sort((a, b) => b.pixels.length - a.pixels.length).slice(0, 24);
+}
+
 function otsuThreshold(hist: Uint32Array, total: number): number {
   let sumAll = 0;
   for (let t = 0; t < 256; t++) sumAll += t * hist[t];
