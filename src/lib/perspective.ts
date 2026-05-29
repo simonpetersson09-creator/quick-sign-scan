@@ -647,6 +647,84 @@ function evaluateEdgeQuad(args: {
   };
 }
 
+function polygonImageStats(
+  quad: [Point, Point, Point, Point],
+  lum: Uint8ClampedArray,
+  width: number,
+  height: number,
+): { mean: number; darkRatio: number } {
+  const minX = Math.max(1, Math.floor(Math.min(...quad.map((p) => p.x))));
+  const minY = Math.max(1, Math.floor(Math.min(...quad.map((p) => p.y))));
+  const maxX = Math.min(width - 2, Math.ceil(Math.max(...quad.map((p) => p.x))));
+  const maxY = Math.min(height - 2, Math.ceil(Math.max(...quad.map((p) => p.y))));
+  let sum = 0;
+  let count = 0;
+  const samples: number[] = [];
+
+  for (let y = minY; y <= maxY; y += 2) {
+    for (let x = minX; x <= maxX; x += 2) {
+      if (!pointInPolygon({ x, y }, quad)) continue;
+      const value = lum[y * width + x];
+      sum += value;
+      count++;
+      samples.push(value);
+    }
+  }
+
+  const mean = count ? sum / count : 0;
+  let dark = 0;
+  const darkCutoff = Math.max(35, mean - 45);
+  for (const value of samples) {
+    if (value < darkCutoff) dark++;
+  }
+  return { mean, darkRatio: count ? dark / count : 0 };
+}
+
+function quadEdgeSupport(
+  quad: [Point, Point, Point, Point],
+  edges: Uint8Array,
+  width: number,
+  height: number,
+): number {
+  let hits = 0;
+  let samples = 0;
+  for (let side = 0; side < 4; side++) {
+    const a = quad[side];
+    const b = quad[(side + 1) % 4];
+    const steps = Math.max(8, Math.ceil(dist(a, b) / 2));
+    for (let s = 0; s <= steps; s++) {
+      const t = s / steps;
+      const x = Math.round(a.x + (b.x - a.x) * t);
+      const y = Math.round(a.y + (b.y - a.y) * t);
+      samples++;
+      let found = false;
+      for (let yy = Math.max(1, y - 2); yy <= Math.min(height - 2, y + 2) && !found; yy++) {
+        for (let xx = Math.max(1, x - 2); xx <= Math.min(width - 2, x + 2); xx++) {
+          if (edges[yy * width + xx]) {
+            found = true;
+            break;
+          }
+        }
+      }
+      if (found) hits++;
+    }
+  }
+  return hits / Math.max(1, samples);
+}
+
+function pointInPolygon(point: Point, polygon: Point[]): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const a = polygon[i];
+    const b = polygon[j];
+    if ((a.y > point.y) !== (b.y > point.y)) {
+      const x = ((b.x - a.x) * (point.y - a.y)) / Math.max(1e-6, b.y - a.y) + a.x;
+      if (point.x < x) inside = !inside;
+    }
+  }
+  return inside;
+}
+
 function otsuThreshold(hist: Uint32Array, total: number): number {
   let sumAll = 0;
   for (let t = 0; t < 256; t++) sumAll += t * hist[t];
