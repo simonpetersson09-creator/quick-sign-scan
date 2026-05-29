@@ -10,9 +10,14 @@ export interface Point {
 //   x = (a*u + b*v + c) / (g*u + h*v + 1)
 //   y = (d*u + e*v + f) / (g*u + h*v + 1)
 export interface UnitSquareTransform {
-  a: number; b: number; c: number;
-  d: number; e: number; f: number;
-  g: number; h: number;
+  a: number;
+  b: number;
+  c: number;
+  d: number;
+  e: number;
+  f: number;
+  g: number;
+  h: number;
 }
 
 export function unitSquareToQuad(quad: [Point, Point, Point, Point]): UnitSquareTransform {
@@ -24,7 +29,8 @@ export function unitSquareToQuad(quad: [Point, Point, Point, Point]): UnitSquare
   const dy2 = p3.y - p2.y;
   const sy = p0.y - p1.y + p2.y - p3.y;
 
-  let g = 0, h = 0;
+  let g = 0,
+    h = 0;
   if (Math.abs(sx) > 1e-9 || Math.abs(sy) > 1e-9) {
     const denom = dx1 * dy2 - dy1 * dx2;
     if (Math.abs(denom) > 1e-9) {
@@ -104,9 +110,15 @@ export function warpQuadToRect(
       outData[oi] =
         srcData[i00] * w00 + srcData[i10] * w10 + srcData[i01] * w01 + srcData[i11] * w11;
       outData[oi + 1] =
-        srcData[i00 + 1] * w00 + srcData[i10 + 1] * w10 + srcData[i01 + 1] * w01 + srcData[i11 + 1] * w11;
+        srcData[i00 + 1] * w00 +
+        srcData[i10 + 1] * w10 +
+        srcData[i01 + 1] * w01 +
+        srcData[i11 + 1] * w11;
       outData[oi + 2] =
-        srcData[i00 + 2] * w00 + srcData[i10 + 2] * w10 + srcData[i01 + 2] * w01 + srcData[i11 + 2] * w11;
+        srcData[i00 + 2] * w00 +
+        srcData[i10 + 2] * w10 +
+        srcData[i01 + 2] * w01 +
+        srcData[i11 + 2] * w11;
       outData[oi + 3] = 255;
     }
   }
@@ -142,14 +154,20 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
   const blackTarget = n * 0.05;
   for (let v = 0; v < 256; v++) {
     cum += hist[v];
-    if (cum >= blackTarget) { black = v; break; }
+    if (cum >= blackTarget) {
+      black = v;
+      break;
+    }
   }
   cum = 0;
   let white = 255;
   const whiteTarget = n * 0.75;
   for (let v = 0; v < 256; v++) {
     cum += hist[v];
-    if (cum >= whiteTarget) { white = v; break; }
+    if (cum >= whiteTarget) {
+      white = v;
+      break;
+    }
   }
   if (white - black < 30) white = Math.min(255, black + 30);
 
@@ -188,7 +206,6 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
   ctx.putImageData(img, 0, 0);
   return canvas;
 }
-
 
 export interface DocumentDetection {
   corners: [Point, Point, Point, Point];
@@ -244,7 +261,10 @@ export function detectDocumentQuad(
     if (!mask[start] || visited[start]) continue;
     const pixels: number[] = [];
     let sp = 0;
-    let minX = width, minY = height, maxX = -1, maxY = -1;
+    let minX = width,
+      minY = height,
+      maxX = -1,
+      maxY = -1;
     stack[sp++] = start;
     visited[start] = 1;
 
@@ -275,9 +295,14 @@ export function detectDocumentQuad(
       const y = (idx / width) | 0;
       const x = idx - y * width;
       if (
-        x === 0 || y === 0 || x === width - 1 || y === height - 1 ||
-        !component[idx - 1] || !component[idx + 1] ||
-        !component[idx - width] || !component[idx + width]
+        x === 0 ||
+        y === 0 ||
+        x === width - 1 ||
+        y === height - 1 ||
+        !component[idx - 1] ||
+        !component[idx + 1] ||
+        !component[idx - width] ||
+        !component[idx + width]
       ) {
         contour.push({ x, y });
       }
@@ -334,11 +359,17 @@ function erodeMask(mask: Uint8Array, width: number, height: number): Uint8Array 
     for (let x = 1; x < width - 1; x++) {
       const i = y * width + x;
       if (
-        mask[i] && mask[i - 1] && mask[i + 1] &&
-        mask[i - width] && mask[i + width] &&
-        mask[i - width - 1] && mask[i - width + 1] &&
-        mask[i + width - 1] && mask[i + width + 1]
-      ) out[i] = 1;
+        mask[i] &&
+        mask[i - 1] &&
+        mask[i + 1] &&
+        mask[i - width] &&
+        mask[i + width] &&
+        mask[i - width - 1] &&
+        mask[i - width + 1] &&
+        mask[i + width - 1] &&
+        mask[i + width + 1]
+      )
+        out[i] = 1;
     }
   }
   return out;
@@ -350,17 +381,29 @@ function dilateMask(mask: Uint8Array, width: number, height: number): Uint8Array
     for (let x = 1; x < width - 1; x++) {
       const i = y * width + x;
       if (
-        mask[i] || mask[i - 1] || mask[i + 1] ||
-        mask[i - width] || mask[i + width] ||
-        mask[i - width - 1] || mask[i - width + 1] ||
-        mask[i + width - 1] || mask[i + width + 1]
-      ) out[i] = 1;
+        mask[i] ||
+        mask[i - 1] ||
+        mask[i + 1] ||
+        mask[i - width] ||
+        mask[i + width] ||
+        mask[i - width - 1] ||
+        mask[i - width + 1] ||
+        mask[i + width - 1] ||
+        mask[i + width + 1]
+      )
+        out[i] = 1;
     }
   }
   return out;
 }
 
-function pushIf(mask: Uint8Array, visited: Uint8Array, stack: Int32Array, sp: number, idx: number): number {
+function pushIf(
+  mask: Uint8Array,
+  visited: Uint8Array,
+  stack: Int32Array,
+  sp: number,
+  idx: number,
+): number {
   if (mask[idx] && !visited[idx]) {
     visited[idx] = 1;
     stack[sp] = idx;
@@ -393,8 +436,11 @@ function evaluateContour(
   const shortSide = Math.max(1, Math.min(avgW, avgH));
   const a4Ratio = Math.max(avgW, avgH) / shortSide;
   const ratioError = Math.abs(a4Ratio - A4_RATIO) / A4_RATIO;
-  const perspectiveError = Math.max(top, bottom) / Math.max(1, Math.min(top, bottom)) - 1 +
-    Math.max(left, right) / Math.max(1, Math.min(left, right)) - 1;
+  const perspectiveError =
+    Math.max(top, bottom) / Math.max(1, Math.min(top, bottom)) -
+    1 +
+    Math.max(left, right) / Math.max(1, Math.min(left, right)) -
+    1;
   const sideDeviation = contourSideDeviation(contour, ordered) / shortSide;
   const polygonFill = componentArea / Math.max(1, area);
 
@@ -410,7 +456,8 @@ function evaluateContour(
   const straightScore = clamp01(1 - sideDeviation / 0.1);
   const fillScore = polygonFill >= 0.72 ? 1 : clamp01((polygonFill - 0.5) / 0.22);
   const perspectiveScore = clamp01(1 - perspectiveError / 1.25);
-  const confidence = 0.4 * straightScore + 0.15 * ratioScore + 0.2 * fillScore + 0.25 * perspectiveScore;
+  const confidence =
+    0.4 * straightScore + 0.15 * ratioScore + 0.2 * fillScore + 0.25 * perspectiveScore;
 
   return {
     corners: ordered,
@@ -421,16 +468,18 @@ function evaluateContour(
 }
 
 function convexHull(points: Point[]): Point[] {
-  const sorted = [...points].sort((a, b) => a.x === b.x ? a.y - b.y : a.x - b.x);
+  const sorted = [...points].sort((a, b) => (a.x === b.x ? a.y - b.y : a.x - b.x));
   const lower: Point[] = [];
   for (const p of sorted) {
-    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0)
+      lower.pop();
     lower.push(p);
   }
   const upper: Point[] = [];
   for (let i = sorted.length - 1; i >= 0; i--) {
     const p = sorted[i];
-    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0)
+      upper.pop();
     upper.push(p);
   }
   lower.pop();
@@ -461,7 +510,9 @@ function reduceHullToQuad(hull: Point[]): [Point, Point, Point, Point] | null {
 function orderQuad(quad: [Point, Point, Point, Point]): [Point, Point, Point, Point] {
   const cx = quad.reduce((s, p) => s + p.x, 0) / 4;
   const cy = quad.reduce((s, p) => s + p.y, 0) / 4;
-  let ordered = [...quad].sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx));
+  let ordered = [...quad].sort(
+    (a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx),
+  );
   if (polygonArea(ordered) < 0) ordered = ordered.reverse();
   let tlIndex = 0;
   let best = Infinity;

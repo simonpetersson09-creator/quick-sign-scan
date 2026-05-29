@@ -28,11 +28,11 @@ export const Route = createFileRoute("/scan")({
 
 // Stability requirements — the document must be locked in on all 4 corners
 // for a sustained period before the camera captures, so we never fire too early.
-const STABLE_DELTA = 0.008; // normalized 0..1 — max corner movement to count as stable
-const DETECT_FRAMES = 8;    // consecutive detections before we even consider it found
-const HOLD_FRAMES = 18;     // ~0.6s — "Håll stilla" phase
-const READY_FRAMES = 45;    // ~1.5s — "Dokument hittat" lock-in
-const STABLE_FRAMES = 75;   // ~2.5s total before auto-capture
+const STABLE_DELTA = 0.016; // normalized 0..1 — max smoothed corner movement to count as stable
+const DETECT_FRAMES = 5; // consecutive detections before we even consider it found
+const HOLD_FRAMES = 18; // ~0.6s — "Håll stilla" phase
+const READY_FRAMES = 45; // ~1.5s — "Dokument hittat" lock-in
+const STABLE_FRAMES = 75; // ~2.5s total before auto-capture
 
 function ScanPage() {
   const navigate = useNavigate();
@@ -146,19 +146,23 @@ function ScanPage() {
     detectionMeta.current = detection;
 
     // Normalize to 0..1
-    const norm = corners.map((p) => ({ x: p.x / dw, y: p.y / dh })) as
-      [Point, Point, Point, Point];
+    const norm = corners.map((p) => ({ x: p.x / dw, y: p.y / dh })) as [Point, Point, Point, Point];
 
     // Stronger smoothing — slower lock-in, more reliable corners
+    const previousSmooth = smoothQuad.current;
     const smoothed = emaQuad(smoothQuad.current, norm, 0.22);
     smoothQuad.current = smoothed;
 
     const last = lastRawQuad.current;
     lastRawQuad.current = norm;
-    const delta = last ? maxCornerDelta(norm, last) : 1;
+    const delta = previousSmooth
+      ? maxCornerDelta(smoothed, previousSmooth)
+      : last
+        ? maxCornerDelta(norm, last)
+        : 1;
 
     if (delta < STABLE_DELTA) stableCount.current++;
-    else stableCount.current = Math.max(0, stableCount.current - 3);
+    else stableCount.current = Math.max(0, stableCount.current - 1);
 
     // Wait for enough consecutive detections before showing anything as "found".
     if (detectCount.current < DETECT_FRAMES) {
@@ -183,11 +187,7 @@ function ScanPage() {
     }
   }
 
-
-  function drawOverlay(
-    quad: [Point, Point, Point, Point] | null,
-    active: boolean,
-  ) {
+  function drawOverlay(quad: [Point, Point, Point, Point] | null, active: boolean) {
     const svg = svgRef.current;
     const poly = polyRef.current;
     if (!svg || !poly) return;
@@ -217,13 +217,14 @@ function ScanPage() {
     const offX = (w - dispW) / 2;
     const offY = (h - dispH) / 2;
 
-    const pts = quad
-      .map((p) => `${offX + p.x * dispW},${offY + p.y * dispH}`)
-      .join(" ");
+    const pts = quad.map((p) => `${offX + p.x * dispW},${offY + p.y * dispH}`).join(" ");
     poly.setAttribute("points", pts);
     poly.style.opacity = "1";
     poly.setAttribute("stroke", active ? "var(--success)" : "rgba(255,255,255,0.95)");
-    poly.setAttribute("fill", active ? "color-mix(in oklab, var(--success) 18%, transparent)" : "rgba(255,255,255,0.06)");
+    poly.setAttribute(
+      "fill",
+      active ? "color-mix(in oklab, var(--success) 18%, transparent)" : "rgba(255,255,255,0.06)",
+    );
 
     quad.forEach((p, i) => {
       const c = cornerRefs.current[i];
@@ -273,12 +274,14 @@ function ScanPage() {
     scanStore.set({
       imageDataUrl: dataUrl,
       sourceDataUrl,
-      detection: meta ? {
-        corners: normQuad,
-        a4Ratio: meta.a4Ratio,
-        confidence: meta.confidence,
-        debug: meta.debug,
-      } : null,
+      detection: meta
+        ? {
+            corners: normQuad,
+            a4Ratio: meta.a4Ratio,
+            confidence: meta.confidence,
+            debug: meta.debug,
+          }
+        : null,
     });
     streamRef.current?.getTracks().forEach((t) => t.stop());
     navigate({ to: "/preview" });
@@ -292,7 +295,6 @@ function ScanPage() {
     setStatus("capturing");
     capture(q);
   }
-
 
   const statusText: Record<Status, string> = {
     starting: "Startar kamera…",
@@ -359,9 +361,7 @@ function ScanPage() {
         </button>
         <div
           className={`px-4 py-2 rounded-full text-[13px] font-medium backdrop-blur transition ${
-            statusActive
-              ? "bg-success/90 text-success-foreground"
-              : "bg-black/55 text-white"
+            statusActive ? "bg-success/90 text-success-foreground" : "bg-black/55 text-white"
           }`}
         >
           {statusText[status]}
@@ -373,9 +373,7 @@ function ScanPage() {
 
       {/* Bottom hint / manual capture */}
       <div className="relative pb-safe px-5 pt-4 flex flex-col items-center gap-3">
-        {error && (
-          <p className="text-center text-sm text-red-200 max-w-xs">{error}</p>
-        )}
+        {error && <p className="text-center text-sm text-red-200 max-w-xs">{error}</p>}
         <button
           onClick={manualCapture}
           disabled={
@@ -392,9 +390,9 @@ function ScanPage() {
           <Camera className="h-7 w-7" />
         </button>
         <p className="text-xs text-white/75 text-center max-w-[260px]">
-          Lägg A4-dokumentet på en jämn, kontrasterande yta. Bilden tas automatiskt när hörnen är stabila.
+          Lägg A4-dokumentet på en jämn, kontrasterande yta. Bilden tas automatiskt när hörnen är
+          stabila.
         </p>
-
       </div>
     </div>
   );
