@@ -77,7 +77,7 @@ function PreviewPage() {
 
       {!detection && (
         <div className="mt-4 rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm font-medium">
-          Kunde inte identifiera dokumentets kanter tillräckligt säkert.
+          Kunde inte identifiera dokumentets kanter.
         </div>
       )}
 
@@ -105,11 +105,15 @@ function PreviewPage() {
           {debugOpen && (
             <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-[12px]">
               <Metric label="A4-ratio" ok={Math.abs(detection.a4Ratio - Math.SQRT2) < 0.18} value={detection.a4Ratio.toFixed(2)} />
-              <Metric label="Säkerhet" ok={detection.confidence >= 0.68} value={`${Math.round(detection.confidence * 100)}%`} />
+              <Metric label="Confidence" ok={detection.confidence >= 0.58} value={`${Math.round(detection.confidence * 100)}%`} />
+              <Metric label="Kandidater" ok={detection.debug.candidateCount > 0} value={detection.debug.candidateCount} />
+              <Metric label="A4-score" ok={detection.debug.a4Score >= 0.55} value={`${Math.round(detection.debug.a4Score * 100)}%`} />
+              <Metric label="Kant-score" ok={detection.debug.edgeScore >= 0.34} value={`${Math.round(detection.debug.edgeScore * 100)}%`} />
+              <Metric label="Text-score" ok={detection.debug.textScore >= 0.2} value={`${Math.round(detection.debug.textScore * 100)}%`} />
+              <Metric label="Yta" ok={detection.debug.areaRatio >= 0.1 && detection.debug.areaRatio <= 0.9} value={`${Math.round(detection.debug.areaRatio * 100)}%`} />
               <Metric label="Raka sidor" ok={detection.debug.sideDeviation < 0.08} value={detection.debug.sideDeviation.toFixed(3)} />
               <Metric label="Perspektiv" ok={detection.debug.perspectiveError < 0.95} value={detection.debug.perspectiveError.toFixed(2)} />
-              <Metric label="Konturfyllnad" ok={detection.debug.polygonFill >= 0.8} value={detection.debug.polygonFill.toFixed(2)} />
-              <Metric label="Tröskel" ok value={Math.round(detection.debug.threshold)} />
+              <Metric label="Canny-tröskel" ok value={Math.round(detection.debug.edgeThreshold)} />
             </div>
           )}
         </div>

@@ -11,7 +11,14 @@ export interface ScanSession {
     a4Ratio: number;
     confidence: number;
     debug: {
+      edgeThreshold: number;
       threshold: number;
+      candidateCount: number;
+      a4Score: number;
+      edgeScore: number;
+      brightnessScore: number;
+      textScore: number;
+      areaRatio: number;
       sideDeviation: number;
       perspectiveError: number;
       polygonFill: number;
