@@ -63,9 +63,9 @@ function PreviewPage() {
           className="rounded-2xl overflow-hidden shadow-[var(--shadow-card)] border border-border bg-white"
           style={{ width: "min(78vw, 340px)", aspectRatio: "1 / 1.414" }}
         >
-          <img src={image} alt="Skannat dokument" className="w-full h-full object-cover" />
-        </div>
           <img src={image} alt="Skannat dokument" className="w-full h-full object-contain bg-white" />
+        </div>
+      </div>
 
 
       <div
