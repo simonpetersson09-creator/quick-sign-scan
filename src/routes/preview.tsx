@@ -140,7 +140,7 @@ function PreviewPage() {
               />
               <Metric
                 label="Confidence"
-                ok={detection.confidence >= 0.58}
+                ok={detection.confidence >= 0.5}
                 value={`${Math.round(detection.confidence * 100)}%`}
               />
               <Metric
