@@ -458,6 +458,7 @@ function pushIf(
 function evaluateContour(
   contour: Point[],
   componentArea: number,
+  bboxArea: number,
   frameArea: number,
   threshold: number,
 ): DocumentDetection | null {
@@ -484,21 +485,27 @@ function evaluateContour(
     1 +
     Math.max(left, right) / Math.max(1, Math.min(left, right)) -
     1;
-  const sideDeviation = contourSideDeviation(contour, ordered) / shortSide;
-  const polygonFill = componentArea / Math.max(1, area);
+  // Measure straightness against the convex hull only — the raw contour
+  // contains noise from text/edge fuzz that would falsely inflate deviation.
+  const sideDeviation = contourSideDeviation(hull, ordered) / shortSide;
+  // Fill ratio uses bbox (not pixel count) — robust to dark ink inside paper.
+  const polygonFill = bboxArea / Math.max(1, area);
 
   // A real A4 sheet can project close to square when photographed at an angle,
-  // so ratio validation must be broad. Straight contour + fill are stronger
-  // signals here; the final warp always outputs a true A4 rectangle.
-  if (ratioError > 0.48) return null;
-  if (perspectiveError > 1.25) return null;
-  if (sideDeviation > 0.1) return null;
-  if (polygonFill < 0.5 || polygonFill > 1.25) return null;
+  // so ratio validation must be broad. Straight edges and bounding-box fill
+  // are stronger signals; the final warp always outputs a true A4 rectangle.
+  if (ratioError > 0.55) return null;
+  if (perspectiveError > 1.5) return null;
+  if (sideDeviation > 0.08) return null;
+  if (polygonFill < 0.55 || polygonFill > 1.45) return null;
 
-  const ratioScore = clamp01(1 - ratioError / 0.48);
-  const straightScore = clamp01(1 - sideDeviation / 0.1);
-  const fillScore = polygonFill >= 0.72 ? 1 : clamp01((polygonFill - 0.5) / 0.22);
-  const perspectiveScore = clamp01(1 - perspectiveError / 1.25);
+  const ratioScore = clamp01(1 - ratioError / 0.55);
+  const straightScore = clamp01(1 - sideDeviation / 0.08);
+  const fillScore =
+    polygonFill >= 0.85 && polygonFill <= 1.15
+      ? 1
+      : clamp01(1 - Math.abs(polygonFill - 1) / 0.45);
+  const perspectiveScore = clamp01(1 - perspectiveError / 1.5);
   const confidence =
     0.4 * straightScore + 0.15 * ratioScore + 0.2 * fillScore + 0.25 * perspectiveScore;
 
