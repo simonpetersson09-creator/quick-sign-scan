@@ -227,7 +227,7 @@ export interface DocumentDetection {
 }
 
 const A4_RATIO = Math.SQRT2;
-export const MIN_DOCUMENT_CONFIDENCE = 0.58;
+export const MIN_DOCUMENT_CONFIDENCE = 0.5;
 
 // Detect the document from its contour: isolate candidate paper, extract the
 // outer boundary, reduce the convex contour to four real corners, then reject
@@ -655,15 +655,15 @@ function evaluateEdgeQuad(args: {
   const areaScore =
     areaRatio <= 0.7 ? clamp01((areaRatio - 0.1) / 0.18) : clamp01((0.9 - areaRatio) / 0.2);
   const confidence =
-    0.25 * edgeScore +
-    0.2 * straightScore +
-    0.16 * a4Score +
-    0.14 * brightnessScore +
-    0.12 * textScore +
-    0.08 * perspectiveScore +
+    0.3 * edgeScore +
+    0.18 * straightScore +
+    0.14 * a4Score +
+    0.16 * brightnessScore +
+    0.1 * textScore +
+    0.07 * perspectiveScore +
     0.05 * areaScore;
 
-  if (edgeScore < 0.34 || brightnessScore < 0.18) return null;
+  if (edgeScore < 0.26 || brightnessScore < 0.18) return null;
 
   return {
     corners: ordered,
