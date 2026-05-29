@@ -363,6 +363,27 @@ function otsuThreshold(hist: Uint32Array, total: number): number {
   return threshold;
 }
 
+function percentileThreshold(hist: Uint32Array, total: number, percentile: number): number {
+  const target = total * percentile;
+  let seen = 0;
+  for (let v = 0; v < 256; v++) {
+    seen += hist[v];
+    if (seen >= target) return v;
+  }
+  return 127;
+}
+
+function uniqueThresholds(values: number[]): number[] {
+  const out: number[] = [];
+  for (const value of values) {
+    const threshold = Math.max(45, Math.min(235, Math.round(value)));
+    if (!out.some((existing) => Math.abs(existing - threshold) < 8)) {
+      out.push(threshold);
+    }
+  }
+  return out;
+}
+
 function erodeMask(mask: Uint8Array, width: number, height: number): Uint8Array {
   const out = new Uint8Array(mask.length);
   for (let y = 1; y < height - 1; y++) {
