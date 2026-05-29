@@ -14,6 +14,7 @@ import { Route as SignRouteImport } from './routes/sign'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SendRouteImport } from './routes/send'
 import { Route as ScanRouteImport } from './routes/scan'
+import { Route as ReviewRouteImport } from './routes/review'
 import { Route as PreviewRouteImport } from './routes/preview'
 import { Route as IndexRouteImport } from './routes/index'
 
@@ -42,6 +43,11 @@ const ScanRoute = ScanRouteImport.update({
   path: '/scan',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReviewRoute = ReviewRouteImport.update({
+  id: '/review',
+  path: '/review',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PreviewRoute = PreviewRouteImport.update({
   id: '/preview',
   path: '/preview',
@@ -56,6 +62,7 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/preview': typeof PreviewRoute
+  '/review': typeof ReviewRoute
   '/scan': typeof ScanRoute
   '/send': typeof SendRoute
   '/settings': typeof SettingsRoute
@@ -65,6 +72,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/preview': typeof PreviewRoute
+  '/review': typeof ReviewRoute
   '/scan': typeof ScanRoute
   '/send': typeof SendRoute
   '/settings': typeof SettingsRoute
@@ -75,6 +83,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/preview': typeof PreviewRoute
+  '/review': typeof ReviewRoute
   '/scan': typeof ScanRoute
   '/send': typeof SendRoute
   '/settings': typeof SettingsRoute
@@ -86,6 +95,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/preview'
+    | '/review'
     | '/scan'
     | '/send'
     | '/settings'
@@ -95,6 +105,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/preview'
+    | '/review'
     | '/scan'
     | '/send'
     | '/settings'
@@ -104,6 +115,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/preview'
+    | '/review'
     | '/scan'
     | '/send'
     | '/settings'
@@ -114,6 +126,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   PreviewRoute: typeof PreviewRoute
+  ReviewRoute: typeof ReviewRoute
   ScanRoute: typeof ScanRoute
   SendRoute: typeof SendRoute
   SettingsRoute: typeof SettingsRoute
@@ -158,6 +171,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ScanRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/review': {
+      id: '/review'
+      path: '/review'
+      fullPath: '/review'
+      preLoaderRoute: typeof ReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/preview': {
       id: '/preview'
       path: '/preview'
@@ -178,6 +198,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   PreviewRoute: PreviewRoute,
+  ReviewRoute: ReviewRoute,
   ScanRoute: ScanRoute,
   SendRoute: SendRoute,
   SettingsRoute: SettingsRoute,

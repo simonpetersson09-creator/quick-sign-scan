@@ -76,7 +76,7 @@ function SignPage() {
     if (saveAsDefault && !useSaved) {
       saveSettings({ ...settings, savedSignature: dataUrl });
     }
-    navigate({ to: "/send" });
+    navigate({ to: "/review" });
   }
 
   return (
