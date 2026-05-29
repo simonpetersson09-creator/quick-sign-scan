@@ -78,6 +78,14 @@ function SignPage() {
     }
     navigate({ to: "/review" });
   }
+
+  return (
+    <AppShell title="Signera" back="/preview">
+      <p className="text-sm text-muted-foreground mt-1">
+        Skriv din signatur med fingret i rutan nedan.
+      </p>
+
+      {settings.savedSignature && (
         <button
           onClick={() => setUseSaved((v) => !v)}
           className={`mt-4 rounded-2xl border p-3 text-left text-sm transition ${
