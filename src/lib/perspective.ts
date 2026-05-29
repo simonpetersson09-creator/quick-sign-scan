@@ -115,6 +115,81 @@ export function warpQuadToRect(
   return out;
 }
 
+// Paper enhancement: normalize lighting and stretch whites so the document
+// looks like clean white paper with crisp dark ink (like a scanner output).
+// Operates in-place on a canvas and returns it.
+export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
+  const w = canvas.width;
+  const h = canvas.height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  const n = w * h;
+
+  // 1) Compute luminance + histogram
+  const lum = new Uint8ClampedArray(n);
+  const hist = new Uint32Array(256);
+  for (let i = 0, j = 0; i < d.length; i += 4, j++) {
+    const l = (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) | 0;
+    lum[j] = l;
+    hist[l]++;
+  }
+
+  // 2) Find black point (5th percentile) and white point (75th percentile)
+  //    Mapping 75th percentile to white aggressively whitens the paper.
+  let cum = 0;
+  let black = 0;
+  const blackTarget = n * 0.05;
+  for (let v = 0; v < 256; v++) {
+    cum += hist[v];
+    if (cum >= blackTarget) { black = v; break; }
+  }
+  cum = 0;
+  let white = 255;
+  const whiteTarget = n * 0.75;
+  for (let v = 0; v < 256; v++) {
+    cum += hist[v];
+    if (cum >= whiteTarget) { white = v; break; }
+  }
+  if (white - black < 30) white = Math.min(255, black + 30);
+
+  // 3) Apply per-pixel: stretch luminance, desaturate slightly toward gray
+  const range = white - black;
+  const lut = new Uint8ClampedArray(256);
+  for (let v = 0; v < 256; v++) {
+    let t = (v - black) / range;
+    if (t < 0) t = 0;
+    else if (t > 1) t = 1;
+    // Soft gamma for nicer midtones
+    t = Math.pow(t, 0.9);
+    lut[v] = (t * 255) | 0;
+  }
+
+  for (let i = 0, j = 0; i < d.length; i += 4, j++) {
+    const oldL = lum[j];
+    const newL = lut[oldL];
+    // Scale RGB proportionally; clamp.
+    const k = oldL === 0 ? 1 : newL / Math.max(1, oldL);
+    let r = d[i] * k;
+    let g = d[i + 1] * k;
+    let b = d[i + 2] * k;
+    // Desaturate slightly (pull 40% toward luminance) to neutralize paper tint
+    r = r * 0.6 + newL * 0.4;
+    g = g * 0.6 + newL * 0.4;
+    b = b * 0.6 + newL * 0.4;
+    if (r > 255) r = 255;
+    if (g > 255) g = 255;
+    if (b > 255) b = 255;
+    d[i] = r;
+    d[i + 1] = g;
+    d[i + 2] = b;
+  }
+
+  ctx.putImageData(img, 0, 0);
+  return canvas;
+}
+
+
 // Find the 4 extreme corners of a bright (paper-like) region in a grayscale frame.
 // Returns null if no plausible document is found.
 // Coordinates returned are in the SAME pixel space as the input data (width x height).
