@@ -1,9 +1,14 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
-import { PenLine, Send } from "lucide-react";
+import {
+  analyzeDocumentQuality,
+  QualityReport,
+  VERDICT_MESSAGE,
+} from "@/lib/quality";
+import { Check, RefreshCw, AlertTriangle, ArrowRight } from "lucide-react";
 
 export const Route = createFileRoute("/preview")({
   head: () => ({ meta: [{ title: "Förhandsgranska" }] }),
@@ -13,8 +18,8 @@ export const Route = createFileRoute("/preview")({
 function PreviewPage() {
   const navigate = useNavigate();
   const [image, setImage] = useState<string | null>(null);
-  const [sigPos, setSigPos] = useState<{ x: number; y: number }>({ x: 0.5, y: 0.86 });
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [report, setReport] = useState<QualityReport | null>(null);
+  const [analyzing, setAnalyzing] = useState(true);
 
   useEffect(() => {
     const img = scanStore.get().imageDataUrl;
@@ -23,68 +28,152 @@ function PreviewPage() {
       return;
     }
     setImage(img);
-    // "AI-detected" signature line — default near bottom center
-    scanStore.set({ signaturePosition: { x: 0.5, y: 0.86 } });
+    setAnalyzing(true);
+    analyzeDocumentQuality(img)
+      .then((r) => {
+        setReport(r);
+      })
+      .catch(() => {
+        setReport(null);
+      })
+      .finally(() => setAnalyzing(false));
   }, [navigate]);
 
-  function moveTo(e: React.PointerEvent<HTMLDivElement>) {
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const x = Math.max(0.05, Math.min(0.95, (e.clientX - rect.left) / rect.width));
-    const y = Math.max(0.05, Math.min(0.95, (e.clientY - rect.top) / rect.height));
-    setSigPos({ x, y });
-    scanStore.set({ signaturePosition: { x, y } });
+  function retake() {
+    scanStore.set({ imageDataUrl: null, signatureDataUrl: null, signaturePosition: null, pdfDataUrl: null });
+    navigate({ to: "/scan" });
   }
 
-  function goSign() {
-    scanStore.set({ signaturePosition: sigPos });
-    navigate({ to: "/sign" });
-  }
-  function goSend() {
-    scanStore.set({ signatureDataUrl: null, signaturePosition: null });
-    navigate({ to: "/send" });
+  function accept() {
+    navigate({ to: "/place" });
   }
 
   if (!image) return null;
 
+  const ok = report?.verdict === "ok";
+
   return (
     <AppShell title="Förhandsgranska" back="/">
       <p className="text-sm text-muted-foreground mt-1 mb-3">
-        Vi har hittat en föreslagen plats för signaturen. Tryck för att flytta.
+        Kontrollera att dokumentet är skarpt och komplett.
       </p>
-      <div className="flex-1 flex items-center justify-center">
+
+      <div className="flex items-center justify-center">
         <div
-          ref={containerRef}
-          onPointerDown={moveTo}
-          className="relative rounded-2xl overflow-hidden shadow-[var(--shadow-card)] border border-border bg-white touch-none select-none"
-          style={{ width: "min(82vw, 360px)", aspectRatio: "1 / 1.414" }}
+          className="rounded-2xl overflow-hidden shadow-[var(--shadow-card)] border border-border bg-white"
+          style={{ width: "min(78vw, 340px)", aspectRatio: "1 / 1.414" }}
         >
-          <img src={image} alt="Skannat dokument" className="absolute inset-0 w-full h-full object-cover" />
-          {/* signature placeholder marker */}
-          <div
-            className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-            style={{ left: `${sigPos.x * 100}%`, top: `${sigPos.y * 100}%` }}
-          >
-            <div className="w-32 h-10 rounded-md border-2 border-dashed border-primary/80 bg-primary/10 flex items-center justify-center">
-              <PenLine className="h-4 w-4 text-primary" />
-              <span className="ml-1 text-[11px] font-medium text-primary">Signatur</span>
-            </div>
-          </div>
+          <img src={image} alt="Skannat dokument" className="w-full h-full object-cover" />
         </div>
       </div>
 
+      <div
+        className={`mt-5 rounded-2xl p-4 border transition ${
+          analyzing
+            ? "bg-card border-border"
+            : ok
+              ? "bg-success/10 border-success/30"
+              : "bg-accent/40 border-accent"
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 ${
+              analyzing
+                ? "bg-secondary text-muted-foreground"
+                : ok
+                  ? "bg-success text-success-foreground"
+                  : "bg-foreground/80 text-background"
+            }`}
+          >
+            {analyzing ? (
+              <RefreshCw className="h-4 w-4 animate-spin" />
+            ) : ok ? (
+              <Check className="h-5 w-5" />
+            ) : (
+              <AlertTriangle className="h-4 w-4" />
+            )}
+          </div>
+          <div className="flex-1">
+            <div className="text-[15px] font-semibold">
+              {analyzing
+                ? "Analyserar kvalitet…"
+                : report
+                  ? VERDICT_MESSAGE[report.verdict]
+                  : "Kunde inte analysera"}
+            </div>
+            {report && (
+              <div className="text-[12px] text-muted-foreground mt-0.5">
+                {ok
+                  ? "Du kan gå vidare till signering."
+                  : "Du kan ändå använda bilden, eller ta om den."}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {report && (
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mt-4">
+            <Metric
+              label="Skärpa"
+              ok={report.sharpness >= 55}
+              value={Math.round(report.sharpness)}
+            />
+            <Metric
+              label="Kontrast"
+              ok={report.contrast >= 28}
+              value={Math.round(report.contrast)}
+            />
+            <Metric
+              label="Ljus"
+              ok={report.brightness >= 95 && report.brightness <= 240}
+              value={Math.round(report.brightness)}
+            />
+            <Metric
+              label="Komplett"
+              ok={report.inkBands.every((b) => b >= 0.003)}
+              value={`${Math.round(report.inkBands.reduce((a, b) => a + b, 0) * 100)}%`}
+            />
+          </div>
+        )}
+      </div>
+
+      <div className="flex-1" />
+
       <div className="flex flex-col gap-3 pt-5">
-        <PrimaryButton onClick={goSign}>
+        <PrimaryButton onClick={accept} disabled={analyzing}>
           <span className="inline-flex items-center justify-center gap-2">
-            <PenLine className="h-5 w-5" /> Signera dokument
+            Använd dokument <ArrowRight className="h-5 w-5" />
           </span>
         </PrimaryButton>
-        <PrimaryButton variant="secondary" onClick={goSend}>
+        <PrimaryButton variant="secondary" onClick={retake}>
           <span className="inline-flex items-center justify-center gap-2">
-            <Send className="h-5 w-5" /> Skicka utan signatur
+            <RefreshCw className="h-5 w-5" /> Ta om bild
           </span>
         </PrimaryButton>
       </div>
     </AppShell>
+  );
+}
+
+function Metric({
+  label,
+  ok,
+  value,
+}: {
+  label: string;
+  ok: boolean;
+  value: string | number;
+}) {
+  return (
+    <div className="flex items-center justify-between text-[13px]">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="inline-flex items-center gap-1.5">
+        <span
+          className={`h-2 w-2 rounded-full ${ok ? "bg-success" : "bg-destructive/80"}`}
+        />
+        <span className="font-medium tabular-nums">{value}</span>
+      </span>
+    </div>
   );
 }

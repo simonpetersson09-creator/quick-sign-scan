@@ -34,7 +34,7 @@ function ReviewPage() {
   }, [navigate]);
 
   return (
-    <AppShell title="Granska dokument" back="/preview">
+    <AppShell title="Granska dokument" back="/sign">
       <p className="text-sm text-muted-foreground mt-1 mb-3">
         Så här kommer dokumentet att skickas.
       </p>

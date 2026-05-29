@@ -16,6 +16,7 @@ import { Route as SendRouteImport } from './routes/send'
 import { Route as ScanRouteImport } from './routes/scan'
 import { Route as ReviewRouteImport } from './routes/review'
 import { Route as PreviewRouteImport } from './routes/preview'
+import { Route as PlaceRouteImport } from './routes/place'
 import { Route as IndexRouteImport } from './routes/index'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -53,6 +54,11 @@ const PreviewRoute = PreviewRouteImport.update({
   path: '/preview',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PlaceRoute = PlaceRouteImport.update({
+  id: '/place',
+  path: '/place',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -61,6 +67,7 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/place': typeof PlaceRoute
   '/preview': typeof PreviewRoute
   '/review': typeof ReviewRoute
   '/scan': typeof ScanRoute
@@ -71,6 +78,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/place': typeof PlaceRoute
   '/preview': typeof PreviewRoute
   '/review': typeof ReviewRoute
   '/scan': typeof ScanRoute
@@ -82,6 +90,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/place': typeof PlaceRoute
   '/preview': typeof PreviewRoute
   '/review': typeof ReviewRoute
   '/scan': typeof ScanRoute
@@ -94,6 +103,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/place'
     | '/preview'
     | '/review'
     | '/scan'
@@ -104,6 +114,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/place'
     | '/preview'
     | '/review'
     | '/scan'
@@ -114,6 +125,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/place'
     | '/preview'
     | '/review'
     | '/scan'
@@ -125,6 +137,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  PlaceRoute: typeof PlaceRoute
   PreviewRoute: typeof PreviewRoute
   ReviewRoute: typeof ReviewRoute
   ScanRoute: typeof ScanRoute
@@ -185,6 +198,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PreviewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/place': {
+      id: '/place'
+      path: '/place'
+      fullPath: '/place'
+      preLoaderRoute: typeof PlaceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -197,6 +217,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  PlaceRoute: PlaceRoute,
   PreviewRoute: PreviewRoute,
   ReviewRoute: ReviewRoute,
   ScanRoute: ScanRoute,
