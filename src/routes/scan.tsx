@@ -22,6 +22,8 @@ type Status =
   | "capturing"
   | "error";
 
+type ErrorType = "permission_denied" | "not_found" | "unknown";
+
 export const Route = createFileRoute("/scan")({
   head: () => ({ meta: [{ title: "Skanna dokument" }] }),
   component: ScanPage,
