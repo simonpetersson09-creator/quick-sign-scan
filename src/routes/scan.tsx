@@ -10,7 +10,7 @@ import {
   maxCornerDelta,
   warpQuadToRect,
 } from "@/lib/perspective";
-import { Camera, CameraOff, X, RefreshCw, ArrowLeft, Settings as SettingsIcon } from "lucide-react";
+import { Camera, CameraOff, X, RefreshCw, ArrowLeft } from "lucide-react";
 
 type Status =
   | "starting"
