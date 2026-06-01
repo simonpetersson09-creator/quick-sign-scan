@@ -211,7 +211,7 @@ function SendPage() {
       <div className="flex-1" />
 
       <div className="pt-5 flex flex-col gap-3">
-        <PrimaryButton onClick={send} disabled={!to || !pdfUrl || sending}>
+        <PrimaryButton onClick={send} disabled={!emailValid || !pdfUrl || sending}>
           <span className="inline-flex items-center justify-center gap-2">
             <Mail className="h-5 w-5" />
             {sending ? "Förbereder…" : "Skicka PDF"}
