@@ -64,7 +64,7 @@ function Home() {
       {/* CTA */}
       <div className="flex items-center gap-3 pb-4">
         <Link to="/scan" className="flex-1 block group">
-          <div className="rounded-xl bg-primary text-primary-foreground py-3 px-4 shadow-[var(--shadow-card)] transition active:scale-[0.98] h-full flex items-center gap-3">
+          <div className="rounded-xl bg-primary text-primary-foreground py-3 px-4 shadow-[var(--shadow-card)] transition active:scale-[0.98] h-full flex items-center justify-center gap-3">
             <ScanLine className="h-5 w-5 shrink-0 opacity-90" strokeWidth={1.75} />
             <span className="text-[15px] font-semibold tracking-tight">Skanna dokument</span>
           </div>
