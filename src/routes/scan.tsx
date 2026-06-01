@@ -60,36 +60,46 @@ function ScanPage() {
   const [error, setError] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<ErrorType | null>(null);
 
+  const startCamera = useCallback(async () => {
+    setStatus("starting");
+    setError(null);
+    setErrorType(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
+        audio: false,
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      setStatus("searching");
+      loop();
+    } catch (e) {
+      console.error(e);
+      const err = e as Error;
+      if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+        setErrorType("permission_denied");
+        setError("Kamerabehörighet nekad. Appen kan inte skanna dokument utan tillgång till kameran.");
+      } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
+        setErrorType("not_found");
+        setError("Ingen kamera hittades på den här enheten.");
+      } else {
+        setErrorType("unknown");
+        setError("Kunde inte öppna kameran. Ett oväntat fel inträffade.");
+      }
+      setStatus("error");
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
-    async function start() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: "environment" },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
-          },
-          audio: false,
-        });
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
-        setStatus("searching");
-        loop();
-      } catch (e) {
-        console.error(e);
-        setError("Kunde inte öppna kameran. Kontrollera att du gett behörighet.");
-        setStatus("error");
-      }
-    }
-    start();
+    startCamera();
     return () => {
       cancelled = true;
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
