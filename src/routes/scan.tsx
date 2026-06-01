@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { scanStore } from "@/lib/scanStore";
 import {
   detectDocumentQuad,
@@ -10,7 +10,7 @@ import {
   maxCornerDelta,
   warpQuadToRect,
 } from "@/lib/perspective";
-import { Camera, X } from "lucide-react";
+import { Camera, CameraOff, X, RefreshCw, ArrowLeft } from "lucide-react";
 
 type Status =
   | "starting"
@@ -21,6 +21,8 @@ type Status =
   | "ready"
   | "capturing"
   | "error";
+
+type ErrorType = "permission_denied" | "not_found" | "unknown";
 
 export const Route = createFileRoute("/scan")({
   head: () => ({ meta: [{ title: "Skanna dokument" }] }),
@@ -56,37 +58,48 @@ function ScanPage() {
 
   const [status, setStatus] = useState<Status>("starting");
   const [error, setError] = useState<string | null>(null);
+  const [errorType, setErrorType] = useState<ErrorType | null>(null);
+
+  const startCamera = useCallback(async () => {
+    setStatus("starting");
+    setError(null);
+    setErrorType(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
+        audio: false,
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      setStatus("searching");
+      loop();
+    } catch (e) {
+      console.error(e);
+      const err = e as Error;
+      if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+        setErrorType("permission_denied");
+        setError("Kamerabehörighet nekad. Appen kan inte skanna dokument utan tillgång till kameran.");
+      } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
+        setErrorType("not_found");
+        setError("Ingen kamera hittades på den här enheten.");
+      } else {
+        setErrorType("unknown");
+        setError("Kunde inte öppna kameran. Ett oväntat fel inträffade.");
+      }
+      setStatus("error");
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
-    async function start() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: "environment" },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
-          },
-          audio: false,
-        });
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
-        setStatus("searching");
-        loop();
-      } catch (e) {
-        console.error(e);
-        setError("Kunde inte öppna kameran. Kontrollera att du gett behörighet.");
-        setStatus("error");
-      }
-    }
-    start();
+    startCamera();
     return () => {
       cancelled = true;
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -393,7 +406,7 @@ function ScanPage() {
 
       {/* Bottom hint / manual capture */}
       <div className="relative pb-safe px-5 pt-4 flex flex-col items-center gap-3">
-        {error && <p className="text-center text-sm text-red-200 max-w-xs">{error}</p>}
+        {error && status !== "error" && <p className="text-center text-sm text-red-200 max-w-xs">{error}</p>}
         <button
           onClick={manualCapture}
           disabled={
@@ -415,6 +428,100 @@ function ScanPage() {
           stabila.
         </p>
       </div>
+
+      {/* Permission / error overlay */}
+      {status === "error" && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm px-6">
+          <div className="flex flex-col items-center text-center max-w-sm gap-5">
+            <div className="h-16 w-16 rounded-full bg-white/10 flex items-center justify-center">
+              <CameraOff className="h-8 w-8 text-white/90" strokeWidth={1.5} />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <h2 className="text-xl font-semibold text-white tracking-tight">
+                {errorType === "permission_denied"
+                  ? "Kamerabehörighet nekad"
+                  : errorType === "not_found"
+                    ? "Ingen kamera hittades"
+                    : "Kameran kunde inte startas"}
+              </h2>
+              <p className="text-[15px] text-white/70 leading-relaxed">
+                {errorType === "permission_denied"
+                  ? "Appen behöver tillgång till kameran för att skanna dokument. Du kan ändra detta i enhetens inställningar."
+                  : error}
+              </p>
+            </div>
+
+            {errorType === "permission_denied" && (
+              <div className="w-full rounded-xl bg-white/8 border border-white/10 p-4 text-left">
+                <p className="text-[13px] font-medium text-white/90 mb-2">Så här aktiverar du kameran:</p>
+                <PlatformInstructions />
+              </div>
+            )}
+
+            <div className="flex flex-col w-full gap-3 mt-1">
+              {errorType === "permission_denied" && (
+                <button
+                  onClick={startCamera}
+                  className="w-full rounded-xl bg-white text-black py-3.5 px-4 font-semibold text-[15px] tracking-tight flex items-center justify-center gap-2 active:scale-[0.98] transition"
+                >
+                  <RefreshCw className="h-4 w-4" strokeWidth={2} />
+                  Försök igen
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  streamRef.current?.getTracks().forEach((t) => t.stop());
+                  navigate({ to: "/" });
+                }}
+                className="w-full rounded-xl bg-white/10 text-white py-3.5 px-4 font-medium text-[15px] tracking-tight flex items-center justify-center gap-2 active:scale-[0.98] transition"
+              >
+                <ArrowLeft className="h-4 w-4" strokeWidth={2} />
+                Tillbaka till start
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+function PlatformInstructions() {
+  const ua = navigator.userAgent;
+  const isIOS = /iPad|iPhone|iPod/.test(ua);
+  const isAndroid = /Android/.test(ua);
+
+  if (isIOS) {
+    return (
+      <ol className="text-[13px] text-white/65 leading-relaxed list-decimal list-inside space-y-1">
+        <li>Öppna <strong className="text-white/85">Inställningar</strong> på din iPhone/iPad</li>
+        <li>Scrolla ner till <strong className="text-white/85">Safari</strong></li>
+        <li>Tryck på <strong className="text-white/85">Kamera</strong></li>
+        <li>Välj <strong className="text-white/85">Tillåt</strong></li>
+        <li>Gå tillbaka till appen och tryck <strong className="text-white/85">Försök igen</strong></li>
+      </ol>
+    );
+  }
+
+  if (isAndroid) {
+    return (
+      <ol className="text-[13px] text-white/65 leading-relaxed list-decimal list-inside space-y-1">
+        <li>Tryck på <strong className="text-white/85">🔒</strong> (låsikonen) i adressfältet</li>
+        <li>Tryck på <strong className="text-white/85">Behörigheter</strong></li>
+        <li>Välj <strong className="text-white/85">Kamera → Tillåt</strong></li>
+        <li>Gå tillbaka till appen och tryck <strong className="text-white/85">Försök igen</strong></li>
+      </ol>
+    );
+  }
+
+  return (
+    <ol className="text-[13px] text-white/65 leading-relaxed list-decimal list-inside space-y-1">
+      <li>Öppna webbläsarens inställningar</li>
+      <li>Hitta <strong className="text-white/85">Sekretess och säkerhet</strong></li>
+      <li>Välj <strong className="text-white/85">Webbplatsbehörigheter</strong></li>
+      <li>Tillåt <strong className="text-white/85">Kamera</strong> för den här webbplatsen</li>
+      <li>Gå tillbaka till appen och tryck <strong className="text-white/85">Försök igen</strong></li>
+    </ol>
   );
 }
