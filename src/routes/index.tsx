@@ -62,8 +62,8 @@ function Home() {
       </div>
 
       {/* CTA */}
-      <div className="grid grid-cols-2 gap-3 pb-4">
-        <Link to="/scan" className="block group">
+      <div className="flex items-center gap-3 pb-4">
+        <Link to="/scan" className="flex-1 block group">
           <div className="rounded-xl bg-primary text-primary-foreground py-3 px-4 shadow-[var(--shadow-card)] transition active:scale-[0.98] h-full flex items-center gap-3">
             <ScanLine className="h-5 w-5 shrink-0 opacity-90" strokeWidth={1.75} />
             <span className="text-[15px] font-semibold tracking-tight">Skanna dokument</span>
@@ -71,9 +71,8 @@ function Home() {
         </Link>
 
         <Link to="/settings" className="block group">
-          <div className="rounded-xl bg-card text-card-foreground py-3 px-4 shadow-[var(--shadow-soft)] border border-border transition active:scale-[0.98] h-full flex items-center gap-3">
-            <SettingsIcon className="h-5 w-5 shrink-0 text-muted-foreground" strokeWidth={1.75} />
-            <span className="text-[15px] font-semibold tracking-tight">Inställningar</span>
+          <div className="rounded-xl bg-card text-muted-foreground h-12 w-12 flex items-center justify-center shadow-[var(--shadow-soft)] border border-border transition active:scale-[0.98]">
+            <SettingsIcon className="h-5 w-5 shrink-0" strokeWidth={1.75} />
           </div>
         </Link>
       </div>
