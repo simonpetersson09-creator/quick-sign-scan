@@ -75,6 +75,17 @@ function SendPage() {
       const filename = `${(subject || "dokument").replace(/[^\w\-]+/g, "_")}.pdf`;
       const pdfBase64 = pdfUrl.includes(",") ? pdfUrl.split(",")[1] : pdfUrl;
 
+      const approxBytes = Math.floor((pdfBase64.length * 3) / 4);
+      const approxMb = approxBytes / (1024 * 1024);
+      console.log(
+        `[send] PDF size: ~${approxMb.toFixed(2)} MB (${approxBytes} bytes)`,
+      );
+      if (approxMb > 5) {
+        setInfo(
+          `Varning: PDF:en är ${approxMb.toFixed(1)} MB. Stora bilagor kan blockeras av mottagarens server – om utskicket misslyckas, använd "Ladda ned PDF" och skicka manuellt.`,
+        );
+      }
+
       await sendEmailFn({
         data: {
           to,
