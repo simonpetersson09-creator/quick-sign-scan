@@ -153,17 +153,34 @@ function SendPage() {
         <Field label="Till">
           <input
             type="email"
+            inputMode="email"
+            autoComplete="email"
             value={to}
-            onChange={(e) => setTo(e.target.value)}
+            onChange={(e) => {
+              setTo(e.target.value);
+              if (emailError) setEmailError(null);
+            }}
+            onBlur={() => {
+              if (!trimmedTo) return;
+              const r = emailSchema.safeParse(trimmedTo);
+              setEmailError(r.success ? null : r.error.issues[0]?.message ?? "Ogiltig e-postadress");
+            }}
             placeholder="namn@exempel.se"
+            aria-invalid={!!emailError}
             className="input"
           />
+          {emailError && (
+            <p className="text-xs text-destructive mt-1.5 ml-1">{emailError}</p>
+          )}
           {settings.recipients.length > 0 && (
             <div className="flex gap-2 mt-2 overflow-x-auto -mx-1 px-1">
               {settings.recipients.map((r) => (
                 <button
                   key={r.email}
-                  onClick={() => setTo(r.email)}
+                  onClick={() => {
+                    setTo(r.email);
+                    setEmailError(null);
+                  }}
                   className="shrink-0 px-3 py-1.5 rounded-full bg-secondary text-secondary-foreground text-xs font-medium"
                 >
                   {r.email}
