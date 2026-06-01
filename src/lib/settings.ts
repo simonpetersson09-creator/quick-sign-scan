@@ -6,6 +6,7 @@ export interface Recipient {
 }
 
 export interface AppSettings {
+  userEmail: string; // used as Reply-To so recipients can answer the user, not no-reply
   defaultRecipient: string;
   defaultSubject: string;
   defaultMessage: string;
@@ -16,6 +17,7 @@ export interface AppSettings {
 const KEY = "docscan.settings.v1";
 
 const defaults: AppSettings = {
+  userEmail: "",
   defaultRecipient: "",
   defaultSubject: "Dokument",
   defaultMessage: "Hej,\n\nBifogar dokumentet.\n\nVänliga hälsningar",
