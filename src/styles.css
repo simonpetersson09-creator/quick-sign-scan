@@ -40,7 +40,7 @@
   --radius: 1rem;
 
   /* Warm, premium, calm palette */
-  --background: oklch(0.985 0.005 80);
+  --background: oklch(0.74 0.008 50);
   --foreground: oklch(0.22 0.015 250);
 
   --card: oklch(1 0 0);
