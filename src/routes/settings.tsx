@@ -28,6 +28,19 @@ function SettingsPage() {
   return (
     <AppShell title="Inställningar" back="/">
       <div className="flex flex-col gap-5 mt-2">
+        <Field label="Din e-postadress (Reply-To)">
+          <input
+            type="email"
+            value={s.userEmail}
+            onChange={(e) => update("userEmail", e.target.value)}
+            placeholder="du@exempel.se"
+            className="input"
+          />
+          <p className="text-[11px] text-muted-foreground mt-1.5 ml-1">
+            Används som svarsadress, så mottagaren kan svara till dig direkt.
+          </p>
+        </Field>
+
         <Field label="Standardmottagare">
           <input
             type="email"
