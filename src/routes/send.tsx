@@ -2,12 +2,17 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
 import { loadSettings, saveSettings } from "@/lib/settings";
 import { buildPdf, dataUrlToBlob } from "@/lib/pdf";
-import { sendScanEmail } from "@/lib/email.functions";
+import {
+  sendScanEmail,
+  type SendErrorCode,
+  type SendScanEmailResult,
+} from "@/lib/email.functions";
 import { Check, Mail } from "lucide-react";
 
 const emailSchema = z
@@ -16,6 +21,29 @@ const emailSchema = z
   .min(1, { message: "Ange en e-postadress" })
   .max(255, { message: "E-postadressen är för lång" })
   .email({ message: "Ogiltig e-postadress" });
+
+const optionalEmailSchema = z
+  .string()
+  .trim()
+  .max(255)
+  .email()
+  .optional()
+  .or(z.literal(""));
+
+const ERROR_MESSAGES: Record<SendErrorCode, string> = {
+  attachment_too_large:
+    "PDF:en är för stor för att skickas. Tryck \"Ladda ned PDF\" och skicka manuellt.",
+  invalid_recipient:
+    "Mottagaradressen avvisades. Kontrollera stavningen och försök igen.",
+  rate_limited:
+    "För många utskick på kort tid. Vänta en stund och försök igen.",
+  network_error:
+    "Nätverksfel – kontrollera anslutningen och försök igen.",
+  unauthorized:
+    "E-posttjänsten är inte korrekt konfigurerad. Kontakta administratör.",
+  unknown:
+    "Kunde inte skicka mailet. Försök igen, eller tryck \"Ladda ned PDF\" och skicka manuellt.",
+};
 
 export const Route = createFileRoute("/send")({
   head: () => ({ meta: [{ title: "Skicka" }] }),
@@ -29,6 +57,7 @@ function SendPage() {
   const [to, setTo] = useState(settings.defaultRecipient);
   const [subject, setSubject] = useState(settings.defaultSubject);
   const [message, setMessage] = useState(settings.defaultMessage);
+  const [replyTo, setReplyTo] = useState(settings.userEmail);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
@@ -38,7 +67,17 @@ function SendPage() {
   const trimmedTo = to.trim();
   const emailValid = emailSchema.safeParse(trimmedTo).success;
 
-
+  // Surface a discreet toast when sessionStorage refuses to persist
+  // (typically iOS Safari's ~5 MB quota for very large scans).
+  useEffect(() => {
+    return scanStore.onQuotaExceeded(() => {
+      toast.warning("Skanningen är för stor för att sparas på enheten", {
+        description:
+          "Den ligger kvar i minnet, men ladda inte om sidan innan du skickat – då försvinner dokumentet.",
+        duration: 6000,
+      });
+    });
+  }, []);
 
   useEffect(() => {
     const s = scanStore.get();
@@ -46,18 +85,21 @@ function SendPage() {
       navigate({ to: "/" });
       return;
     }
-    if (s.pdfDataUrl) {
-      setPdfUrl(s.pdfDataUrl);
-      return;
-    }
+    // Rebuild the PDF every time the page mounts. We deliberately do NOT
+    // persist the rendered PDF — only the source image + signature live
+    // in sessionStorage to stay under the iOS quota.
     const imageDataUrl = s.imageDataUrl;
-    (async () => {
-      const sig = s.signatureDataUrl && s.signaturePosition
-        ? { dataUrl: s.signatureDataUrl, x: s.signaturePosition.x, y: s.signaturePosition.y }
+    const sig =
+      s.signatureDataUrl && s.signaturePosition
+        ? {
+            dataUrl: s.signatureDataUrl,
+            x: s.signaturePosition.x,
+            y: s.signaturePosition.y,
+          }
         : null;
+    (async () => {
       const url = await buildPdf(imageDataUrl, sig);
       setPdfUrl(url);
-      scanStore.set({ pdfDataUrl: url });
     })();
   }, [navigate]);
 
@@ -85,14 +127,26 @@ function SendPage() {
       return;
     }
     const recipient = parsed.data;
+
+    // Reply-To is optional. Only forward it if it parses as a valid email.
+    const replyParsed = optionalEmailSchema.safeParse(replyTo);
+    const replyToValue =
+      replyParsed.success && replyParsed.data && replyParsed.data.length > 0
+        ? replyParsed.data
+        : undefined;
+
     setEmailError(null);
     setSending(true);
     setInfo(null);
     try {
       const recipients = settings.recipients.filter((r) => r.email !== recipient);
       recipients.unshift({ email: recipient });
-      saveSettings({ ...settings, recipients: recipients.slice(0, 8) });
-
+      saveSettings({
+        ...settings,
+        recipients: recipients.slice(0, 8),
+        // Remember the user's reply-to address for next time.
+        userEmail: replyToValue ?? settings.userEmail,
+      });
 
       const filename = `${(subject || "dokument").replace(/[^\w\-]+/g, "_")}.pdf`;
       const pdfBase64 = pdfUrl.includes(",") ? pdfUrl.split(",")[1] : pdfUrl;
@@ -108,26 +162,39 @@ function SendPage() {
         );
       }
 
-      await sendEmailFn({
-        data: {
-          to: recipient,
-          subject: subject || "Skannat dokument",
-          message: message || "",
-          filename,
-          pdfBase64,
-        },
-      });
+      let result: SendScanEmailResult;
+      try {
+        result = (await sendEmailFn({
+          data: {
+            to: recipient,
+            subject: subject || "Skannat dokument",
+            message: message || "",
+            filename,
+            pdfBase64,
+            ...(replyToValue ? { replyTo: replyToValue } : {}),
+          },
+        })) as SendScanEmailResult;
+      } catch (e) {
+        // Input-schema rejection or transport failure — surface a clear code.
+        const msg = e instanceof Error ? e.message : String(e);
+        const code: SendErrorCode =
+          msg === "attachment_too_large" ? "attachment_too_large" : "network_error";
+        result = { ok: false, code, detail: msg };
+      }
 
-      setDone(true);
-      setTimeout(() => {
-        scanStore.clear();
-        navigate({ to: "/" });
-      }, 2200);
+      if (result.ok) {
+        setDone(true);
+        setTimeout(() => {
+          scanStore.clear();
+          navigate({ to: "/" });
+        }, 2200);
+      } else {
+        console.error("[send] failed:", result);
+        setInfo(ERROR_MESSAGES[result.code] ?? ERROR_MESSAGES.unknown);
+      }
     } catch (e) {
       console.error(e);
-      setInfo(
-        "Kunde inte skicka mailet. Försök igen, eller tryck \"Ladda ned PDF\" och skicka manuellt.",
-      );
+      setInfo(ERROR_MESSAGES.unknown);
     } finally {
       setSending(false);
     }
@@ -188,6 +255,18 @@ function SendPage() {
               ))}
             </div>
           )}
+        </Field>
+
+        <Field label="Din e-post (svar går hit)">
+          <input
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            value={replyTo}
+            onChange={(e) => setReplyTo(e.target.value)}
+            placeholder="du@exempel.se (valfritt)"
+            className="input"
+          />
         </Field>
 
         <Field label="Ämne">
