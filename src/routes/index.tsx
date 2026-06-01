@@ -39,19 +39,19 @@ function Home() {
             return (
               <li key={s.label} className="flex flex-col items-center">
                 <div className="flex items-center gap-4 py-2">
-                  <div className="relative h-14 w-14 rounded-full bg-muted/50 border border-border/60 flex items-center justify-center">
-                    <span className="absolute -top-1.5 -left-1.5 h-5 w-5 rounded-full bg-muted-foreground/40 text-background text-[10px] font-semibold flex items-center justify-center">
+                  <div className="relative h-14 w-14 rounded-full bg-card border border-white/40 shadow-[var(--shadow-soft)] flex items-center justify-center">
+                    <span className="absolute -top-1.5 -left-1.5 h-5 w-5 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold flex items-center justify-center ring-2 ring-background">
                       {i + 1}
                     </span>
-                    <Icon className="h-5 w-5 text-muted-foreground/70" strokeWidth={1.75} />
+                    <Icon className="h-5 w-5 text-primary" strokeWidth={1.75} />
                   </div>
-                  <span className="text-[16px] font-medium tracking-tight text-muted-foreground w-24">
+                  <span className="text-[16px] font-medium tracking-tight text-foreground/85 w-24">
                     {s.label}
                   </span>
                 </div>
                 {i < steps.length - 1 && (
                   <ArrowDown
-                    className="h-4 w-4 text-muted-foreground/30 my-0.5"
+                    className="h-4 w-4 text-foreground/30 my-0.5"
                     strokeWidth={1.5}
                   />
                 )}
