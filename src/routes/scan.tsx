@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { scanStore } from "@/lib/scanStore";
 import {
   detectDocumentQuad,
@@ -10,7 +10,7 @@ import {
   maxCornerDelta,
   warpQuadToRect,
 } from "@/lib/perspective";
-import { Camera, X } from "lucide-react";
+import { Camera, CameraOff, X, RefreshCw, ArrowLeft, Settings as SettingsIcon } from "lucide-react";
 
 type Status =
   | "starting"
