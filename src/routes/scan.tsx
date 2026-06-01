@@ -58,6 +58,7 @@ function ScanPage() {
 
   const [status, setStatus] = useState<Status>("starting");
   const [error, setError] = useState<string | null>(null);
+  const [errorType, setErrorType] = useState<ErrorType | null>(null);
 
   useEffect(() => {
     let cancelled = false;
