@@ -33,6 +33,12 @@ function SendPage() {
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
   const [info, setInfo] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
+
+  const trimmedTo = to.trim();
+  const emailValid = emailSchema.safeParse(trimmedTo).success;
+
+
 
   useEffect(() => {
     const s = scanStore.get();
