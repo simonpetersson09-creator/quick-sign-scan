@@ -15,7 +15,7 @@ const steps = [
   { icon: ScanLine, label: "Skanna" },
   { icon: PenLine, label: "Signera" },
   { icon: Mail, label: "Skicka" },
-  { icon: CheckCircle2, label: "Avsluta" },
+  { icon: CheckCircle2, label: "Färdig" },
 ];
 
 function Home() {
