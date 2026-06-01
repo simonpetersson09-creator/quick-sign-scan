@@ -110,7 +110,7 @@ function SendPage() {
 
       await sendEmailFn({
         data: {
-          to,
+          to: recipient,
           subject: subject || "Skannat dokument",
           message: message || "",
           filename,
