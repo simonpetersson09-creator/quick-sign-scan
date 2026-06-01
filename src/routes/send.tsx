@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
@@ -8,6 +9,13 @@ import { loadSettings, saveSettings } from "@/lib/settings";
 import { buildPdf, dataUrlToBlob } from "@/lib/pdf";
 import { sendScanEmail } from "@/lib/email.functions";
 import { Check, Mail } from "lucide-react";
+
+const emailSchema = z
+  .string()
+  .trim()
+  .min(1, { message: "Ange en e-postadress" })
+  .max(255, { message: "E-postadressen är för lång" })
+  .email({ message: "Ogiltig e-postadress" });
 
 export const Route = createFileRoute("/send")({
   head: () => ({ meta: [{ title: "Skicka" }] }),
