@@ -70,13 +70,16 @@ function SendPage() {
   // Surface a discreet toast when sessionStorage refuses to persist
   // (typically iOS Safari's ~5 MB quota for very large scans).
   useEffect(() => {
-    return scanStore.onQuotaExceeded(() => {
+    const unsubscribe = scanStore.onQuotaExceeded(() => {
       toast.warning("Skanningen är för stor för att sparas på enheten", {
         description:
           "Den ligger kvar i minnet, men ladda inte om sidan innan du skickat – då försvinner dokumentet.",
         duration: 6000,
       });
     });
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
