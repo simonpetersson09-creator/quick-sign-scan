@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
@@ -8,6 +9,13 @@ import { loadSettings, saveSettings } from "@/lib/settings";
 import { buildPdf, dataUrlToBlob } from "@/lib/pdf";
 import { sendScanEmail } from "@/lib/email.functions";
 import { Check, Mail } from "lucide-react";
+
+const emailSchema = z
+  .string()
+  .trim()
+  .min(1, { message: "Ange en e-postadress" })
+  .max(255, { message: "E-postadressen är för lång" })
+  .email({ message: "Ogiltig e-postadress" });
 
 export const Route = createFileRoute("/send")({
   head: () => ({ meta: [{ title: "Skicka" }] }),
@@ -25,6 +33,12 @@ function SendPage() {
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
   const [info, setInfo] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
+
+  const trimmedTo = to.trim();
+  const emailValid = emailSchema.safeParse(trimmedTo).success;
+
+
 
   useEffect(() => {
     const s = scanStore.get();
@@ -64,13 +78,21 @@ function SendPage() {
   }
 
   async function send() {
-    if (!pdfUrl || !to) return;
+    if (!pdfUrl) return;
+    const parsed = emailSchema.safeParse(trimmedTo);
+    if (!parsed.success) {
+      setEmailError(parsed.error.issues[0]?.message ?? "Ogiltig e-postadress");
+      return;
+    }
+    const recipient = parsed.data;
+    setEmailError(null);
     setSending(true);
     setInfo(null);
     try {
-      const recipients = settings.recipients.filter((r) => r.email !== to);
-      recipients.unshift({ email: to });
+      const recipients = settings.recipients.filter((r) => r.email !== recipient);
+      recipients.unshift({ email: recipient });
       saveSettings({ ...settings, recipients: recipients.slice(0, 8) });
+
 
       const filename = `${(subject || "dokument").replace(/[^\w\-]+/g, "_")}.pdf`;
       const pdfBase64 = pdfUrl.includes(",") ? pdfUrl.split(",")[1] : pdfUrl;
@@ -88,7 +110,7 @@ function SendPage() {
 
       await sendEmailFn({
         data: {
-          to,
+          to: recipient,
           subject: subject || "Skannat dokument",
           message: message || "",
           filename,
@@ -131,17 +153,34 @@ function SendPage() {
         <Field label="Till">
           <input
             type="email"
+            inputMode="email"
+            autoComplete="email"
             value={to}
-            onChange={(e) => setTo(e.target.value)}
+            onChange={(e) => {
+              setTo(e.target.value);
+              if (emailError) setEmailError(null);
+            }}
+            onBlur={() => {
+              if (!trimmedTo) return;
+              const r = emailSchema.safeParse(trimmedTo);
+              setEmailError(r.success ? null : r.error.issues[0]?.message ?? "Ogiltig e-postadress");
+            }}
             placeholder="namn@exempel.se"
+            aria-invalid={!!emailError}
             className="input"
           />
+          {emailError && (
+            <p className="text-xs text-destructive mt-1.5 ml-1">{emailError}</p>
+          )}
           {settings.recipients.length > 0 && (
             <div className="flex gap-2 mt-2 overflow-x-auto -mx-1 px-1">
               {settings.recipients.map((r) => (
                 <button
                   key={r.email}
-                  onClick={() => setTo(r.email)}
+                  onClick={() => {
+                    setTo(r.email);
+                    setEmailError(null);
+                  }}
                   className="shrink-0 px-3 py-1.5 rounded-full bg-secondary text-secondary-foreground text-xs font-medium"
                 >
                   {r.email}
@@ -172,7 +211,7 @@ function SendPage() {
       <div className="flex-1" />
 
       <div className="pt-5 flex flex-col gap-3">
-        <PrimaryButton onClick={send} disabled={!to || !pdfUrl || sending}>
+        <PrimaryButton onClick={send} disabled={!emailValid || !pdfUrl || sending}>
           <span className="inline-flex items-center justify-center gap-2">
             <Mail className="h-5 w-5" />
             {sending ? "Förbereder…" : "Skicka PDF"}
