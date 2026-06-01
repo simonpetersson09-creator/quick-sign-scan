@@ -1,5 +1,6 @@
-// Simple in-memory store for the current scan session.
-// Documents are never persisted to disk or database.
+// Scan session store, persisted to sessionStorage so an iOS background-kill
+// or page reload doesn't lose a scan between capture and send.
+// Data is cleared on tab close or after explicit clear().
 
 type Listener = () => void;
 
@@ -43,18 +44,63 @@ const initial: ScanSession = {
   signaturePosition: null,
 };
 
-let state: ScanSession = { ...initial };
+const STORAGE_KEY = "scanSession.v1";
+
+function hasSessionStorage(): boolean {
+  try {
+    return typeof window !== "undefined" && !!window.sessionStorage;
+  } catch {
+    return false;
+  }
+}
+
+function load(): ScanSession {
+  if (!hasSessionStorage()) return { ...initial };
+  try {
+    const raw = window.sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return { ...initial };
+    const parsed = JSON.parse(raw) as Partial<ScanSession>;
+    return { ...initial, ...parsed };
+  } catch {
+    return { ...initial };
+  }
+}
+
+function persist(s: ScanSession) {
+  if (!hasSessionStorage()) return;
+  try {
+    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+  } catch (e) {
+    // sessionStorage can throw QuotaExceededError for big data URLs.
+    // Fall back gracefully — the in-memory state still works for this session.
+    console.warn("[scanStore] could not persist to sessionStorage:", e);
+  }
+}
+
+let state: ScanSession = load();
 const listeners = new Set<Listener>();
+
+function notify() {
+  listeners.forEach((l) => l());
+}
 
 export const scanStore = {
   get: () => state,
   set: (patch: Partial<ScanSession>) => {
     state = { ...state, ...patch };
-    listeners.forEach((l) => l());
+    persist(state);
+    notify();
   },
   clear: () => {
     state = { ...initial };
-    listeners.forEach((l) => l());
+    if (hasSessionStorage()) {
+      try {
+        window.sessionStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // ignore
+      }
+    }
+    notify();
   },
   subscribe: (l: Listener) => {
     listeners.add(l);
