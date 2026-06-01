@@ -78,13 +78,21 @@ function SendPage() {
   }
 
   async function send() {
-    if (!pdfUrl || !to) return;
+    if (!pdfUrl) return;
+    const parsed = emailSchema.safeParse(trimmedTo);
+    if (!parsed.success) {
+      setEmailError(parsed.error.issues[0]?.message ?? "Ogiltig e-postadress");
+      return;
+    }
+    const recipient = parsed.data;
+    setEmailError(null);
     setSending(true);
     setInfo(null);
     try {
-      const recipients = settings.recipients.filter((r) => r.email !== to);
-      recipients.unshift({ email: to });
+      const recipients = settings.recipients.filter((r) => r.email !== recipient);
+      recipients.unshift({ email: recipient });
       saveSettings({ ...settings, recipients: recipients.slice(0, 8) });
+
 
       const filename = `${(subject || "dokument").replace(/[^\w\-]+/g, "_")}.pdf`;
       const pdfBase64 = pdfUrl.includes(",") ? pdfUrl.split(",")[1] : pdfUrl;
