@@ -140,9 +140,8 @@ function SendPage() {
 
       const approxBytes = Math.floor((pdfBase64.length * 3) / 4);
       const approxMb = approxBytes / (1024 * 1024);
-      console.log(
-        `[send] PDF size: ~${approxMb.toFixed(2)} MB (${approxBytes} bytes)`,
-      );
+      // Privacy: do not log document size in a way that could fingerprint
+      // a specific document. A coarse bucket is enough for support.
       if (approxMb > 5) {
         setInfo(t("largePdfWarning", { mb: approxMb.toFixed(1) }));
       }
