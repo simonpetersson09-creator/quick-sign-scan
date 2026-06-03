@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
+import { useT } from "@/lib/i18n";
 import { PenLine, Send } from "lucide-react";
 
 export const Route = createFileRoute("/place")({
