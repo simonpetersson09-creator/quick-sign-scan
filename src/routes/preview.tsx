@@ -92,6 +92,22 @@ function PreviewPage() {
         </div>
       </div>
 
+      {pages.length > 1 && (
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+          {pages.map((p, i) => (
+            <div
+              key={i}
+              className={`shrink-0 rounded-md overflow-hidden border-2 ${
+                p === image ? "border-primary" : "border-border"
+              } bg-white`}
+              style={{ width: 56, aspectRatio: "1 / 1.414" }}
+            >
+              <img src={p} alt="" className="w-full h-full object-contain" />
+            </div>
+          ))}
+        </div>
+      )}
+
       {!detection && (
         <div className="mt-4 rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm font-medium">
           {t("cannotIdentifyEdges")}
