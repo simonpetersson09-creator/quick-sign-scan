@@ -13,6 +13,7 @@ export const Route = createFileRoute("/sign")({
 });
 
 function SignPage() {
+  const t = useT();
   const navigate = useNavigate();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawing = useRef(false);
