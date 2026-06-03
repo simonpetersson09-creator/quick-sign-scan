@@ -707,7 +707,7 @@ function evaluateEdgeQuad(args: {
   const brightnessScore = clamp01((stats.mean - 105) / 105);
   const textScore = clamp01(stats.darkRatio / 0.055);
   const areaScore =
-    areaRatio <= 0.7 ? clamp01((areaRatio - 0.1) / 0.18) : clamp01((0.9 - areaRatio) / 0.2);
+    areaRatio <= 0.7 ? clamp01((areaRatio - 0.05) / 0.18) : clamp01((0.95 - areaRatio) / 0.2);
   const confidence =
     0.3 * edgeScore +
     0.18 * straightScore +
@@ -717,7 +717,7 @@ function evaluateEdgeQuad(args: {
     0.07 * perspectiveScore +
     0.05 * areaScore;
 
-  if (edgeScore < 0.26 || brightnessScore < 0.18) return null;
+  if (edgeScore < 0.18 || brightnessScore < 0.1) return null;
 
   return {
     corners: ordered,
