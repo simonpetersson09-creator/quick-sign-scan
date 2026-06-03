@@ -66,6 +66,32 @@ function ScanPage() {
     setStatus("starting");
     setError(null);
     setErrorType(null);
+
+    // Try to read the current permission state. On browsers where this is
+    // unsupported or limited (notably Safari/iOS), we fall through and just
+    // call getUserMedia — which either resolves immediately (granted) or
+    // shows the native prompt (first time).
+    let knownState: PermissionState | null = null;
+    try {
+      // "camera" may not be in all TS lib versions
+      const status = await navigator.permissions?.query?.({ name: "camera" as PermissionName });
+      if (status?.state === "granted" || status?.state === "denied" || status?.state === "prompt") {
+        knownState = status.state;
+      }
+    } catch {
+      // Permissions API not available or doesn't support "camera" — ignore
+      // and rely on getUserMedia. Never treat this as "denied".
+    }
+
+    // If we *know* permission is denied, skip the getUserMedia call which
+    // would otherwise re-trigger nothing on iOS and silently fail.
+    if (knownState === "denied") {
+      setErrorType("permission_denied");
+      setError(t("errPermissionDenied"));
+      setStatus("error");
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -85,12 +111,30 @@ function ScanPage() {
     } catch (e) {
       console.error(`[scan] camera error: ${(e as Error)?.name ?? "unknown"}`);
       const err = e as Error;
-      if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-        setErrorType("permission_denied");
-        setError(t("errPermissionDenied"));
-      } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
+      if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
         setErrorType("not_found");
         setError(t("errNotFound"));
+      } else if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+        // Could be a real denial OR a dismissed prompt on Safari/iOS.
+        // Re-check Permissions API: only show "denied" if we can confirm it.
+        // If state is still "prompt" (user dismissed), stay in a recoverable
+        // error state instead of falsely accusing them of blocking the camera.
+        let confirmed: PermissionState | null = null;
+        try {
+          // "camera" may not be in all TS lib versions
+          const status = await navigator.permissions?.query?.({ name: "camera" as PermissionName });
+          if (status?.state) confirmed = status.state as PermissionState;
+        } catch {
+          // ignore
+        }
+        if (confirmed === "prompt") {
+          // User dismissed the prompt — not a hard denial. Allow retry.
+          setErrorType("unknown");
+          setError(t("errUnknown"));
+        } else {
+          setErrorType("permission_denied");
+          setError(t("errPermissionDenied"));
+        }
       } else {
         setErrorType("unknown");
         setError(t("errUnknown"));
