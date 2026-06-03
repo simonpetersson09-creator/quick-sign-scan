@@ -287,11 +287,18 @@ function PreviewPage() {
             {t("useDocument")} <ArrowRight className="h-5 w-5" />
           </span>
         </PrimaryButton>
-        <PrimaryButton variant="secondary" onClick={retake}>
-          <span className="inline-flex items-center justify-center gap-2">
-            <RefreshCw className="h-5 w-5" /> {t("retake")}
-          </span>
-        </PrimaryButton>
+        <div className="grid grid-cols-2 gap-3">
+          <PrimaryButton variant="secondary" onClick={addPage}>
+            <span className="inline-flex items-center justify-center gap-2">
+              <Plus className="h-5 w-5" /> {t("addPage")}
+            </span>
+          </PrimaryButton>
+          <PrimaryButton variant="secondary" onClick={retake}>
+            <span className="inline-flex items-center justify-center gap-2">
+              <RefreshCw className="h-5 w-5" /> {t("retake")}
+            </span>
+          </PrimaryButton>
+        </div>
       </div>
     </AppShell>
   );
