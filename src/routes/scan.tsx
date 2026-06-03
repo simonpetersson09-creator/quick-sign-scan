@@ -87,17 +87,17 @@ function ScanPage() {
       const err = e as Error;
       if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
         setErrorType("permission_denied");
-        setError("Kamerabehörighet nekad. Appen kan inte skanna dokument utan tillgång till kameran.");
+        setError(t("errPermissionDenied"));
       } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
         setErrorType("not_found");
-        setError("Ingen kamera hittades på den här enheten.");
+        setError(t("errNotFound"));
       } else {
         setErrorType("unknown");
-        setError("Kunde inte öppna kameran. Ett oväntat fel inträffade.");
+        setError(t("errUnknown"));
       }
       setStatus("error");
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     let cancelled = false;
