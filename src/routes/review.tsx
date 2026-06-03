@@ -20,6 +20,7 @@ function ReviewPage() {
   const navigate = useNavigate();
   const t = useT();
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [sizeBytes, setSizeBytes] = useState<number | null>(null);
   const [pages, setPages] = useState<number>(1);
   const [zoom, setZoom] = useState(1);
@@ -34,25 +35,36 @@ function ReviewPage() {
       navigate({ to: "/" });
       return;
     }
+    let createdBlobUrl: string | null = null;
+    let cancelled = false;
     (async () => {
       const sig =
         s.signatureDataUrl && s.signaturePosition
           ? { dataUrl: s.signatureDataUrl, x: s.signaturePosition.x, y: s.signaturePosition.y }
           : null;
       const url = await buildPdf(img, sig);
+      if (cancelled) return;
       setPdfUrl(url);
       scanStore.set({ pdfDataUrl: url });
       try {
         const blob = dataUrlToBlob(url);
         setSizeBytes(blob.size);
-        // Rough page count from raw PDF text
+        // iOS Safari cannot render data: URL PDFs in iframes — use a blob URL.
+        createdBlobUrl = URL.createObjectURL(blob);
+        if (!cancelled) setPdfBlobUrl(createdBlobUrl);
+        // Rough page count from raw PDF text. Binary-safe enough for /Type /Page tokens.
         const text = await blob.text();
-        const matches = text.match(/\/Type\s*\/Page[^s]/g);
+        if (cancelled) return;
+        const matches = text.match(/\/Type\s*\/Page(?![s])/g);
         setPages(matches?.length || 1);
       } catch {
         setPages(1);
       }
     })();
+    return () => {
+      cancelled = true;
+      if (createdBlobUrl) URL.revokeObjectURL(createdBlobUrl);
+    };
   }, [navigate]);
 
   function proceed() {
