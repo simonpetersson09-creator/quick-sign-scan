@@ -12,6 +12,7 @@ export const Route = createFileRoute("/place")({
 });
 
 function PlacePage() {
+  const t = useT();
   const navigate = useNavigate();
   const [image, setImage] = useState<string | null>(null);
   const [sigPos, setSigPos] = useState<{ x: number; y: number }>({ x: 0.5, y: 0.86 });
