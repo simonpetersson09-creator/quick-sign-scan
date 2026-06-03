@@ -260,12 +260,12 @@ function PreviewPage() {
       <div className="flex flex-col gap-3 pt-5">
         <PrimaryButton onClick={accept} disabled={!canUse}>
           <span className="inline-flex items-center justify-center gap-2">
-            Använd dokument <ArrowRight className="h-5 w-5" />
+            {t("useDocument")} <ArrowRight className="h-5 w-5" />
           </span>
         </PrimaryButton>
         <PrimaryButton variant="secondary" onClick={retake}>
           <span className="inline-flex items-center justify-center gap-2">
-            <RefreshCw className="h-5 w-5" /> Ta om bild
+            <RefreshCw className="h-5 w-5" /> {t("retake")}
           </span>
         </PrimaryButton>
       </div>
