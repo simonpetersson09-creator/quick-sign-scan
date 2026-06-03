@@ -16,6 +16,7 @@ function PreviewPage() {
   const navigate = useNavigate();
   const t = useT();
   const [image, setImage] = useState<string | null>(null);
+  const [pages, setPages] = useState<string[]>([]);
   const [sourceImage, setSourceImage] = useState<string | null>(null);
   const [detection, setDetection] = useState<ReturnType<typeof scanStore.get>["detection"]>(null);
   const [report, setReport] = useState<QualityReport | null>(null);
