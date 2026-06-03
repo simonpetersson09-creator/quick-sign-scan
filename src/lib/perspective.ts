@@ -319,7 +319,21 @@ export function detectDocumentQuad(
     const hull = convexHull(component.points);
     if (hull.length < 4) continue;
 
-    for (const quad of approximateHullQuads(hull)) {
+    const candidateQuads = approximateHullQuads(hull);
+
+    // Fallback: always evaluate the component's axis-aligned bounding rect
+    // as a quad. This guarantees we still produce 4 corners when the hull
+    // has rounded/shadowy edges that the RDP+reduce path fails to simplify
+    // cleanly. Worse-fit candidates get filtered by evaluateEdgeQuad.
+    const bboxQuad: [Point, Point, Point, Point] = orderQuad([
+      { x: component.minX, y: component.minY },
+      { x: component.maxX, y: component.minY },
+      { x: component.maxX, y: component.maxY },
+      { x: component.minX, y: component.maxY },
+    ]);
+    candidateQuads.push(bboxQuad);
+
+    for (const quad of candidateQuads) {
       candidateCount++;
       const detection = evaluateEdgeQuad({
         quad,
