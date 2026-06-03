@@ -197,17 +197,17 @@ function SendPage() {
           <div className="h-16 w-16 rounded-full bg-success/15 flex items-center justify-center">
             <Check className="h-8 w-8 text-success" />
           </div>
-          <h2 className="text-xl font-semibold mt-5">Klart</h2>
-          <p className="text-muted-foreground mt-2 text-sm">Dokumentet har raderats från appen.</p>
+          <h2 className="text-xl font-semibold mt-5">{t("done")}</h2>
+          <p className="text-muted-foreground mt-2 text-sm">{t("doneCleared")}</p>
         </div>
       </AppShell>
     );
   }
 
   return (
-    <AppShell title="Skicka via e-post" back="/review">
+    <AppShell title={t("sendTitle")} back="/review">
       <div className="flex flex-col gap-4 mt-2">
-        <Field label="Till">
+        <Field label={t("fieldTo")}>
           <input
             type="email"
             inputMode="email"
@@ -220,9 +220,9 @@ function SendPage() {
             onBlur={() => {
               if (!trimmedTo) return;
               const r = emailSchema.safeParse(trimmedTo);
-              setEmailError(r.success ? null : r.error.issues[0]?.message ?? "Ogiltig e-postadress");
+              setEmailError(r.success ? null : r.error.issues[0]?.message ?? t("invalidEmail"));
             }}
-            placeholder="namn@exempel.se"
+            placeholder={t("placeholderTo")}
             aria-invalid={!!emailError}
             className="input"
           />
@@ -247,19 +247,19 @@ function SendPage() {
           )}
         </Field>
 
-        <Field label="Din e-post (svar går hit)">
+        <Field label={t("fieldReplyTo")}>
           <input
             type="email"
             inputMode="email"
             autoComplete="email"
             value={replyTo}
             onChange={(e) => setReplyTo(e.target.value)}
-            placeholder="du@exempel.se (valfritt)"
+            placeholder={t("placeholderReply")}
             className="input"
           />
         </Field>
 
-        <Field label="Ämne">
+        <Field label={t("fieldSubject")}>
           <input
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
@@ -267,7 +267,7 @@ function SendPage() {
           />
         </Field>
 
-        <Field label="Meddelande">
+        <Field label={t("fieldMessage")}>
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
