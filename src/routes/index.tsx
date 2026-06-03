@@ -98,7 +98,7 @@ function Home() {
           className="flex flex-col items-center justify-center rounded-xl bg-card text-muted-foreground h-12 w-12 shadow-[var(--shadow-soft)] border border-border transition active:scale-[0.98]"
         >
           <Globe className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
-          <span className="text-[9px] font-semibold tracking-wide mt-0.5">
+          <span className="text-[7px] font-semibold tracking-wide mt-0.5">
             {lang === "sv" ? (
               <>
                 <span className="text-foreground">SV</span>
