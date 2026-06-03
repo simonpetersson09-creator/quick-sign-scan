@@ -66,7 +66,7 @@ function Home() {
       </div>
 
       {/* Trust tagline */}
-      <p className="text-center text-[11px] text-muted-foreground/60 tracking-wide pb-1">
+      <p className="text-center text-[10px] text-muted-foreground/60 tracking-wide pb-1 max-w-[220px]">
         {t("appTagline")}
       </p>
 
