@@ -10,6 +10,7 @@ import {
   maxCornerDelta,
   warpQuadToRect,
 } from "@/lib/perspective";
+import { useT } from "@/lib/i18n";
 import { Camera, CameraOff, X, RefreshCw, ArrowLeft } from "lucide-react";
 
 type Status =
@@ -38,6 +39,7 @@ const READY_FRAMES = 45; // ~1.5s — "Dokument hittat" lock-in
 const STABLE_FRAMES = 75; // ~2.5s total before auto-capture
 
 function ScanPage() {
+  const t = useT();
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -85,17 +87,17 @@ function ScanPage() {
       const err = e as Error;
       if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
         setErrorType("permission_denied");
-        setError("Kamerabehörighet nekad. Appen kan inte skanna dokument utan tillgång till kameran.");
+        setError(t("errPermissionDenied"));
       } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
         setErrorType("not_found");
-        setError("Ingen kamera hittades på den här enheten.");
+        setError(t("errNotFound"));
       } else {
         setErrorType("unknown");
-        setError("Kunde inte öppna kameran. Ett oväntat fel inträffade.");
+        setError(t("errUnknown"));
       }
       setStatus("error");
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     let cancelled = false;
@@ -330,14 +332,14 @@ function ScanPage() {
   }
 
   const statusText: Record<Status, string> = {
-    starting: "Startar kamera…",
-    searching: "Sök efter dokument",
-    uncertain: "Kunde inte identifiera dokumentets kanter.",
-    align: "Rikta in dokumentet",
-    hold: "Håll stilla…",
-    ready: "Dokument hittat",
-    capturing: "Skannar och rätar upp…",
-    error: "Fel",
+    starting: t("statusStarting"),
+    searching: t("statusSearching"),
+    uncertain: t("statusUncertain"),
+    align: t("statusAlign"),
+    hold: t("statusHold"),
+    ready: t("statusReady"),
+    capturing: t("statusCapturing"),
+    error: t("statusError"),
   };
 
   const statusActive = status === "ready" || status === "capturing";
@@ -388,7 +390,7 @@ function ScanPage() {
             navigate({ to: "/" });
           }}
           className="h-10 w-10 rounded-full bg-black/55 backdrop-blur flex items-center justify-center"
-          aria-label="Avbryt"
+          aria-label={t("cancel")}
         >
           <X className="h-5 w-5" />
         </button>
@@ -419,13 +421,12 @@ function ScanPage() {
             detectCount.current < DETECT_FRAMES
           }
           className="h-16 w-16 rounded-full bg-white text-black flex items-center justify-center shadow-lg active:scale-95 disabled:opacity-40"
-          aria-label="Fotografera manuellt"
+          aria-label={t("manualCapture")}
         >
           <Camera className="h-7 w-7" />
         </button>
         <p className="text-xs text-white/75 text-center max-w-[260px]">
-          Lägg A4-dokumentet på en jämn, kontrasterande yta. Bilden tas automatiskt när hörnen är
-          stabila.
+          {t("scanHint")}
         </p>
       </div>
 
@@ -440,21 +441,21 @@ function ScanPage() {
             <div className="flex flex-col gap-2">
               <h2 className="text-xl font-semibold text-white tracking-tight">
                 {errorType === "permission_denied"
-                  ? "Kamerabehörighet nekad"
+                  ? t("errPermissionTitle")
                   : errorType === "not_found"
-                    ? "Ingen kamera hittades"
-                    : "Kameran kunde inte startas"}
+                    ? t("errNotFoundTitle")
+                    : t("errUnknownTitle")}
               </h2>
               <p className="text-[15px] text-white/70 leading-relaxed">
                 {errorType === "permission_denied"
-                  ? "Appen behöver tillgång till kameran för att skanna dokument. Du kan ändra detta i enhetens inställningar."
+                  ? t("errPermissionDesc")
                   : error}
               </p>
             </div>
 
             {errorType === "permission_denied" && (
               <div className="w-full rounded-xl bg-white/8 border border-white/10 p-4 text-left">
-                <p className="text-[13px] font-medium text-white/90 mb-2">Så här aktiverar du kameran:</p>
+                <p className="text-[13px] font-medium text-white/90 mb-2">{t("howToEnable")}</p>
                 <PlatformInstructions />
               </div>
             )}
@@ -466,18 +467,18 @@ function ScanPage() {
                   className="w-full rounded-xl bg-white text-black py-3.5 px-4 font-semibold text-[15px] tracking-tight flex items-center justify-center gap-2 active:scale-[0.98] transition"
                 >
                   <RefreshCw className="h-4 w-4" strokeWidth={2} />
-                  Försök igen
+                  {t("retry")}
                 </button>
               )}
               <button
                 onClick={() => {
-                  streamRef.current?.getTracks().forEach((t) => t.stop());
+                  streamRef.current?.getTracks().forEach((tr) => tr.stop());
                   navigate({ to: "/" });
                 }}
                 className="w-full rounded-xl bg-white/10 text-white py-3.5 px-4 font-medium text-[15px] tracking-tight flex items-center justify-center gap-2 active:scale-[0.98] transition"
               >
                 <ArrowLeft className="h-4 w-4" strokeWidth={2} />
-                Tillbaka till start
+                {t("backHome")}
               </button>
             </div>
           </div>
@@ -488,40 +489,40 @@ function ScanPage() {
 }
 
 function PlatformInstructions() {
+  const t = useT();
   const ua = navigator.userAgent;
   const isIOS = /iPad|iPhone|iPod/.test(ua);
   const isAndroid = /Android/.test(ua);
 
-  if (isIOS) {
+  const renderStep = (key: string) => {
+    const raw = t(key);
+    const parts = raw.split(/(\{b\}.*?\{\/b\})/g);
     return (
-      <ol className="text-[13px] text-white/65 leading-relaxed list-decimal list-inside space-y-1">
-        <li>Öppna <strong className="text-white/85">Inställningar</strong> på din iPhone/iPad</li>
-        <li>Scrolla ner till <strong className="text-white/85">Safari</strong></li>
-        <li>Tryck på <strong className="text-white/85">Kamera</strong></li>
-        <li>Välj <strong className="text-white/85">Tillåt</strong></li>
-        <li>Gå tillbaka till appen och tryck <strong className="text-white/85">Försök igen</strong></li>
-      </ol>
+      <>
+        {parts.map((p, i) =>
+          p.startsWith("{b}") ? (
+            <strong key={i} className="text-white/85">
+              {p.slice(3, -4)}
+            </strong>
+          ) : (
+            <span key={i}>{p}</span>
+          ),
+        )}
+      </>
     );
-  }
+  };
 
-  if (isAndroid) {
-    return (
-      <ol className="text-[13px] text-white/65 leading-relaxed list-decimal list-inside space-y-1">
-        <li>Tryck på <strong className="text-white/85">🔒</strong> (låsikonen) i adressfältet</li>
-        <li>Tryck på <strong className="text-white/85">Behörigheter</strong></li>
-        <li>Välj <strong className="text-white/85">Kamera → Tillåt</strong></li>
-        <li>Gå tillbaka till appen och tryck <strong className="text-white/85">Försök igen</strong></li>
-      </ol>
-    );
-  }
+  const keys = isIOS
+    ? ["iosStep1", "iosStep2", "iosStep3", "iosStep4", "iosStep5"]
+    : isAndroid
+      ? ["andStep1", "andStep2", "andStep3", "andStep4"]
+      : ["genStep1", "genStep2", "genStep3", "genStep4", "genStep5"];
 
   return (
     <ol className="text-[13px] text-white/65 leading-relaxed list-decimal list-inside space-y-1">
-      <li>Öppna webbläsarens inställningar</li>
-      <li>Hitta <strong className="text-white/85">Sekretess och säkerhet</strong></li>
-      <li>Välj <strong className="text-white/85">Webbplatsbehörigheter</strong></li>
-      <li>Tillåt <strong className="text-white/85">Kamera</strong> för den här webbplatsen</li>
-      <li>Gå tillbaka till appen och tryck <strong className="text-white/85">Försök igen</strong></li>
+      {keys.map((k) => (
+        <li key={k}>{renderStep(k)}</li>
+      ))}
     </ol>
   );
 }

@@ -13,14 +13,17 @@ import {
   type SendErrorCode,
   type SendScanEmailResult,
 } from "@/lib/email.functions";
+import { useT } from "@/lib/i18n";
 import { Check, Mail } from "lucide-react";
 
-const emailSchema = z
-  .string()
-  .trim()
-  .min(1, { message: "Ange en e-postadress" })
-  .max(255, { message: "E-postadressen är för lång" })
-  .email({ message: "Ogiltig e-postadress" });
+function makeEmailSchema(t: (k: string) => string) {
+  return z
+    .string()
+    .trim()
+    .min(1, { message: t("enterEmail") })
+    .max(255, { message: t("emailTooLong") })
+    .email({ message: t("invalidEmail") });
+}
 
 const optionalEmailSchema = z
   .string()
@@ -30,21 +33,6 @@ const optionalEmailSchema = z
   .optional()
   .or(z.literal(""));
 
-const ERROR_MESSAGES: Record<SendErrorCode, string> = {
-  attachment_too_large:
-    "PDF:en är för stor för att skickas. Tryck \"Ladda ned PDF\" och skicka manuellt.",
-  invalid_recipient:
-    "Mottagaradressen avvisades. Kontrollera stavningen och försök igen.",
-  rate_limited:
-    "För många utskick på kort tid. Vänta en stund och försök igen.",
-  network_error:
-    "Nätverksfel – kontrollera anslutningen och försök igen.",
-  unauthorized:
-    "E-posttjänsten är inte korrekt konfigurerad. Kontakta administratör.",
-  unknown:
-    "Kunde inte skicka mailet. Försök igen, eller tryck \"Ladda ned PDF\" och skicka manuellt.",
-};
-
 export const Route = createFileRoute("/send")({
   head: () => ({ meta: [{ title: "Skicka" }] }),
   component: SendPage,
@@ -52,6 +40,7 @@ export const Route = createFileRoute("/send")({
 
 function SendPage() {
   const navigate = useNavigate();
+  const t = useT();
   const sendEmailFn = useServerFn(sendScanEmail);
   const settings = useMemo(() => loadSettings(), []);
   const [to, setTo] = useState(settings.defaultRecipient);
@@ -64,6 +53,7 @@ function SendPage() {
   const [info, setInfo] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
 
+  const emailSchema = useMemo(() => makeEmailSchema(t), [t]);
   const trimmedTo = to.trim();
   const emailValid = emailSchema.safeParse(trimmedTo).success;
 
@@ -71,16 +61,15 @@ function SendPage() {
   // (typically iOS Safari's ~5 MB quota for very large scans).
   useEffect(() => {
     const unsubscribe = scanStore.onQuotaExceeded(() => {
-      toast.warning("Skanningen är för stor för att sparas på enheten", {
-        description:
-          "Den ligger kvar i minnet, men ladda inte om sidan innan du skickat – då försvinner dokumentet.",
+      toast.warning(t("scanTooLargeTitle"), {
+        description: t("scanTooLargeDesc"),
         duration: 6000,
       });
     });
     return () => {
       unsubscribe();
     };
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     const s = scanStore.get();
@@ -126,7 +115,7 @@ function SendPage() {
     if (!pdfUrl) return;
     const parsed = emailSchema.safeParse(trimmedTo);
     if (!parsed.success) {
-      setEmailError(parsed.error.issues[0]?.message ?? "Ogiltig e-postadress");
+      setEmailError(parsed.error.issues[0]?.message ?? t("invalidEmail"));
       return;
     }
     const recipient = parsed.data;
@@ -160,9 +149,7 @@ function SendPage() {
         `[send] PDF size: ~${approxMb.toFixed(2)} MB (${approxBytes} bytes)`,
       );
       if (approxMb > 5) {
-        setInfo(
-          `Varning: PDF:en är ${approxMb.toFixed(1)} MB. Stora bilagor kan blockeras av mottagarens server – om utskicket misslyckas, använd "Ladda ned PDF" och skicka manuellt.`,
-        );
+        setInfo(t("largePdfWarning", { mb: approxMb.toFixed(1) }));
       }
 
       let result: SendScanEmailResult;
@@ -170,7 +157,7 @@ function SendPage() {
         result = (await sendEmailFn({
           data: {
             to: recipient,
-            subject: subject || "Skannat dokument",
+            subject: subject || t("defaultSubjectFallback"),
             message: message || "",
             filename,
             pdfBase64,
@@ -193,11 +180,11 @@ function SendPage() {
         }, 2200);
       } else {
         console.error("[send] failed:", result);
-        setInfo(ERROR_MESSAGES[result.code] ?? ERROR_MESSAGES.unknown);
+        setInfo(t(`err_${result.code}`) ?? t("err_unknown"));
       }
     } catch (e) {
       console.error(e);
-      setInfo(ERROR_MESSAGES.unknown);
+      setInfo(t("err_unknown"));
     } finally {
       setSending(false);
     }
@@ -210,17 +197,17 @@ function SendPage() {
           <div className="h-16 w-16 rounded-full bg-success/15 flex items-center justify-center">
             <Check className="h-8 w-8 text-success" />
           </div>
-          <h2 className="text-xl font-semibold mt-5">Klart</h2>
-          <p className="text-muted-foreground mt-2 text-sm">Dokumentet har raderats från appen.</p>
+          <h2 className="text-xl font-semibold mt-5">{t("done")}</h2>
+          <p className="text-muted-foreground mt-2 text-sm">{t("doneCleared")}</p>
         </div>
       </AppShell>
     );
   }
 
   return (
-    <AppShell title="Skicka via e-post" back="/review">
+    <AppShell title={t("sendTitle")} back="/review">
       <div className="flex flex-col gap-4 mt-2">
-        <Field label="Till">
+        <Field label={t("fieldTo")}>
           <input
             type="email"
             inputMode="email"
@@ -233,9 +220,9 @@ function SendPage() {
             onBlur={() => {
               if (!trimmedTo) return;
               const r = emailSchema.safeParse(trimmedTo);
-              setEmailError(r.success ? null : r.error.issues[0]?.message ?? "Ogiltig e-postadress");
+              setEmailError(r.success ? null : r.error.issues[0]?.message ?? t("invalidEmail"));
             }}
-            placeholder="namn@exempel.se"
+            placeholder={t("placeholderTo")}
             aria-invalid={!!emailError}
             className="input"
           />
@@ -260,19 +247,19 @@ function SendPage() {
           )}
         </Field>
 
-        <Field label="Din e-post (svar går hit)">
+        <Field label={t("fieldReplyTo")}>
           <input
             type="email"
             inputMode="email"
             autoComplete="email"
             value={replyTo}
             onChange={(e) => setReplyTo(e.target.value)}
-            placeholder="du@exempel.se (valfritt)"
+            placeholder={t("placeholderReply")}
             className="input"
           />
         </Field>
 
-        <Field label="Ämne">
+        <Field label={t("fieldSubject")}>
           <input
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
@@ -280,7 +267,7 @@ function SendPage() {
           />
         </Field>
 
-        <Field label="Meddelande">
+        <Field label={t("fieldMessage")}>
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
@@ -296,7 +283,7 @@ function SendPage() {
         <PrimaryButton onClick={send} disabled={!emailValid || !pdfUrl || sending}>
           <span className="inline-flex items-center justify-center gap-2">
             <Mail className="h-5 w-5" />
-            {sending ? "Förbereder…" : "Skicka PDF"}
+            {sending ? t("preparing") : t("sendPdf")}
           </span>
         </PrimaryButton>
         <PrimaryButton
@@ -305,13 +292,13 @@ function SendPage() {
           disabled={!pdfUrl}
           className="h-12 text-[15px]"
         >
-          Ladda ned PDF
+          {t("downloadPdf")}
         </PrimaryButton>
         {info ? (
           <p className="text-center text-xs text-destructive mt-1">{info}</p>
         ) : (
           <p className="text-center text-xs text-muted-foreground mt-1">
-            PDF:en bifogas och skickas direkt från servern till mottagaren.
+            {t("sendFootnote")}
           </p>
         )}
       </div>

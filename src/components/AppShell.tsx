@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { ChevronLeft } from "lucide-react";
+import { useT } from "@/lib/i18n";
 
 interface Props {
   title?: string;
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export function AppShell({ title, back, children, rightSlot }: Props) {
+  const t = useT();
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {(title || back) && (
@@ -18,7 +20,7 @@ export function AppShell({ title, back, children, rightSlot }: Props) {
             <Link
               to={back}
               className="-ml-2 inline-flex items-center justify-center h-10 w-10 rounded-full text-foreground/70 hover:bg-secondary transition"
-              aria-label="Tillbaka"
+              aria-label={t("back")}
             >
               <ChevronLeft className="h-6 w-6" />
             </Link>

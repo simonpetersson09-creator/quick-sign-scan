@@ -4,6 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
 import { buildPdf, dataUrlToBlob } from "@/lib/pdf";
+import { useT } from "@/lib/i18n";
 import { ArrowLeft, Camera, Check, Mail, Minus, PenLine, Plus } from "lucide-react";
 
 export const Route = createFileRoute("/review")({
@@ -17,6 +18,7 @@ const ZOOM_STEP = 0.25;
 
 function ReviewPage() {
   const navigate = useNavigate();
+  const t = useT();
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [sizeBytes, setSizeBytes] = useState<number | null>(null);
   const [pages, setPages] = useState<number>(1);
@@ -59,15 +61,15 @@ function ReviewPage() {
   }
 
   return (
-    <AppShell title="Granska PDF" back="/sign">
+    <AppShell title={t("reviewTitle")} back="/sign">
       {/* Status row */}
       <div className="mt-1 mb-3 flex flex-wrap items-center gap-2">
-        <StatusChip tone="success" label="Dokument klart" />
+        <StatusChip tone="success" label={t("documentReady")} />
         <StatusChip
           tone={signed ? "success" : "muted"}
-          label={signed ? "Signerad" : "Ej signerad"}
+          label={signed ? t("signed") : t("notSigned")}
         />
-        <StatusChip tone="muted" label={`${pages} ${pages === 1 ? "sida" : "sidor"}`} />
+        <StatusChip tone="muted" label={`${pages} ${pages === 1 ? t("pageSingular") : t("pagePlural")}`} />
         <StatusChip
           tone="muted"
           label={sizeBytes ? formatBytes(sizeBytes) : "…"}
@@ -90,12 +92,12 @@ function ReviewPage() {
             {pdfUrl ? (
               <iframe
                 src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0&view=Fit&zoom=page-fit`}
-                title="PDF-förhandsvisning"
+                title={t("pdfPreview")}
                 className="w-full h-full block"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground">
-                Skapar PDF…
+                {t("creatingPdf")}
               </div>
             )}
           </div>
@@ -106,7 +108,7 @@ function ReviewPage() {
           <ZoomButton
             onClick={() => setZoom((z) => Math.max(MIN_ZOOM, +(z - ZOOM_STEP).toFixed(2)))}
             disabled={zoom <= MIN_ZOOM}
-            aria-label="Zooma ut"
+            aria-label={t("zoomOut")}
           >
             <Minus className="h-4 w-4" />
           </ZoomButton>
@@ -116,7 +118,7 @@ function ReviewPage() {
           <ZoomButton
             onClick={() => setZoom((z) => Math.min(MAX_ZOOM, +(z + ZOOM_STEP).toFixed(2)))}
             disabled={zoom >= MAX_ZOOM}
-            aria-label="Zooma in"
+            aria-label={t("zoomIn")}
           >
             <Plus className="h-4 w-4" />
           </ZoomButton>
@@ -140,13 +142,13 @@ function ReviewPage() {
             onChange={(e) => setApproved(e.target.checked)}
           />
           <span className="text-sm text-foreground/80 leading-snug">
-            Jag har granskat dokumentet och godkänner att det skickas.
+            {t("approveLabel")}
           </span>
         </label>
 
         <PrimaryButton onClick={proceed} disabled={!approved || !pdfUrl}>
           <span className="inline-flex items-center justify-center gap-2">
-            <Mail className="h-5 w-5" /> Fortsätt till e-post
+            <Mail className="h-5 w-5" /> {t("continueToEmail")}
           </span>
         </PrimaryButton>
 
@@ -157,7 +159,7 @@ function ReviewPage() {
             className="h-12 text-[15px]"
           >
             <span className="inline-flex items-center justify-center gap-2">
-              <PenLine className="h-4 w-4" /> Flytta signatur
+              <PenLine className="h-4 w-4" /> {t("moveSignature")}
             </span>
           </PrimaryButton>
           <PrimaryButton
@@ -169,7 +171,7 @@ function ReviewPage() {
             className="h-12 text-[15px]"
           >
             <span className="inline-flex items-center justify-center gap-2">
-              <Camera className="h-4 w-4" /> Ta om bild
+              <Camera className="h-4 w-4" /> {t("retake")}
             </span>
           </PrimaryButton>
         </div>
@@ -178,7 +180,7 @@ function ReviewPage() {
           onClick={() => navigate({ to: "/sign" })}
           className="inline-flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition py-1"
         >
-          <ArrowLeft className="h-3.5 w-3.5" /> Tillbaka till signering
+          <ArrowLeft className="h-3.5 w-3.5" /> {t("backToSign")}
         </button>
       </div>
     </AppShell>

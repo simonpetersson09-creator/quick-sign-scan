@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
-import { analyzeDocumentQuality, QualityReport, VERDICT_MESSAGE } from "@/lib/quality";
+import { analyzeDocumentQuality, QualityReport } from "@/lib/quality";
+import { useT } from "@/lib/i18n";
 import { Check, RefreshCw, AlertTriangle, ArrowRight } from "lucide-react";
 
 export const Route = createFileRoute("/preview")({
@@ -13,6 +14,7 @@ export const Route = createFileRoute("/preview")({
 
 function PreviewPage() {
   const navigate = useNavigate();
+  const t = useT();
   const [image, setImage] = useState<string | null>(null);
   const [sourceImage, setSourceImage] = useState<string | null>(null);
   const [detection, setDetection] = useState<ReturnType<typeof scanStore.get>["detection"]>(null);
@@ -64,9 +66,9 @@ function PreviewPage() {
   const polygonPoints = detection?.corners.map((p) => `${p.x * 100},${p.y * 100}`).join(" ");
 
   return (
-    <AppShell title="Förhandsgranska" back="/">
+    <AppShell title={t("previewTitle")} back="/">
       <p className="text-sm text-muted-foreground mt-1 mb-3">
-        Kontrollera att dokumentet är skarpt och komplett.
+        {t("previewHint")}
       </p>
 
       <div className="flex items-center justify-center">
@@ -76,7 +78,7 @@ function PreviewPage() {
         >
           <img
             src={image}
-            alt="Skannat dokument"
+            alt={t("scannedAlt")}
             className="w-full h-full object-contain bg-white"
           />
         </div>
@@ -84,20 +86,20 @@ function PreviewPage() {
 
       {!detection && (
         <div className="mt-4 rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm font-medium">
-          Kunde inte identifiera dokumentets kanter.
+          {t("cannotIdentifyEdges")}
         </div>
       )}
 
       {sourceImage && detection && (
         <div className="mt-4 rounded-2xl border border-border bg-card p-3">
           <div className="flex items-center justify-between gap-3 mb-2">
-            <span className="text-sm font-semibold">Identifierad polygon</span>
+            <span className="text-sm font-semibold">{t("identifiedPolygon")}</span>
             <button
               type="button"
               onClick={() => setDebugOpen((v) => !v)}
               className="text-xs font-medium text-primary"
             >
-              {debugOpen ? "Dölj debug" : "Visa debug"}
+              {debugOpen ? t("hideDebug") : t("showDebug")}
             </button>
           </div>
           <div className="relative overflow-hidden rounded-xl border border-border bg-background">
@@ -214,16 +216,14 @@ function PreviewPage() {
           <div className="flex-1">
             <div className="text-[15px] font-semibold">
               {analyzing
-                ? "Analyserar kvalitet…"
+                ? t("analyzingQuality")
                 : report
-                  ? VERDICT_MESSAGE[report.verdict]
-                  : "Kunde inte analysera"}
+                  ? t(`verdict_${report.verdict}`)
+                  : t("cannotAnalyze")}
             </div>
             {report && (
               <div className="text-[12px] text-muted-foreground mt-0.5">
-                {ok
-                  ? "Du kan gå vidare till signering."
-                  : "Du kan ändå använda bilden, eller ta om den."}
+                {ok ? t("canContinueToSign") : t("useAnyway")}
               </div>
             )}
           </div>
@@ -232,22 +232,22 @@ function PreviewPage() {
         {report && (
           <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mt-4">
             <Metric
-              label="Skärpa"
+              label={t("metric_sharpness")}
               ok={report.sharpness >= 55}
               value={Math.round(report.sharpness)}
             />
             <Metric
-              label="Kontrast"
+              label={t("metric_contrast")}
               ok={report.contrast >= 28}
               value={Math.round(report.contrast)}
             />
             <Metric
-              label="Ljus"
+              label={t("metric_brightness")}
               ok={report.brightness >= 95 && report.brightness <= 240}
               value={Math.round(report.brightness)}
             />
             <Metric
-              label="Komplett"
+              label={t("metric_complete")}
               ok={report.inkBands.every((b) => b >= 0.003)}
               value={`${Math.round(report.inkBands.reduce((a, b) => a + b, 0) * 100)}%`}
             />
@@ -260,12 +260,12 @@ function PreviewPage() {
       <div className="flex flex-col gap-3 pt-5">
         <PrimaryButton onClick={accept} disabled={!canUse}>
           <span className="inline-flex items-center justify-center gap-2">
-            Använd dokument <ArrowRight className="h-5 w-5" />
+            {t("useDocument")} <ArrowRight className="h-5 w-5" />
           </span>
         </PrimaryButton>
         <PrimaryButton variant="secondary" onClick={retake}>
           <span className="inline-flex items-center justify-center gap-2">
-            <RefreshCw className="h-5 w-5" /> Ta om bild
+            <RefreshCw className="h-5 w-5" /> {t("retake")}
           </span>
         </PrimaryButton>
       </div>

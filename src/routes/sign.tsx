@@ -4,6 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
 import { loadSettings, saveSettings } from "@/lib/settings";
+import { useT } from "@/lib/i18n";
 import { RotateCcw } from "lucide-react";
 
 export const Route = createFileRoute("/sign")({
@@ -12,6 +13,7 @@ export const Route = createFileRoute("/sign")({
 });
 
 function SignPage() {
+  const t = useT();
   const navigate = useNavigate();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawing = useRef(false);
@@ -80,9 +82,9 @@ function SignPage() {
   }
 
   return (
-    <AppShell title="Signera" back="/place">
+    <AppShell title={t("signTitle")} back="/place">
       <p className="text-sm text-muted-foreground mt-1">
-        Skriv din signatur med fingret i rutan nedan.
+        {t("signHint")}
       </p>
 
       {settings.savedSignature && (
@@ -93,9 +95,9 @@ function SignPage() {
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="font-medium">Använd sparad signatur</span>
+            <span className="font-medium">{t("useSavedSignature")}</span>
             <span className={`text-xs ${useSaved ? "text-primary" : "text-muted-foreground"}`}>
-              {useSaved ? "Vald" : "Tryck för att välja"}
+              {useSaved ? t("selected") : t("tapToSelect")}
             </span>
           </div>
           <img src={settings.savedSignature} alt="" className="h-12 mt-2 object-contain" />
@@ -113,7 +115,7 @@ function SignPage() {
         />
         {!hasInk && !useSaved && (
           <div className="absolute inset-0 flex items-end justify-center pb-3 pointer-events-none">
-            <span className="text-xs text-muted-foreground">Signera här</span>
+            <span className="text-xs text-muted-foreground">{t("signHere")}</span>
           </div>
         )}
         <div className="absolute left-4 right-4 bottom-3 border-b border-dashed border-muted-foreground/40 pointer-events-none" />
@@ -125,7 +127,7 @@ function SignPage() {
           disabled={!hasInk || useSaved}
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground disabled:opacity-40 px-2 py-1"
         >
-          <RotateCcw className="h-4 w-4" /> Rensa
+          <RotateCcw className="h-4 w-4" /> {t("clear")}
         </button>
       </div>
 
@@ -133,11 +135,11 @@ function SignPage() {
 
       <div className="flex flex-col gap-3 pt-5">
         <PrimaryButton onClick={() => done(false)} disabled={!hasInk && !useSaved}>
-          Klar — fortsätt
+          {t("doneContinue")}
         </PrimaryButton>
         {!useSaved && (
           <PrimaryButton variant="ghost" onClick={() => done(true)} disabled={!hasInk}>
-            Klar & spara signaturen
+            {t("doneAndSave")}
           </PrimaryButton>
         )}
       </div>
