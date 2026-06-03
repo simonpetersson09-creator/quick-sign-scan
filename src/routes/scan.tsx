@@ -594,9 +594,10 @@ function ScanPage() {
             }`}
             aria-hidden="true"
           >
-            {["top-0 left-0", "top-0 right-0", "bottom-0 right-0", "bottom-0 left-0"].map((pos) => (
-              <span key={pos} className={`absolute ${pos} h-10 w-10 border-white/95`} />
-            ))}
+            <span className="absolute left-[-2px] top-[-2px] h-10 w-10 border-l-4 border-t-4 border-white/95" />
+            <span className="absolute right-[-2px] top-[-2px] h-10 w-10 border-r-4 border-t-4 border-white/95" />
+            <span className="absolute bottom-[-2px] right-[-2px] h-10 w-10 border-b-4 border-r-4 border-white/95" />
+            <span className="absolute bottom-[-2px] left-[-2px] h-10 w-10 border-b-4 border-l-4 border-white/95" />
           </div>
         </div>
         <svg
