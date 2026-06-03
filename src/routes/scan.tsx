@@ -300,6 +300,7 @@ function ScanPage() {
         smoothQuad.current = null;
         lastRawQuad.current = null;
         drawOverlay(null, false);
+        setProgress(0);
       }
       setStatus((s) => (s === "starting" ? s : missCount.current > 45 ? "uncertain" : "searching"));
       return;
@@ -327,6 +328,10 @@ function ScanPage() {
 
     if (delta < STABLE_DELTA) stableCount.current++;
     else stableCount.current = Math.max(0, stableCount.current - 1);
+
+    // Progress 0..1 — fills up as the document stays stable, hits 1.0 right before capture.
+    const pct = Math.max(0, Math.min(1, stableCount.current / STABLE_FRAMES));
+    setProgress(pct);
 
     // Wait for enough consecutive detections before showing anything as "found".
     if (detectCount.current < DETECT_FRAMES) {
