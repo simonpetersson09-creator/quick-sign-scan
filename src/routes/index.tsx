@@ -79,24 +79,32 @@ function Home() {
           </div>
         </Link>
 
-        {/* Flaggorna — lodrätt, total höjd = 48 px */}
-        <div className="flex flex-col h-12 w-12 gap-[2px]">
-          <div className="flex-1 rounded-lg overflow-hidden border border-border transition active:scale-[0.98]">
-            <svg viewBox="0 0 36 24" className="w-full h-full">
-              <rect width="36" height="24" fill="#006AA7" />
-              <rect x="11" y="0" width="4" height="24" fill="#FECC00" />
-              <rect x="0" y="10" width="36" height="4" fill="#FECC00" />
+        {/* Flaggorna — lodrätt glaspill, total höjd = 48 px */}
+        <div className="flex flex-col items-center justify-center gap-1.5 p-1 h-12 rounded-full bg-white/20 backdrop-blur-md border border-white/40 shadow-[var(--shadow-soft)]">
+          <button
+            type="button"
+            aria-label="Svenska"
+            className="w-[26px] h-[26px] rounded-full overflow-hidden border-2 border-white ring-2 ring-white/40 shadow-sm transition active:scale-90"
+          >
+            <svg viewBox="0 0 16 10" preserveAspectRatio="xMidYMid slice" className="w-full h-full scale-150">
+              <rect width="16" height="10" fill="#006AA7" />
+              <rect x="5" width="2" height="10" fill="#FECC00" />
+              <rect y="4" width="16" height="2" fill="#FECC00" />
             </svg>
-          </div>
-          <div className="flex-1 rounded-lg overflow-hidden border border-border transition active:scale-[0.98]">
-            <svg viewBox="0 0 36 24" className="w-full h-full">
-              <rect width="36" height="24" fill="#012169" />
-              <path d="M0 0 L36 24 M36 0 L0 24" stroke="#FFF" strokeWidth="4.8" />
-              <path d="M0 0 L36 24 M36 0 L0 24" stroke="#C8102E" strokeWidth="3.2" />
-              <path d="M18 0 V24 M0 12 H36" stroke="#FFF" strokeWidth="8" />
-              <path d="M18 0 V24 M0 12 H36" stroke="#C8102E" strokeWidth="4.8" />
+          </button>
+          <button
+            type="button"
+            aria-label="English"
+            className="w-[26px] h-[26px] rounded-full overflow-hidden border-2 border-transparent opacity-60 transition hover:opacity-100 hover:border-white/30 active:scale-90"
+          >
+            <svg viewBox="0 0 50 30" preserveAspectRatio="xMidYMid slice" className="w-full h-full scale-150">
+              <rect width="50" height="30" fill="#012169" />
+              <path d="M0,0 L50,30 M50,0 L0,30" stroke="#FFF" strokeWidth="6" />
+              <path d="M0,0 L50,30 M50,0 L0,30" stroke="#C8102E" strokeWidth="4" />
+              <path d="M25,0 V30 M0,15 H50" stroke="#FFF" strokeWidth="10" />
+              <path d="M25,0 V30 M0,15 H50" stroke="#C8102E" strokeWidth="6" />
             </svg>
-          </div>
+          </button>
         </div>
       </div>
     </div>
