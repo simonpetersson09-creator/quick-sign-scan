@@ -68,7 +68,7 @@ function PlacePage() {
           >
             <div className="w-32 h-10 rounded-md border-2 border-dashed border-primary/80 bg-primary/10 flex items-center justify-center">
               <PenLine className="h-4 w-4 text-primary" />
-              <span className="ml-1 text-[11px] font-medium text-primary">Signatur</span>
+              <span className="ml-1 text-[11px] font-medium text-primary">{t("signatureLabel")}</span>
             </div>
           </div>
         </div>
