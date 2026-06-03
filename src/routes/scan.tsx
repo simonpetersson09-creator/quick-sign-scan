@@ -73,7 +73,7 @@ function ScanPage() {
     // shows the native prompt (first time).
     let knownState: PermissionState | null = null;
     try {
-      // @ts-expect-error - "camera" is not in all TS lib versions
+      // "camera" may not be in all TS lib versions
       const status = await navigator.permissions?.query?.({ name: "camera" });
       if (status?.state === "granted" || status?.state === "denied" || status?.state === "prompt") {
         knownState = status.state;
@@ -121,7 +121,7 @@ function ScanPage() {
         // error state instead of falsely accusing them of blocking the camera.
         let confirmed: PermissionState | null = null;
         try {
-          // @ts-expect-error - "camera" is not in all TS lib versions
+          // "camera" may not be in all TS lib versions
           const status = await navigator.permissions?.query?.({ name: "camera" });
           if (status?.state) confirmed = status.state as PermissionState;
         } catch {
