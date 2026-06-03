@@ -513,11 +513,9 @@ function ScanPage() {
           playsInline
           muted
           autoPlay
-          // iOS Safari ignores playsInline unless it's also a literal attribute,
-          // and disablePictureInPicture avoids the camera being yanked into PiP.
-          // @ts-expect-error — non-standard attributes accepted by Safari
+          // iOS Safari ignores playsInline unless it's also a literal attribute.
           // eslint-disable-next-line react/no-unknown-property
-          {...{ "webkit-playsinline": "true", "x-webkit-airplay": "deny" }}
+          {...({ "webkit-playsinline": "true", "x-webkit-airplay": "deny" } as Record<string, string>)}
           disablePictureInPicture
           onLoadedMetadata={(e) => {
             const v = e.currentTarget;
