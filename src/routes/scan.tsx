@@ -473,6 +473,26 @@ function ScanPage() {
         console.error("[scan] enhancePaper failed, using raw warp", e);
       }
 
+      // Paint a thin white border over the warped result. Even with the
+      // inset above, slight perspective/detection error can leave a sliver
+      // of the table/background along the edges. A guaranteed white frame
+      // makes the output look like a uniform scanned sheet.
+      try {
+        const bctx = warped.getContext("2d");
+        if (bctx) {
+          const bw = Math.max(6, Math.round(outW * 0.012));
+          const bh = Math.max(6, Math.round(outH * 0.012));
+          bctx.fillStyle = "#ffffff";
+          bctx.fillRect(0, 0, outW, bh);
+          bctx.fillRect(0, outH - bh, outW, bh);
+          bctx.fillRect(0, 0, bw, outH);
+          bctx.fillRect(outW - bw, 0, bw, outH);
+        }
+      } catch (e) {
+        console.error("[scan] border paint failed", e);
+      }
+
+
       const sourceCanvas = document.createElement("canvas");
       sourceCanvas.width = vw;
       sourceCanvas.height = vh;
