@@ -77,12 +77,12 @@ function PlacePage() {
       <div className="flex flex-col gap-3 pt-5">
         <PrimaryButton onClick={goSign}>
           <span className="inline-flex items-center justify-center gap-2">
-            <PenLine className="h-5 w-5" /> Signera dokument
+            <PenLine className="h-5 w-5" /> {t("signDocument")}
           </span>
         </PrimaryButton>
         <PrimaryButton variant="secondary" onClick={goSend}>
           <span className="inline-flex items-center justify-center gap-2">
-            <Send className="h-5 w-5" /> Skicka utan signatur
+            <Send className="h-5 w-5" /> {t("sendWithoutSignature")}
           </span>
         </PrimaryButton>
       </div>
