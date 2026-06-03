@@ -5,7 +5,7 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
 import { analyzeDocumentQuality, QualityReport } from "@/lib/quality";
 import { useT } from "@/lib/i18n";
-import { Check, RefreshCw, AlertTriangle, ArrowRight } from "lucide-react";
+import { Check, RefreshCw, AlertTriangle, ArrowRight, Plus } from "lucide-react";
 
 export const Route = createFileRoute("/preview")({
   head: () => ({ meta: [{ title: "Förhandsgranska" }] }),
