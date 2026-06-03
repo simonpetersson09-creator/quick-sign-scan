@@ -39,6 +39,7 @@ const READY_FRAMES = 45; // ~1.5s — "Dokument hittat" lock-in
 const STABLE_FRAMES = 75; // ~2.5s total before auto-capture
 
 function ScanPage() {
+  const t = useT();
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
