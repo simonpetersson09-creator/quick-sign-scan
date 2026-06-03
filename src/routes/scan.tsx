@@ -597,6 +597,7 @@ function ScanPage() {
         <button
           onClick={manualCapture}
           disabled={
+            !cameraReady ||
             status === "starting" ||
             status === "error" ||
             status === "capturing" ||
