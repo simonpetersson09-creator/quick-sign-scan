@@ -93,13 +93,13 @@ function PreviewPage() {
       {sourceImage && detection && (
         <div className="mt-4 rounded-2xl border border-border bg-card p-3">
           <div className="flex items-center justify-between gap-3 mb-2">
-            <span className="text-sm font-semibold">Identifierad polygon</span>
+            <span className="text-sm font-semibold">{t("identifiedPolygon")}</span>
             <button
               type="button"
               onClick={() => setDebugOpen((v) => !v)}
               className="text-xs font-medium text-primary"
             >
-              {debugOpen ? "Dölj debug" : "Visa debug"}
+              {debugOpen ? t("hideDebug") : t("showDebug")}
             </button>
           </div>
           <div className="relative overflow-hidden rounded-xl border border-border bg-background">
