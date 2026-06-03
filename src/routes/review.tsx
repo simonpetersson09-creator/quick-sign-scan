@@ -18,6 +18,7 @@ const ZOOM_STEP = 0.25;
 
 function ReviewPage() {
   const navigate = useNavigate();
+  const t = useT();
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [sizeBytes, setSizeBytes] = useState<number | null>(null);
   const [pages, setPages] = useState<number>(1);
