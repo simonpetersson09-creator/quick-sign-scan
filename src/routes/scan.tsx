@@ -433,15 +433,17 @@ function ScanPage() {
       setDebugInfo((d) => ({ ...d, vw, vh, ready: true, lastCapture: Date.now() }));
     }
 
-    // Inset corners ~1.8% toward centroid as a safety margin so background,
+    // Inset corners ~3.2% toward centroid as a safety margin so background,
     // bordskanter eller skuggor utanför pappret aldrig läcker in i resultatet.
+    // Större inset = mer kantmarginal bortskuren, men säkrare enhetlig vit yta.
     const cx = (normQuad[0].x + normQuad[1].x + normQuad[2].x + normQuad[3].x) / 4;
     const cy = (normQuad[0].y + normQuad[1].y + normQuad[2].y + normQuad[3].y) / 4;
-    const INSET = 0.018;
+    const INSET = 0.032;
     const inset = normQuad.map((p) => ({
       x: p.x + (cx - p.x) * INSET,
       y: p.y + (cy - p.y) * INSET,
     })) as [Point, Point, Point, Point];
+
 
     // Convert insatta hörn till källans pixelkoordinater
     const srcQuad = inset.map((p) => ({
@@ -470,6 +472,26 @@ function ScanPage() {
       } catch (e) {
         console.error("[scan] enhancePaper failed, using raw warp", e);
       }
+
+      // Paint a thin white border over the warped result. Even with the
+      // inset above, slight perspective/detection error can leave a sliver
+      // of the table/background along the edges. A guaranteed white frame
+      // makes the output look like a uniform scanned sheet.
+      try {
+        const bctx = warped.getContext("2d");
+        if (bctx) {
+          const bw = Math.max(6, Math.round(outW * 0.012));
+          const bh = Math.max(6, Math.round(outH * 0.012));
+          bctx.fillStyle = "#ffffff";
+          bctx.fillRect(0, 0, outW, bh);
+          bctx.fillRect(0, outH - bh, outW, bh);
+          bctx.fillRect(0, 0, bw, outH);
+          bctx.fillRect(outW - bw, 0, bw, outH);
+        }
+      } catch (e) {
+        console.error("[scan] border paint failed", e);
+      }
+
 
       const sourceCanvas = document.createElement("canvas");
       sourceCanvas.width = vw;
