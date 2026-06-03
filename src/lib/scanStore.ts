@@ -11,6 +11,9 @@ type Listener = () => void;
 export interface ScanSession {
   imageDataUrl: string | null;
   sourceDataUrl: string | null;
+  // All scanned pages in order. The last entry mirrors imageDataUrl and
+  // is the page used for signature placement.
+  pages: string[];
   detection: {
     corners: [
       { x: number; y: number },
