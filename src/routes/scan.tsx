@@ -639,11 +639,14 @@ function ScanPage() {
           <X className="h-5 w-5" />
         </button>
         <div
-          className={`px-4 py-2 rounded-full text-[13px] font-medium backdrop-blur transition ${
+          className={`px-4 py-2 rounded-full text-[13px] font-medium backdrop-blur transition tabular-nums ${
             statusActive ? "bg-success/90 text-success-foreground" : "bg-black/55 text-white"
           }`}
         >
           {statusText[status]}
+          {progress > 0 && status !== "capturing" && (
+            <span className="ml-2 opacity-80">{Math.round(progress * 100)}%</span>
+          )}
         </div>
         <div className="w-10" />
       </div>
