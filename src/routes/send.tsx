@@ -40,6 +40,7 @@ export const Route = createFileRoute("/send")({
 
 function SendPage() {
   const navigate = useNavigate();
+  const t = useT();
   const sendEmailFn = useServerFn(sendScanEmail);
   const settings = useMemo(() => loadSettings(), []);
   const [to, setTo] = useState(settings.defaultRecipient);
@@ -52,6 +53,7 @@ function SendPage() {
   const [info, setInfo] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
 
+  const emailSchema = useMemo(() => makeEmailSchema(t), [t]);
   const trimmedTo = to.trim();
   const emailValid = emailSchema.safeParse(trimmedTo).success;
 
@@ -59,16 +61,15 @@ function SendPage() {
   // (typically iOS Safari's ~5 MB quota for very large scans).
   useEffect(() => {
     const unsubscribe = scanStore.onQuotaExceeded(() => {
-      toast.warning("Skanningen är för stor för att sparas på enheten", {
-        description:
-          "Den ligger kvar i minnet, men ladda inte om sidan innan du skickat – då försvinner dokumentet.",
+      toast.warning(t("scanTooLargeTitle"), {
+        description: t("scanTooLargeDesc"),
         duration: 6000,
       });
     });
     return () => {
       unsubscribe();
     };
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     const s = scanStore.get();
