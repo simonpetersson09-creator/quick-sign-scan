@@ -8,6 +8,12 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
   tanstackStart: {
+    router: {
+      // Keep routes in the main client bundle. The scan flow stores documents
+      // only in memory for privacy, so a stale lazy route chunk during the
+      // transition from camera → preview would force a reload and lose the scan.
+      autoCodeSplitting: false,
+    },
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
     server: { entry: "server" },
