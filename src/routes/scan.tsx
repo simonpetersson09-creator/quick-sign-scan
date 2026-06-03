@@ -400,11 +400,26 @@ function ScanPage() {
       setStatus("uncertain");
       return;
     }
-    capturedRef.current = true;
     const video = videoRef.current;
-    if (!video) return;
+    // Hard guard: refuse to capture unless the video element actually has
+    // a current frame with real dimensions. Prevents black/empty captures
+    // on slow iOS Safari startup where the stream is attached but no
+    // frame has been decoded yet.
+    if (
+      !video ||
+      video.readyState < 2 ||
+      !video.videoWidth ||
+      !video.videoHeight
+    ) {
+      setStatus("searching");
+      return;
+    }
+    capturedRef.current = true;
     const vw = video.videoWidth;
     const vh = video.videoHeight;
+    if (debugEnabled) {
+      setDebugInfo((d) => ({ ...d, vw, vh, ready: true, lastCapture: Date.now() }));
+    }
 
     // Inset corners ~1.8% toward centroid as a safety margin so background,
     // bordskanter eller skuggor utanför pappret aldrig läcker in i resultatet.
