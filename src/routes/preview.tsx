@@ -86,7 +86,7 @@ function PreviewPage() {
 
       {!detection && (
         <div className="mt-4 rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm font-medium">
-          Kunde inte identifiera dokumentets kanter.
+          {t("cannotIdentifyEdges")}
         </div>
       )}
 
