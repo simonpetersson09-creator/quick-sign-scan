@@ -38,6 +38,28 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
 
+  // Stale chunk after a redeploy: the lazy-loaded route bundle hash has
+  // changed and the old hashed file no longer exists. The browser then
+  // throws "Importing a module script failed" / "Failed to fetch dynamically
+  // imported module". The only safe recovery is a hard reload so the new
+  // index.html with current chunk hashes is loaded.
+  const msg = (error?.message || "").toLowerCase();
+  const isChunkError =
+    msg.includes("importing a module script failed") ||
+    msg.includes("failed to fetch dynamically imported module") ||
+    msg.includes("dynamically imported module") ||
+    msg.includes("loading chunk") ||
+    msg.includes("loading css chunk");
+
+  if (typeof window !== "undefined" && isChunkError) {
+    // Avoid an infinite reload loop — only auto-reload once per session.
+    const KEY = "__lov_chunk_reloaded";
+    if (!sessionStorage.getItem(KEY)) {
+      sessionStorage.setItem(KEY, "1");
+      window.location.reload();
+    }
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
@@ -50,6 +72,10 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
+              if (isChunkError && typeof window !== "undefined") {
+                window.location.reload();
+                return;
+              }
               router.invalidate();
               reset();
             }}
@@ -68,6 +94,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
     </div>
   );
 }
+
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
