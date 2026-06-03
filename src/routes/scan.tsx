@@ -151,14 +151,44 @@ function ScanPage() {
         return;
       }
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+      const videoEl = videoRef.current;
+      if (videoEl) {
+        videoEl.srcObject = stream;
+        // Wait for the video to actually have frame data before allowing
+        // detection / capture. Without this, the first ticks of the RAF
+        // loop hit a 0x0 video and we draw a blank canvas.
+        const waitReady = new Promise<void>((resolve) => {
+          if (videoEl.readyState >= 2 && videoEl.videoWidth > 0) {
+            resolve();
+            return;
+          }
+          const onReady = () => {
+            if (videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
+              videoEl.removeEventListener("loadedmetadata", onReady);
+              videoEl.removeEventListener("canplay", onReady);
+              resolve();
+            }
+          };
+          videoEl.addEventListener("loadedmetadata", onReady);
+          videoEl.addEventListener("canplay", onReady);
+        });
         try {
-          await videoRef.current.play();
+          await videoEl.play();
         } catch {
           // iOS Safari can reject play() if the gesture context was lost.
-          // Surface as a recoverable error rather than crashing.
         }
+        // Race readiness against a short timeout — if metadata never arrives
+        // we still let detect() bail safely on its own readyState check.
+        await Promise.race([
+          waitReady,
+          new Promise<void>((r) => setTimeout(r, 4000)),
+        ]);
+        if (cancelledRef.current) {
+          stream.getTracks().forEach((tr) => tr.stop());
+          streamRef.current = null;
+          return;
+        }
+        setCameraReady(videoEl.videoWidth > 0 && videoEl.videoHeight > 0);
       }
       if (cancelledRef.current) {
         stream.getTracks().forEach((tr) => tr.stop());
