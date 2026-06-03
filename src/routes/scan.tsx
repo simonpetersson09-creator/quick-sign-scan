@@ -589,15 +589,15 @@ function ScanPage() {
           <div
             className={`relative w-[min(82vw,46vh)] max-w-[360px] aspect-[1/1.4142] rounded-[10px] border-2 transition ${
               statusActive
-                ? "border-success shadow-[0_0_0_1px_rgba(0,0,0,0.55),0_0_26px_rgba(255,255,255,0.34)]"
-                : "border-white/95 shadow-[0_0_0_1px_rgba(0,0,0,0.7),0_0_24px_rgba(255,255,255,0.30)]"
+                ? "border-success shadow-[0_0_0_1px_var(--scan-frame-outline),0_0_26px_var(--scan-frame-active-glow)]"
+                : "border-[var(--scan-frame)] shadow-[0_0_0_1px_var(--scan-frame-outline),0_0_24px_var(--scan-frame-glow)]"
             }`}
             aria-hidden="true"
           >
-            <span className="absolute left-[-2px] top-[-2px] h-10 w-10 border-l-4 border-t-4 border-white/95" />
-            <span className="absolute right-[-2px] top-[-2px] h-10 w-10 border-r-4 border-t-4 border-white/95" />
-            <span className="absolute bottom-[-2px] right-[-2px] h-10 w-10 border-b-4 border-r-4 border-white/95" />
-            <span className="absolute bottom-[-2px] left-[-2px] h-10 w-10 border-b-4 border-l-4 border-white/95" />
+            <span className="absolute left-[-2px] top-[-2px] h-10 w-10 border-l-4 border-t-4 border-[var(--scan-frame)]" />
+            <span className="absolute right-[-2px] top-[-2px] h-10 w-10 border-r-4 border-t-4 border-[var(--scan-frame)]" />
+            <span className="absolute bottom-[-2px] right-[-2px] h-10 w-10 border-b-4 border-r-4 border-[var(--scan-frame)]" />
+            <span className="absolute bottom-[-2px] left-[-2px] h-10 w-10 border-b-4 border-l-4 border-[var(--scan-frame)]" />
           </div>
         </div>
         <svg
@@ -661,11 +661,7 @@ function ScanPage() {
             !cameraReady ||
             status === "starting" ||
             status === "error" ||
-            status === "capturing" ||
-            !smoothQuad.current ||
-            !detectionMeta.current ||
-            detectionMeta.current.confidence < MIN_DOCUMENT_CONFIDENCE ||
-            detectCount.current < DETECT_FRAMES
+            status === "capturing"
           }
           className="h-16 w-16 rounded-full bg-white text-black flex items-center justify-center shadow-lg active:scale-95 disabled:opacity-40"
           aria-label={t("manualCapture")}
