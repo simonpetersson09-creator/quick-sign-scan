@@ -474,8 +474,14 @@ function ScanPage() {
   function manualCapture() {
     // Require a detected document — never capture the raw camera frame,
     // otherwise the preview shows an un-cropped photo instead of a scan.
+    const v = videoRef.current;
     const q = smoothQuad.current;
     if (
+      !cameraReady ||
+      !v ||
+      v.readyState < 2 ||
+      !v.videoWidth ||
+      !v.videoHeight ||
       !q ||
       !detectionMeta.current ||
       detectionMeta.current.confidence < MIN_DOCUMENT_CONFIDENCE ||
