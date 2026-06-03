@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 
 const GATEWAY_URL = "https://connector-gateway.lovable.dev/resend";
@@ -72,13 +73,40 @@ export const sendScanEmail = createServerFn({ method: "POST" })
     return r.data;
   })
   .handler(async ({ data }): Promise<SendScanEmailResult> => {
+    // Same-origin guard: this endpoint is only meant to be called from the
+    // app's own frontend. Reject cross-origin callers to prevent the function
+    // from being used as an open email relay.
+    try {
+      const req = getRequest();
+      const origin = req?.headers.get("origin") ?? req?.headers.get("referer") ?? "";
+      const host = req?.headers.get("host") ?? "";
+      let ok = false;
+      if (origin && host) {
+        try {
+          const originHost = new URL(origin).host;
+          ok = originHost === host;
+        } catch {
+          ok = false;
+        }
+      }
+      if (!ok) {
+        console.error(`[sendScanEmail] rejected cross-origin request host=${host}`);
+        return { ok: false, code: "unauthorized", detail: "Forbidden" };
+      }
+    } catch (e) {
+      console.error(`[sendScanEmail] origin check failed: ${e instanceof Error ? e.name : "unknown"}`);
+      return { ok: false, code: "unauthorized", detail: "Forbidden" };
+    }
+
     const LOVABLE_API_KEY = process.env.LOVABLE_API_KEY;
     if (!LOVABLE_API_KEY) {
-      return { ok: false, code: "unauthorized", detail: "LOVABLE_API_KEY missing" };
+      console.error("[sendScanEmail] email gateway credential not configured");
+      return { ok: false, code: "unauthorized", detail: "Email service misconfigured" };
     }
     const RESEND_API_KEY = process.env.RESEND_API_KEY;
     if (!RESEND_API_KEY) {
-      return { ok: false, code: "unauthorized", detail: "RESEND_API_KEY missing" };
+      console.error("[sendScanEmail] email provider credential not configured");
+      return { ok: false, code: "unauthorized", detail: "Email service misconfigured" };
     }
 
     const approxBytes = Math.floor((data.pdfBase64.length * 3) / 4);
