@@ -703,8 +703,13 @@ function ScanPage() {
             <span className="ml-2 opacity-80">{Math.round(progress * 100)}%</span>
           )}
         </div>
-        <div className="w-10" />
-      </div>
+        {pageCount > 0 ? (
+          <div className="px-3 py-1.5 rounded-full bg-success/90 text-success-foreground text-[12px] font-semibold tabular-nums">
+            {pageCount}
+          </div>
+        ) : (
+          <div className="w-10" />
+        )}
 
       <div className="flex-1" />
 
