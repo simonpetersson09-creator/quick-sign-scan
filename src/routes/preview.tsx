@@ -232,22 +232,22 @@ function PreviewPage() {
         {report && (
           <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mt-4">
             <Metric
-              label="Skärpa"
+              label={t("metric_sharpness")}
               ok={report.sharpness >= 55}
               value={Math.round(report.sharpness)}
             />
             <Metric
-              label="Kontrast"
+              label={t("metric_contrast")}
               ok={report.contrast >= 28}
               value={Math.round(report.contrast)}
             />
             <Metric
-              label="Ljus"
+              label={t("metric_brightness")}
               ok={report.brightness >= 95 && report.brightness <= 240}
               value={Math.round(report.brightness)}
             />
             <Metric
-              label="Komplett"
+              label={t("metric_complete")}
               ok={report.inkBands.every((b) => b >= 0.003)}
               value={`${Math.round(report.inkBands.reduce((a, b) => a + b, 0) * 100)}%`}
             />
