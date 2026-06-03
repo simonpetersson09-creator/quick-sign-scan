@@ -108,7 +108,7 @@ function ReviewPage() {
           <ZoomButton
             onClick={() => setZoom((z) => Math.max(MIN_ZOOM, +(z - ZOOM_STEP).toFixed(2)))}
             disabled={zoom <= MIN_ZOOM}
-            aria-label="Zooma ut"
+            aria-label={t("zoomOut")}
           >
             <Minus className="h-4 w-4" />
           </ZoomButton>
