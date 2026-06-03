@@ -51,6 +51,11 @@ const HOLD_FRAMES = 8; // ~0.27s — "Håll stilla" phase
 const READY_FRAMES = 18; // ~0.6s — "Dokument hittat" lock-in
 const STABLE_FRAMES = 28; // ~0.95s total before auto-capture
 
+type StartCameraOptions = {
+  restartStream?: boolean;
+  skipPermissionPreflight?: boolean;
+};
+
 function ScanPage() {
   const t = useT();
   const navigate = useNavigate();
@@ -89,7 +94,26 @@ function ScanPage() {
     typeof window !== "undefined" && /[?&]debug=1\b/.test(window.location.search);
   const cancelledRef = useRef(false);
 
-  const startCamera = useCallback(async () => {
+  const startCamera = useCallback(async (options: StartCameraOptions = {}) => {
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    if (options.restartStream || streamRef.current) {
+      streamRef.current?.getTracks().forEach((tr) => tr.stop());
+      streamRef.current = null;
+      if (videoRef.current) videoRef.current.srcObject = null;
+    }
+    capturedRef.current = false;
+    stableCount.current = 0;
+    detectCount.current = 0;
+    missCount.current = 0;
+    smoothQuad.current = null;
+    lastRawQuad.current = null;
+    detectionMeta.current = null;
+    setProgress(0);
+    setCameraReady(false);
+    drawOverlay(null, false);
     setStatus("starting");
     setError(null);
     setErrorType(null);
@@ -116,13 +140,15 @@ function ScanPage() {
     // call getUserMedia — which either resolves immediately (granted) or
     // shows the native prompt (first time).
     let knownState: PermissionState | null = null;
-    try {
-      const status = await navigator.permissions?.query?.({ name: "camera" as PermissionName });
-      if (status?.state === "granted" || status?.state === "denied" || status?.state === "prompt") {
-        knownState = status.state;
+    if (!options.skipPermissionPreflight) {
+      try {
+        const status = await navigator.permissions?.query?.({ name: "camera" as PermissionName });
+        if (status?.state === "granted" || status?.state === "denied" || status?.state === "prompt") {
+          knownState = status.state;
+        }
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
     }
 
     if (cancelledRef.current) return;
