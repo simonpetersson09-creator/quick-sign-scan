@@ -3,6 +3,7 @@ import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { loadSettings, saveSettings } from "@/lib/settings";
+import { useT } from "@/lib/i18n";
 import { Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/settings")({
@@ -11,6 +12,7 @@ export const Route = createFileRoute("/settings")({
 });
 
 function SettingsPage() {
+  const t = useT();
   const [s, setS] = useState(() => loadSettings());
   const [saved, setSaved] = useState(false);
 
@@ -26,32 +28,32 @@ function SettingsPage() {
   }
 
   return (
-    <AppShell title="Inställningar" back="/">
+    <AppShell title={t("settingsTitle")} back="/">
       <div className="flex flex-col gap-5 mt-2">
-        <Field label="Din e-postadress (Reply-To)">
+        <Field label={t("yourEmailLabel")}>
           <input
             type="email"
             value={s.userEmail}
             onChange={(e) => update("userEmail", e.target.value)}
-            placeholder="du@exempel.se"
+            placeholder={t("placeholderReply").replace(" (valfritt)", "").replace(" (optional)", "")}
             className="input"
           />
           <p className="text-[11px] text-muted-foreground mt-1.5 ml-1">
-            Används som svarsadress, så mottagaren kan svara till dig direkt.
+            {t("yourEmailHint")}
           </p>
         </Field>
 
-        <Field label="Standardmottagare">
+        <Field label={t("defaultRecipientLabel")}>
           <input
             type="email"
             value={s.defaultRecipient}
             onChange={(e) => update("defaultRecipient", e.target.value)}
-            placeholder="namn@exempel.se"
+            placeholder={t("placeholderTo")}
             className="input"
           />
         </Field>
 
-        <Field label="Standardämne">
+        <Field label={t("defaultSubjectLabel")}>
           <input
             value={s.defaultSubject}
             onChange={(e) => update("defaultSubject", e.target.value)}
@@ -59,7 +61,7 @@ function SettingsPage() {
           />
         </Field>
 
-        <Field label="Standardmeddelande">
+        <Field label={t("defaultMessageLabel")}>
           <textarea
             value={s.defaultMessage}
             onChange={(e) => update("defaultMessage", e.target.value)}
@@ -68,27 +70,27 @@ function SettingsPage() {
           />
         </Field>
 
-        <Field label="Sparad signatur">
+        <Field label={t("savedSignatureLabel")}>
           {s.savedSignature ? (
             <div className="rounded-2xl border border-border bg-card p-3 flex items-center justify-between">
               <img src={s.savedSignature} alt="" className="h-12 object-contain" />
               <button
                 onClick={() => update("savedSignature", null)}
                 className="text-destructive p-2"
-                aria-label="Ta bort signatur"
+                aria-label={t("removeSignature")}
               >
                 <Trash2 className="h-5 w-5" />
               </button>
             </div>
           ) : (
             <div className="rounded-2xl border border-dashed border-border bg-card p-4 text-sm text-muted-foreground text-center">
-              Ingen signatur sparad ännu. Du kan spara en signatur när du signerar ett dokument.
+              {t("noSignatureYet")}
             </div>
           )}
         </Field>
 
         {s.recipients.length > 0 && (
-          <Field label="Senaste mottagare">
+          <Field label={t("recentRecipients")}>
             <div className="flex flex-wrap gap-2">
               {s.recipients.map((r) => (
                 <span key={r.email} className="px-3 py-1.5 rounded-full bg-secondary text-secondary-foreground text-xs font-medium">
@@ -104,10 +106,10 @@ function SettingsPage() {
 
       <div className="pt-6">
         <PrimaryButton onClick={save}>
-          {saved ? "Sparat ✓" : "Spara inställningar"}
+          {saved ? t("savedCheck") : t("saveSettings")}
         </PrimaryButton>
         <p className="text-center text-xs text-muted-foreground mt-3">
-          Inga dokument sparas — endast dina inställningar.
+          {t("settingsFootnote")}
         </p>
       </div>
 
