@@ -53,10 +53,10 @@
   --primary-foreground: oklch(0.99 0.005 80);
 
   --secondary: oklch(0.96 0.008 80);
-  --secondary-foreground: oklch(0.30 0.015 250);
+  --secondary-foreground: oklch(0.3 0.015 250);
 
   --muted: oklch(0.95 0.008 80);
-  --muted-foreground: oklch(0.50 0.015 250);
+  --muted-foreground: oklch(0.5 0.015 250);
 
   --accent: oklch(0.92 0.03 200);
   --accent-foreground: oklch(0.25 0.015 250);
@@ -68,8 +68,8 @@
   --success-foreground: oklch(0.99 0.005 80);
 
   --scan-frame: oklch(0.99 0.005 80 / 0.96);
-  --scan-frame-outline: oklch(0 0 0 / 0.70);
-  --scan-frame-glow: oklch(1 0 0 / 0.30);
+  --scan-frame-outline: oklch(0 0 0 / 0.7);
+  --scan-frame-glow: oklch(1 0 0 / 0.3);
   --scan-frame-active-glow: oklch(1 0 0 / 0.34);
 
   --border: oklch(0.92 0.008 80);
@@ -85,15 +85,28 @@
     border-color: var(--color-border);
   }
 
-  html, body {
+  html,
+  body {
     background-color: var(--color-background);
     color: var(--color-foreground);
     -webkit-font-smoothing: antialiased;
-    font-family: ui-rounded, -apple-system, "SF Pro Rounded", system-ui, sans-serif;
+    font-family:
+      ui-rounded,
+      -apple-system,
+      "SF Pro Rounded",
+      system-ui,
+      sans-serif;
   }
 
   /* iOS safe area helpers */
-  .pt-safe { padding-top: max(env(safe-area-inset-top), 1rem); }
-  .pb-safe { padding-bottom: max(env(safe-area-inset-bottom), 1rem); }
-  .px-safe { padding-left: max(env(safe-area-inset-left), 1rem); padding-right: max(env(safe-area-inset-right), 1rem); }
+  .pt-safe {
+    padding-top: max(env(safe-area-inset-top), 1rem);
+  }
+  .pb-safe {
+    padding-bottom: max(env(safe-area-inset-bottom), 1rem);
+  }
+  .px-safe {
+    padding-left: max(env(safe-area-inset-left), 1rem);
+    padding-right: max(env(safe-area-inset-right), 1rem);
+  }
 }
