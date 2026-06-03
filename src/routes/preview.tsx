@@ -216,16 +216,14 @@ function PreviewPage() {
           <div className="flex-1">
             <div className="text-[15px] font-semibold">
               {analyzing
-                ? "Analyserar kvalitet…"
+                ? t("analyzingQuality")
                 : report
-                  ? VERDICT_MESSAGE[report.verdict]
-                  : "Kunde inte analysera"}
+                  ? t(`verdict_${report.verdict}`)
+                  : t("cannotAnalyze")}
             </div>
             {report && (
               <div className="text-[12px] text-muted-foreground mt-0.5">
-                {ok
-                  ? "Du kan gå vidare till signering."
-                  : "Du kan ändå använda bilden, eller ta om den."}
+                {ok ? t("canContinueToSign") : t("useAnyway")}
               </div>
             )}
           </div>
