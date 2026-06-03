@@ -72,6 +72,7 @@ function ScanPage() {
   const capturedRef = useRef(false);
 
   const [status, setStatus] = useState<Status>("starting");
+  const [progress, setProgress] = useState(0); // 0..1 — visual lock-in progress
   const [error, setError] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<ErrorType | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
