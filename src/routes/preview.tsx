@@ -41,6 +41,11 @@ function PreviewPage() {
     navigate({ to: "/scan" });
   }
 
+  function startOver() {
+    scanStore.clear();
+    navigate({ to: "/" });
+  }
+
   function addPage() {
     navigate({ to: "/scan" });
   }
