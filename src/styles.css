@@ -67,6 +67,11 @@
   --success: oklch(0.62 0.14 155);
   --success-foreground: oklch(0.99 0.005 80);
 
+  --scan-frame: oklch(0.99 0.005 80 / 0.96);
+  --scan-frame-outline: oklch(0 0 0 / 0.70);
+  --scan-frame-glow: oklch(1 0 0 / 0.30);
+  --scan-frame-active-glow: oklch(1 0 0 / 0.34);
+
   --border: oklch(0.92 0.008 80);
   --input: oklch(0.92 0.008 80);
   --ring: oklch(0.34 0.06 244);
