@@ -709,10 +709,11 @@ function ScanPage() {
           </div>
         ) : (
           <div className="w-10" />
+        )}
       </div>
 
-
       <div className="flex-1" />
+
 
       {/* Bottom hint / manual capture */}
       <div className="relative pb-safe px-5 pt-4 flex flex-col items-center gap-3">
