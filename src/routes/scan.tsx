@@ -585,9 +585,23 @@ function ScanPage() {
           className="absolute inset-0 w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-black/25 pointer-events-none" />
+        <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center px-8 pt-24 pb-36">
+          <div
+            className={`relative w-[min(82vw,46vh)] max-w-[360px] aspect-[1/1.4142] rounded-[10px] border-2 transition ${
+              statusActive
+                ? "border-success shadow-[0_0_0_1px_rgba(0,0,0,0.55),0_0_26px_rgba(255,255,255,0.34)]"
+                : "border-white/95 shadow-[0_0_0_1px_rgba(0,0,0,0.7),0_0_24px_rgba(255,255,255,0.30)]"
+            }`}
+            aria-hidden="true"
+          >
+            {["top-0 left-0", "top-0 right-0", "bottom-0 right-0", "bottom-0 left-0"].map((pos) => (
+              <span key={pos} className={`absolute ${pos} h-10 w-10 border-white/95`} />
+            ))}
+          </div>
+        </div>
         <svg
           ref={svgRef}
-          className="absolute inset-0 w-full h-full pointer-events-none"
+          className="absolute inset-0 z-20 w-full h-full pointer-events-none"
           preserveAspectRatio="none"
         >
           <polygon
