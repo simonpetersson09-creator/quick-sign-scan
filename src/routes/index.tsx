@@ -81,7 +81,7 @@ function Home() {
 
         {/* Skanna — lite bredare, i mitten */}
         <Link to="/scan" className="block group">
-          <div className="rounded-xl bg-primary text-primary-foreground h-12 w-40 shadow-[var(--shadow-card)] transition active:scale-[0.98] flex items-center justify-center gap-2.5">
+          <div className="rounded-xl bg-primary text-primary-foreground h-12 px-6 shadow-[var(--shadow-card)] transition active:scale-[0.98] flex items-center justify-center gap-2.5">
             <ScanLine className="h-[18px] w-[18px] shrink-0 opacity-90" strokeWidth={1.75} />
             <span className="text-[15px] font-semibold tracking-tight whitespace-nowrap">{t("scanDocument")}</span>
           </div>
