@@ -467,18 +467,18 @@ function ScanPage() {
                   className="w-full rounded-xl bg-white text-black py-3.5 px-4 font-semibold text-[15px] tracking-tight flex items-center justify-center gap-2 active:scale-[0.98] transition"
                 >
                   <RefreshCw className="h-4 w-4" strokeWidth={2} />
-                  Försök igen
+                  {t("retry")}
                 </button>
               )}
               <button
                 onClick={() => {
-                  streamRef.current?.getTracks().forEach((t) => t.stop());
+                  streamRef.current?.getTracks().forEach((tr) => tr.stop());
                   navigate({ to: "/" });
                 }}
                 className="w-full rounded-xl bg-white/10 text-white py-3.5 px-4 font-medium text-[15px] tracking-tight flex items-center justify-center gap-2 active:scale-[0.98] transition"
               >
                 <ArrowLeft className="h-4 w-4" strokeWidth={2} />
-                Tillbaka till start
+                {t("backHome")}
               </button>
             </div>
           </div>
