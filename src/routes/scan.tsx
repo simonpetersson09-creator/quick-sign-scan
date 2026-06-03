@@ -23,7 +23,15 @@ type Status =
   | "capturing"
   | "error";
 
-type ErrorType = "permission_denied" | "not_found" | "unknown";
+type ErrorType = "permission_denied" | "not_found" | "iframe_blocked" | "insecure_context" | "unknown";
+
+function isInIframe() {
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+}
 
 export const Route = createFileRoute("/scan")({
   head: () => ({ meta: [{ title: "Skanna dokument" }] }),
