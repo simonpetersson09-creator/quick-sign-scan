@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
-import { loadSettings, saveSettings } from "@/lib/settings";
+import { loadSettings, saveSettings, type AppSettings } from "@/lib/settings";
 import { useT } from "@/lib/i18n";
 
 
@@ -11,12 +12,27 @@ export const Route = createFileRoute("/settings")({
   component: SettingsPage,
 });
 
+// SSR-safe initial state (matches what loadSettings returns on the server).
+const initial: AppSettings = {
+  defaultRecipient: "",
+  defaultSubject: "Dokument",
+  defaultMessage: "Hej,\n\nBifogar dokumentet.\n\nVänliga hälsningar",
+  recipients: [],
+};
+
 function SettingsPage() {
   const t = useT();
-  const [s, setS] = useState(() => loadSettings());
+  const [s, setS] = useState<AppSettings>(initial);
+  const [hydrated, setHydrated] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  function update<K extends keyof typeof s>(k: K, v: (typeof s)[K]) {
+  // Load from localStorage only on the client to avoid SSR hydration mismatch.
+  useEffect(() => {
+    setS(loadSettings());
+    setHydrated(true);
+  }, []);
+
+  function update<K extends keyof AppSettings>(k: K, v: AppSettings[K]) {
     setS({ ...s, [k]: v });
     setSaved(false);
   }
@@ -25,6 +41,18 @@ function SettingsPage() {
     saveSettings(s);
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
+  }
+
+  function removeRecipient(email: string) {
+    const next = { ...s, recipients: s.recipients.filter((r) => r.email !== email) };
+    setS(next);
+    saveSettings(next);
+  }
+
+  function clearAllRecipients() {
+    const next = { ...s, recipients: [] };
+    setS(next);
+    saveSettings(next);
   }
 
   return (
@@ -58,15 +86,37 @@ function SettingsPage() {
           />
         </Field>
 
-
-        {s.recipients.length > 0 && (
+        {hydrated && s.recipients.length > 0 && (
           <Field label={t("recentRecipients")}>
             <div className="flex flex-wrap gap-2">
               {s.recipients.map((r) => (
-                <span key={r.email} className="px-3 py-1.5 rounded-full bg-secondary text-secondary-foreground text-xs font-medium">
+                <span
+                  key={r.email}
+                  className="inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1 rounded-full bg-secondary text-secondary-foreground text-xs font-medium"
+                >
                   {r.email}
+                  <button
+                    type="button"
+                    onClick={() => removeRecipient(r.email)}
+                    aria-label={t("removeRecipient")}
+                    className="h-5 w-5 inline-flex items-center justify-center rounded-full hover:bg-foreground/10 transition-colors"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
                 </span>
               ))}
+            </div>
+            <div className="mt-3 flex flex-col gap-1.5">
+              <button
+                type="button"
+                onClick={clearAllRecipients}
+                className="self-start text-xs font-medium text-destructive hover:underline"
+              >
+                {t("clearRecipients")}
+              </button>
+              <p className="text-[11px] text-muted-foreground ml-1">
+                {t("recipientsFootnote")}
+              </p>
             </div>
           </Field>
         )}

@@ -132,7 +132,7 @@ function SendPage() {
       recipients.unshift({ email: recipient });
       saveSettings({
         ...settings,
-        recipients: recipients.slice(0, 8),
+        recipients: recipients.slice(0, 15),
       });
 
       const filename = `${(subject || "dokument").replace(/[^\w\-]+/g, "_")}.pdf`;
