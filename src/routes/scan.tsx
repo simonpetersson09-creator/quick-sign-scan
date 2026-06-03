@@ -596,19 +596,8 @@ function ScanPage() {
           className="absolute inset-0 w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-black/25 pointer-events-none" />
-        {statusActive && (
-          <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center px-8 pt-24 pb-36">
-            <div
-              className="relative w-[min(82vw,46vh)] max-w-[360px] aspect-[1/1.4142] rounded-[10px] border-2 border-success shadow-[0_0_0_1px_var(--scan-frame-outline),0_0_26px_var(--scan-frame-active-glow)] transition"
-              aria-hidden="true"
-            >
-              <span className="absolute left-[-2px] top-[-2px] h-10 w-10 border-l-4 border-t-4 border-success" />
-              <span className="absolute right-[-2px] top-[-2px] h-10 w-10 border-r-4 border-t-4 border-success" />
-              <span className="absolute bottom-[-2px] right-[-2px] h-10 w-10 border-b-4 border-r-4 border-success" />
-              <span className="absolute bottom-[-2px] left-[-2px] h-10 w-10 border-b-4 border-l-4 border-success" />
-            </div>
-          </div>
-        )}
+        {/* Detected document frame is rendered by the SVG polygon below.
+            No static guide frame — the frame only appears when 4 corners are detected. */}
         <svg
           ref={svgRef}
           className="absolute inset-0 z-20 w-full h-full pointer-events-none"
