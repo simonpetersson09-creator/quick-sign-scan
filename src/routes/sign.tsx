@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
-import { loadSettings, saveSettings } from "@/lib/settings";
+// settings import removed — signatures are never persisted
 import { useT } from "@/lib/i18n";
 import { RotateCcw } from "lucide-react";
 
