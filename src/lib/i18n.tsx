@@ -87,7 +87,7 @@ const sv: Dict = {
 
   // place
   placeTitle: "Placera signatur",
-  placeHint: "Tryck där signaturen ska placeras på dokumentet.",
+  placeHint: "Tryck där signaturen ska placeras. Zooma in för exakt placering.",
   signatureLabel: "Signatur",
   signDocument: "Signera dokument",
   sendWithoutSignature: "Skicka utan signatur",
@@ -252,7 +252,7 @@ const en: Dict = {
 
   // place
   placeTitle: "Place signature",
-  placeHint: "Tap where the signature should be placed on the document.",
+  placeHint: "Tap where the signature should be placed. Zoom in for precise placement.",
   signatureLabel: "Signature",
   signDocument: "Sign document",
   sendWithoutSignature: "Send without signature",
