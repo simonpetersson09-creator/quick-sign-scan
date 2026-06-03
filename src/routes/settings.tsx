@@ -4,7 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { loadSettings, saveSettings } from "@/lib/settings";
 import { useT } from "@/lib/i18n";
-import { Trash2 } from "lucide-react";
+
 
 export const Route = createFileRoute("/settings")({
   head: () => ({ meta: [{ title: "Inställningar" }] }),
@@ -58,24 +58,6 @@ function SettingsPage() {
           />
         </Field>
 
-        <Field label={t("savedSignatureLabel")}>
-          {s.savedSignature ? (
-            <div className="rounded-2xl border border-border bg-card p-3 flex items-center justify-between">
-              <img src={s.savedSignature} alt="" className="h-12 object-contain" />
-              <button
-                onClick={() => update("savedSignature", null)}
-                className="text-destructive p-2"
-                aria-label={t("removeSignature")}
-              >
-                <Trash2 className="h-5 w-5" />
-              </button>
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-border bg-card p-4 text-sm text-muted-foreground text-center">
-              {t("noSignatureYet")}
-            </div>
-          )}
-        </Field>
 
         {s.recipients.length > 0 && (
           <Field label={t("recentRecipients")}>

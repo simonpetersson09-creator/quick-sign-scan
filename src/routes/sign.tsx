@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
-import { loadSettings, saveSettings } from "@/lib/settings";
+// settings import removed — signatures are never persisted
 import { useT } from "@/lib/i18n";
 import { RotateCcw } from "lucide-react";
 
@@ -19,8 +19,7 @@ function SignPage() {
   const drawing = useRef(false);
   const last = useRef<{ x: number; y: number } | null>(null);
   const [hasInk, setHasInk] = useState(false);
-  const [useSaved, setUseSaved] = useState(false);
-  const settings = loadSettings();
+
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -70,14 +69,9 @@ function SignPage() {
     setHasInk(false);
   }
 
-  function done(saveAsDefault: boolean) {
-    const dataUrl = useSaved && settings.savedSignature
-      ? settings.savedSignature
-      : canvasRef.current!.toDataURL("image/png");
+  function done() {
+    const dataUrl = canvasRef.current!.toDataURL("image/png");
     scanStore.set({ signatureDataUrl: dataUrl });
-    if (saveAsDefault && !useSaved) {
-      saveSettings({ ...settings, savedSignature: dataUrl });
-    }
     navigate({ to: "/review" });
   }
 
@@ -87,23 +81,6 @@ function SignPage() {
         {t("signHint")}
       </p>
 
-      {settings.savedSignature && (
-        <button
-          onClick={() => setUseSaved((v) => !v)}
-          className={`mt-4 rounded-2xl border p-3 text-left text-sm transition ${
-            useSaved ? "border-primary bg-primary/5" : "border-border bg-card"
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="font-medium">{t("useSavedSignature")}</span>
-            <span className={`text-xs ${useSaved ? "text-primary" : "text-muted-foreground"}`}>
-              {useSaved ? t("selected") : t("tapToSelect")}
-            </span>
-          </div>
-          <img src={settings.savedSignature} alt="" className="h-12 mt-2 object-contain" />
-        </button>
-      )}
-
       <div className="mt-4 relative rounded-2xl bg-card border border-border shadow-[var(--shadow-soft)] overflow-hidden" style={{ aspectRatio: "16 / 9" }}>
         <canvas
           ref={canvasRef}
@@ -111,9 +88,9 @@ function SignPage() {
           onPointerMove={move}
           onPointerUp={end}
           onPointerCancel={end}
-          className={`absolute inset-0 w-full h-full touch-none ${useSaved ? "opacity-40 pointer-events-none" : ""}`}
+          className="absolute inset-0 w-full h-full touch-none"
         />
-        {!hasInk && !useSaved && (
+        {!hasInk && (
           <div className="absolute inset-0 flex items-end justify-center pb-3 pointer-events-none">
             <span className="text-xs text-muted-foreground">{t("signHere")}</span>
           </div>
@@ -124,7 +101,7 @@ function SignPage() {
       <div className="mt-2 flex justify-end">
         <button
           onClick={clear}
-          disabled={!hasInk || useSaved}
+          disabled={!hasInk}
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground disabled:opacity-40 px-2 py-1"
         >
           <RotateCcw className="h-4 w-4" /> {t("clear")}
@@ -134,15 +111,11 @@ function SignPage() {
       <div className="flex-1" />
 
       <div className="flex flex-col gap-3 pt-5">
-        <PrimaryButton onClick={() => done(false)} disabled={!hasInk && !useSaved}>
+        <PrimaryButton onClick={done} disabled={!hasInk}>
           {t("doneContinue")}
         </PrimaryButton>
-        {!useSaved && (
-          <PrimaryButton variant="ghost" onClick={() => done(true)} disabled={!hasInk}>
-            {t("doneAndSave")}
-          </PrimaryButton>
-        )}
       </div>
     </AppShell>
   );
+
 }
