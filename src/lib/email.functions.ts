@@ -143,8 +143,7 @@ export const sendScanEmail = createServerFn({ method: "POST" })
       lastBody = result;
       const retryable = response.status === 429 || response.status >= 500;
       console.error(
-        `[sendScanEmail] attempt ${attempt}/${maxAttempts} failed: ${response.status}`,
-        result,
+        `[sendScanEmail] ${requestId} attempt ${attempt}/${maxAttempts} failed status=${response.status}`,
       );
 
       if (!retryable || attempt === maxAttempts) break;
