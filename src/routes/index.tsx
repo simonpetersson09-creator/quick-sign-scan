@@ -54,7 +54,7 @@ function Home() {
                   </div>
                   {i < steps.length - 1 && (
                     <ArrowDown
-                      className="h-3.5 w-3.5 text-foreground/25 my-0.5"
+                      className="h-3.5 w-3.5 text-foreground/55 my-0.5"
                       strokeWidth={1.5}
                     />
                   )}
