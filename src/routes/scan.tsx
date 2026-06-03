@@ -421,13 +421,12 @@ function ScanPage() {
             detectCount.current < DETECT_FRAMES
           }
           className="h-16 w-16 rounded-full bg-white text-black flex items-center justify-center shadow-lg active:scale-95 disabled:opacity-40"
-          aria-label="Fotografera manuellt"
+          aria-label={t("manualCapture")}
         >
           <Camera className="h-7 w-7" />
         </button>
         <p className="text-xs text-white/75 text-center max-w-[260px]">
-          Lägg A4-dokumentet på en jämn, kontrasterande yta. Bilden tas automatiskt när hörnen är
-          stabila.
+          {t("scanHint")}
         </p>
       </div>
 
