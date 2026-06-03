@@ -441,14 +441,14 @@ function ScanPage() {
             <div className="flex flex-col gap-2">
               <h2 className="text-xl font-semibold text-white tracking-tight">
                 {errorType === "permission_denied"
-                  ? "Kamerabehörighet nekad"
+                  ? t("errPermissionTitle")
                   : errorType === "not_found"
-                    ? "Ingen kamera hittades"
-                    : "Kameran kunde inte startas"}
+                    ? t("errNotFoundTitle")
+                    : t("errUnknownTitle")}
               </h2>
               <p className="text-[15px] text-white/70 leading-relaxed">
                 {errorType === "permission_denied"
-                  ? "Appen behöver tillgång till kameran för att skanna dokument. Du kan ändra detta i enhetens inställningar."
+                  ? t("errPermissionDesc")
                   : error}
               </p>
             </div>
