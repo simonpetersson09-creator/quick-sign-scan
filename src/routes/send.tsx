@@ -157,7 +157,7 @@ function SendPage() {
         result = (await sendEmailFn({
           data: {
             to: recipient,
-            subject: subject || "Skannat dokument",
+            subject: subject || t("defaultSubjectFallback"),
             message: message || "",
             filename,
             pdfBase64,
