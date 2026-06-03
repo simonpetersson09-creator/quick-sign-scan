@@ -616,6 +616,20 @@ function ScanPage() {
         </p>
       </div>
 
+      {/* Debug overlay — enable with ?debug=1 in the URL */}
+      {debugEnabled && (
+        <div className="absolute top-16 left-3 z-40 rounded-lg bg-black/80 text-white text-[11px] font-mono leading-tight px-3 py-2 pointer-events-none space-y-0.5">
+          <div>video: {debugInfo.vw}×{debugInfo.vh}</div>
+          <div>readyState: {videoRef.current?.readyState ?? 0}</div>
+          <div>dpr: {debugInfo.dpr || (typeof window !== "undefined" ? window.devicePixelRatio : 1)}</div>
+          <div>cameraReady: {String(cameraReady)}</div>
+          <div>status: {status}</div>
+          <div>detect: {detectCount.current} / stable: {stableCount.current}</div>
+          <div>conf: {detectionMeta.current?.confidence?.toFixed(2) ?? "—"}</div>
+          <div>lastCapture: {debugInfo.lastCapture ? new Date(debugInfo.lastCapture).toLocaleTimeString() : "—"}</div>
+        </div>
+      )}
+
       {/* Permission / error overlay */}
       {status === "error" && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm px-6">
