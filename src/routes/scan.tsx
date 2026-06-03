@@ -541,9 +541,12 @@ function ScanPage() {
       { x: 1, y: 1 },
       { x: 0, y: 1 },
     ];
+    const existing = scanStore.get().pages;
+    const nextPages = [...existing, dataUrl];
     scanStore.set({
       imageDataUrl: dataUrl,
       sourceDataUrl: dataUrl,
+      pages: nextPages,
       detection: {
         corners: fullQuad,
         a4Ratio: 1,
@@ -563,6 +566,37 @@ function ScanPage() {
         },
       },
     });
+    finishPageCapture(dataUrl, nextPages.length);
+  }
+
+  // After a successful capture, freeze detection and show the in-camera review
+  // overlay. The stream stays alive so the user can immediately scan another
+  // page without re-asking for camera permissions.
+  function finishPageCapture(dataUrl: string, count: number) {
+    setPageCount(count);
+    setJustCaptured(dataUrl);
+    // Pause RAF/detection until the user chooses next action.
+    capturedRef.current = true;
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+  }
+
+  function scanAnotherPage() {
+    // Resume detection without tearing down the camera stream.
+    setJustCaptured(null);
+    stableCount.current = 0;
+    detectCount.current = 0;
+    missCount.current = 0;
+    smoothQuad.current = null;
+    lastRawQuad.current = null;
+    detectionMeta.current = null;
+    setProgress(0);
+    drawOverlay(null, false);
+    setStatus("searching");
+    capturedRef.current = false;
+    loop();
+  }
+
+  function finishScanning() {
     streamRef.current?.getTracks().forEach((tr) => tr.stop());
     navigate({ to: "/preview" });
   }
