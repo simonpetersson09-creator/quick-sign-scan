@@ -390,7 +390,7 @@ function ScanPage() {
             navigate({ to: "/" });
           }}
           className="h-10 w-10 rounded-full bg-black/55 backdrop-blur flex items-center justify-center"
-          aria-label="Avbryt"
+          aria-label={t("cancel")}
         >
           <X className="h-5 w-5" />
         </button>
