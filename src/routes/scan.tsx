@@ -544,12 +544,20 @@ function ScanPage() {
                   ? t("errPermissionTitle")
                   : errorType === "not_found"
                     ? t("errNotFoundTitle")
-                    : t("errUnknownTitle")}
+                    : errorType === "iframe_blocked"
+                      ? "Förhandsvisning blockerar kameran"
+                      : errorType === "insecure_context"
+                        ? "Osäker anslutning"
+                        : t("errUnknownTitle")}
               </h2>
               <p className="text-[15px] text-white/70 leading-relaxed">
                 {errorType === "permission_denied"
                   ? t("errPermissionDesc")
-                  : error}
+                  : errorType === "iframe_blocked"
+                    ? "Appen körs i Lovables förhandsvisning (en iframe) som inte tillåter kameraåtkomst. Öppna appen i en egen flik så kan webbläsaren be om kamerabehörighet."
+                    : errorType === "insecure_context"
+                      ? "Kameran kräver HTTPS. Öppna appen via en säker (https://) adress."
+                      : error}
               </p>
             </div>
 
@@ -561,7 +569,24 @@ function ScanPage() {
             )}
 
             <div className="flex flex-col w-full gap-3 mt-1">
+              {errorType === "iframe_blocked" && (
+                <button
+                  onClick={() => window.open(window.location.href, "_blank", "noopener,noreferrer")}
+                  className="w-full rounded-xl bg-white text-black py-3.5 px-4 font-semibold text-[15px] tracking-tight flex items-center justify-center gap-2 active:scale-[0.98] transition"
+                >
+                  Öppna i ny flik
+                </button>
+              )}
               {errorType === "permission_denied" && (
+                <button
+                  onClick={startCamera}
+                  className="w-full rounded-xl bg-white text-black py-3.5 px-4 font-semibold text-[15px] tracking-tight flex items-center justify-center gap-2 active:scale-[0.98] transition"
+                >
+                  <RefreshCw className="h-4 w-4" strokeWidth={2} />
+                  {t("retry")}
+                </button>
+              )}
+              {errorType !== "permission_denied" && errorType !== "iframe_blocked" && (
                 <button
                   onClick={startCamera}
                   className="w-full rounded-xl bg-white text-black py-3.5 px-4 font-semibold text-[15px] tracking-tight flex items-center justify-center gap-2 active:scale-[0.98] transition"
