@@ -76,6 +76,8 @@ function ScanPage() {
   const [error, setError] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<ErrorType | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
+  const [pageCount, setPageCount] = useState(() => scanStore.get().pages.length);
+  const [justCaptured, setJustCaptured] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<{
     vw: number;
     vh: number;
