@@ -11,6 +11,7 @@ interface Props {
 }
 
 export function AppShell({ title, back, children, rightSlot }: Props) {
+  const t = useT();
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {(title || back) && (
