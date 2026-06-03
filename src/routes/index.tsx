@@ -63,7 +63,7 @@ function Home() {
       </div>
 
       {/* Trust tagline */}
-      <p className="text-center text-[13px] text-muted-foreground/70 tracking-tight pb-1">
+      <p className="text-center text-[11px] text-muted-foreground/60 tracking-wide pb-1">
         Inga utskrifter. Ingen lagring. Bara signering.
       </p>
 
