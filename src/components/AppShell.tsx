@@ -13,7 +13,7 @@ interface Props {
 export function AppShell({ title, back, children, rightSlot }: Props) {
   const t = useT();
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-dvh flex flex-col bg-background">
       {(title || back) && (
         <header className="pt-safe px-5 pb-3 flex items-center gap-2">
           {back ? (
