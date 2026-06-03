@@ -332,14 +332,14 @@ function ScanPage() {
   }
 
   const statusText: Record<Status, string> = {
-    starting: "Startar kamera…",
-    searching: "Sök efter dokument",
-    uncertain: "Kunde inte identifiera dokumentets kanter.",
-    align: "Rikta in dokumentet",
-    hold: "Håll stilla…",
-    ready: "Dokument hittat",
-    capturing: "Skannar och rätar upp…",
-    error: "Fel",
+    starting: t("statusStarting"),
+    searching: t("statusSearching"),
+    uncertain: t("statusUncertain"),
+    align: t("statusAlign"),
+    hold: t("statusHold"),
+    ready: t("statusReady"),
+    capturing: t("statusCapturing"),
+    error: t("statusError"),
   };
 
   const statusActive = status === "ready" || status === "capturing";
