@@ -31,6 +31,7 @@ function PreviewPage() {
     }
     const session = scanStore.get();
     setImage(img);
+    setPages(session.pages);
     setSourceImage(session.sourceDataUrl);
     setDetection(session.detection);
     setAnalyzing(true);
