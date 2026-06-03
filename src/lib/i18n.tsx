@@ -252,7 +252,7 @@ const en: Dict = {
 
   // place
   placeTitle: "Place signature",
-  placeHint: "Tap where the signature should be placed on the document.",
+  placeHint: "Tap where the signature should be placed. Zoom in for precise placement.",
   signatureLabel: "Signature",
   signDocument: "Sign document",
   sendWithoutSignature: "Send without signature",
