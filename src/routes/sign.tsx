@@ -4,6 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
 import { loadSettings, saveSettings } from "@/lib/settings";
+import { useT } from "@/lib/i18n";
 import { RotateCcw } from "lucide-react";
 
 export const Route = createFileRoute("/sign")({
