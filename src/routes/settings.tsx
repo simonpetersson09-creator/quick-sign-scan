@@ -30,18 +30,6 @@ function SettingsPage() {
   return (
     <AppShell title={t("settingsTitle")} back="/">
       <div className="flex flex-col gap-5 mt-2">
-        <Field label={t("yourEmailLabel")}>
-          <input
-            type="email"
-            value={s.userEmail}
-            onChange={(e) => update("userEmail", e.target.value)}
-            placeholder="du@exempel.se"
-            className="input"
-          />
-          <p className="text-[11px] text-muted-foreground mt-1.5 ml-1">
-            {t("yourEmailHint")}
-          </p>
-        </Field>
 
         <Field label={t("defaultRecipientLabel")}>
           <input

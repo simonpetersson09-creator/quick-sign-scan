@@ -142,8 +142,6 @@ const sv: Dict = {
 
   // settings
   settingsTitle: "Inställningar",
-  yourEmailLabel: "Din e-postadress (Reply-To)",
-  yourEmailHint: "Används som svarsadress, så mottagaren kan svara till dig direkt.",
   defaultRecipientLabel: "Standardmottagare",
   defaultSubjectLabel: "Standardämne",
   defaultMessageLabel: "Standardmeddelande",
@@ -301,8 +299,6 @@ const en: Dict = {
 
   // settings
   settingsTitle: "Settings",
-  yourEmailLabel: "Your email address (Reply-To)",
-  yourEmailHint: "Used as the reply address, so the recipient can reply to you directly.",
   defaultRecipientLabel: "Default recipient",
   defaultSubjectLabel: "Default subject",
   defaultMessageLabel: "Default message",
