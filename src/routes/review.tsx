@@ -1,32 +1,48 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
 import { buildPdf, dataUrlToBlob } from "@/lib/pdf";
 import { useT } from "@/lib/i18n";
-import { ArrowLeft, Camera, Check, Mail, Minus, PenLine, Plus } from "lucide-react";
+import {
+  ArrowLeft,
+  Camera,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Mail,
+  Maximize2,
+  Minus,
+  PenLine,
+  Plus,
+} from "lucide-react";
 
 export const Route = createFileRoute("/review")({
   head: () => ({ meta: [{ title: "Granska PDF" }] }),
   component: ReviewPage,
 });
 
-const MIN_ZOOM = 0.6;
-const MAX_ZOOM = 3;
-const ZOOM_STEP = 0.25;
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 4;
+const ZOOM_STEP = 0.5;
 
 function ReviewPage() {
   const navigate = useNavigate();
   const t = useT();
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [sizeBytes, setSizeBytes] = useState<number | null>(null);
-  const [pages, setPages] = useState<number>(1);
+  const [pages, setPages] = useState<string[]>([]);
+  const [pageIdx, setPageIdx] = useState(0);
   const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
   const [approved, setApproved] = useState(false);
+  const [sigPos, setSigPos] = useState<{ x: number; y: number } | null>(null);
+  const [sigDataUrl, setSigDataUrl] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const imgRef = useRef<HTMLImageElement | null>(null);
 
-  const signed = !!scanStore.get().signatureDataUrl;
+  const signed = !!sigDataUrl;
 
   useEffect(() => {
     let s = scanStore.get();
@@ -47,14 +63,18 @@ function ReviewPage() {
       navigate({ to: "/" });
       return;
     }
-    let createdBlobUrl: string | null = null;
+    const allPages = s.pages.length > 0 ? s.pages : [img];
+    setPages(allPages);
+    setPageIdx(allPages.length - 1);
+    setSigDataUrl(s.signatureDataUrl ?? null);
+    setSigPos(s.signaturePosition ?? null);
+
     let cancelled = false;
     (async () => {
       const sig =
         s.signatureDataUrl && s.signaturePosition
           ? { dataUrl: s.signatureDataUrl, x: s.signaturePosition.x, y: s.signaturePosition.y }
           : null;
-      const allPages = s.pages.length > 0 ? s.pages : [img];
       const url = await buildPdf(allPages, sig);
       if (cancelled) return;
       setPdfUrl(url);
@@ -62,28 +82,137 @@ function ReviewPage() {
       try {
         const blob = dataUrlToBlob(url);
         setSizeBytes(blob.size);
-        // iOS Safari cannot render data: URL PDFs in iframes — use a blob URL.
-        createdBlobUrl = URL.createObjectURL(blob);
-        if (!cancelled) setPdfBlobUrl(createdBlobUrl);
-        // Rough page count from raw PDF text. Binary-safe enough for /Type /Page tokens.
-        const text = await blob.text();
-        if (cancelled) return;
-        const matches = text.match(/\/Type\s*\/Page(?![s])/g);
-        setPages(matches?.length || 1);
       } catch {
-        setPages(1);
+        /* noop */
       }
     })();
     return () => {
       cancelled = true;
-      if (createdBlobUrl) URL.revokeObjectURL(createdBlobUrl);
     };
   }, [navigate]);
+
+  // Diagnostics — logs PDF/page dimensions, viewport, initial scale, scroll pos.
+  useEffect(() => {
+    if (!pages.length) return;
+    const img = imgRef.current;
+    const rect = containerRef.current?.getBoundingClientRect();
+    const log = () => {
+      // eslint-disable-next-line no-console
+      console.log("[review] preview diagnostics", {
+        pageCount: pages.length,
+        pageIdx,
+        pageNatural: img ? { w: img.naturalWidth, h: img.naturalHeight } : null,
+        container: rect ? { w: rect.width, h: rect.height } : null,
+        viewport: { w: window.innerWidth, h: window.innerHeight, dpr: window.devicePixelRatio },
+        initialScale: zoom,
+        pan,
+        scroll: { x: window.scrollX, y: window.scrollY },
+      });
+    };
+    if (img && !img.complete) {
+      img.addEventListener("load", log, { once: true });
+    } else {
+      log();
+    }
+  }, [pages, pageIdx, zoom, pan]);
+
+  // Reset pan/zoom when changing page so user always starts on fit-to-page.
+  useEffect(() => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }, [pageIdx]);
+
+  function clampPan(nx: number, ny: number, z: number) {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return { x: nx, y: ny };
+    const maxX = (rect.width * (z - 1)) / 2;
+    const maxY = (rect.height * (z - 1)) / 2;
+    return {
+      x: Math.max(-maxX, Math.min(maxX, nx)),
+      y: Math.max(-maxY, Math.min(maxY, ny)),
+    };
+  }
+
+  // ---- Pointer / pinch handling ----
+  const pointers = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const gestureStart = useRef<{
+    dist: number;
+    zoom: number;
+    panX: number;
+    panY: number;
+    midX: number;
+    midY: number;
+  } | null>(null);
+  const singleStart = useRef<{
+    x: number;
+    y: number;
+    panX: number;
+    panY: number;
+  } | null>(null);
+
+  function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.current.size === 2) {
+      const pts = Array.from(pointers.current.values());
+      const dx = pts[0].x - pts[1].x;
+      const dy = pts[0].y - pts[1].y;
+      gestureStart.current = {
+        dist: Math.hypot(dx, dy),
+        zoom,
+        panX: pan.x,
+        panY: pan.y,
+        midX: (pts[0].x + pts[1].x) / 2,
+        midY: (pts[0].y + pts[1].y) / 2,
+      };
+      singleStart.current = null;
+    } else if (pointers.current.size === 1) {
+      singleStart.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
+    }
+  }
+
+  function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!pointers.current.has(e.pointerId)) return;
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.current.size >= 2 && gestureStart.current) {
+      const pts = Array.from(pointers.current.values());
+      const dx = pts[0].x - pts[1].x;
+      const dy = pts[0].y - pts[1].y;
+      const dist = Math.hypot(dx, dy);
+      const ratio = dist / gestureStart.current.dist;
+      const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, gestureStart.current.zoom * ratio));
+      setZoom(newZoom);
+      setPan(clampPan(gestureStart.current.panX, gestureStart.current.panY, newZoom));
+    } else if (pointers.current.size === 1 && singleStart.current && zoom > 1) {
+      const dx = e.clientX - singleStart.current.x;
+      const dy = e.clientY - singleStart.current.y;
+      setPan(clampPan(singleStart.current.panX + dx, singleStart.current.panY + dy, zoom));
+    }
+  }
+
+  function onPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    pointers.current.delete(e.pointerId);
+    if (pointers.current.size < 2) gestureStart.current = null;
+    if (pointers.current.size === 0) singleStart.current = null;
+  }
+
+  function changeZoom(next: number) {
+    const z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, +next.toFixed(2)));
+    setZoom(z);
+    setPan((p) => clampPan(p.x, p.y, z));
+  }
+  function resetView() {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }
 
   function proceed() {
     if (!approved || !pdfUrl) return;
     navigate({ to: "/send" });
   }
+
+  const isLastPage = pageIdx === pages.length - 1;
+  const currentImg = pages[pageIdx];
 
   return (
     <AppShell title={t("reviewTitle")} back="/sign">
@@ -94,59 +223,109 @@ function ReviewPage() {
           tone={signed ? "success" : "muted"}
           label={signed ? t("signed") : t("notSigned")}
         />
-        <StatusChip tone="muted" label={`${pages} ${pages === 1 ? t("pageSingular") : t("pagePlural")}`} />
         <StatusChip
           tone="muted"
-          label={sizeBytes ? formatBytes(sizeBytes) : "…"}
+          label={`${pages.length} ${pages.length === 1 ? t("pageSingular") : t("pagePlural")}`}
         />
+        <StatusChip tone="muted" label={sizeBytes ? formatBytes(sizeBytes) : "…"} />
       </div>
 
-      {/* PDF preview with zoom */}
-      <div className="flex-1 flex flex-col items-center justify-center min-h-0">
+      {/* Page preview — image-based so iOS Safari shows full page at fit-to-page. */}
+      <div className="flex-1 flex flex-col items-center justify-center gap-3 min-h-0">
         <div
-          className="relative w-full max-w-[420px] flex-1 min-h-0 overflow-auto rounded-2xl border border-border bg-muted/40 shadow-[var(--shadow-card)]"
+          ref={containerRef}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          className="relative rounded-2xl overflow-hidden shadow-[var(--shadow-card)] border border-border bg-muted/30 touch-none select-none"
+          style={{ width: "min(82vw, 360px)", aspectRatio: "1 / 1.414" }}
         >
           <div
-            className="mx-auto my-3 bg-white shadow-sm"
+            className="absolute inset-0 p-3"
             style={{
-              width: `${Math.round(320 * zoom)}px`,
-              aspectRatio: "1 / 1.414",
-              transition: "width 150ms ease",
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+              transformOrigin: "center center",
+              transition: pointers.current.size === 0 ? "transform 120ms ease" : "none",
             }}
           >
-            {pdfBlobUrl ? (
-              <iframe
-                src={`${pdfBlobUrl}#toolbar=0&navpanes=0&scrollbar=0&view=Fit&zoom=page-fit`}
-                title={t("pdfPreview")}
-                className="w-full h-full block"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground">
-                {t("creatingPdf")}
-              </div>
-            )}
+            <div className="relative w-full h-full">
+              {currentImg && (
+                <img
+                  ref={imgRef}
+                  src={currentImg}
+                  alt={t("scannedAlt")}
+                  className="absolute inset-0 w-full h-full object-contain pointer-events-none bg-white shadow-sm"
+                  draggable={false}
+                />
+              )}
+              {isLastPage && sigDataUrl && sigPos && (
+                <img
+                  src={sigDataUrl}
+                  alt=""
+                  className="absolute pointer-events-none"
+                  style={{
+                    left: `${sigPos.x * 100}%`,
+                    top: `${sigPos.y * 100}%`,
+                    width: "28%",
+                    transform: "translate(-50%, -50%)",
+                  }}
+                  draggable={false}
+                />
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Zoom controls */}
-        <div className="mt-3 inline-flex items-center gap-1 rounded-full border border-border bg-card p-1 shadow-[var(--shadow-soft)]">
-          <ZoomButton
-            onClick={() => setZoom((z) => Math.max(MIN_ZOOM, +(z - ZOOM_STEP).toFixed(2)))}
-            disabled={zoom <= MIN_ZOOM}
-            aria-label={t("zoomOut")}
-          >
-            <Minus className="h-4 w-4" />
-          </ZoomButton>
-          <span className="px-3 text-xs font-medium tabular-nums w-12 text-center">
-            {Math.round(zoom * 100)}%
-          </span>
-          <ZoomButton
-            onClick={() => setZoom((z) => Math.min(MAX_ZOOM, +(z + ZOOM_STEP).toFixed(2)))}
-            disabled={zoom >= MAX_ZOOM}
-            aria-label={t("zoomIn")}
-          >
-            <Plus className="h-4 w-4" />
-          </ZoomButton>
+        {/* Page nav + zoom controls */}
+        <div className="flex items-center gap-2">
+          {pages.length > 1 && (
+            <div className="inline-flex items-center gap-1 rounded-full border border-border bg-card p-1 shadow-[var(--shadow-soft)]">
+              <ZoomButton
+                onClick={() => setPageIdx((i) => Math.max(0, i - 1))}
+                disabled={pageIdx === 0}
+                aria-label="Föregående sida"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </ZoomButton>
+              <span className="px-2 text-xs font-medium tabular-nums">
+                {pageIdx + 1}/{pages.length}
+              </span>
+              <ZoomButton
+                onClick={() => setPageIdx((i) => Math.min(pages.length - 1, i + 1))}
+                disabled={pageIdx === pages.length - 1}
+                aria-label="Nästa sida"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </ZoomButton>
+            </div>
+          )}
+          <div className="inline-flex items-center gap-1 rounded-full border border-border bg-card p-1 shadow-[var(--shadow-soft)]">
+            <ZoomButton
+              onClick={() => changeZoom(zoom - ZOOM_STEP)}
+              disabled={zoom <= MIN_ZOOM}
+              aria-label={t("zoomOut")}
+            >
+              <Minus className="h-4 w-4" />
+            </ZoomButton>
+            <span className="px-3 text-xs font-medium tabular-nums w-12 text-center">
+              {Math.round(zoom * 100)}%
+            </span>
+            <ZoomButton
+              onClick={() => changeZoom(zoom + ZOOM_STEP)}
+              disabled={zoom >= MAX_ZOOM}
+              aria-label={t("zoomIn")}
+            >
+              <Plus className="h-4 w-4" />
+            </ZoomButton>
+            <ZoomButton
+              onClick={resetView}
+              disabled={zoom === 1 && pan.x === 0 && pan.y === 0}
+              aria-label="Återställ"
+            >
+              <Maximize2 className="h-4 w-4" />
+            </ZoomButton>
+          </div>
         </div>
       </div>
 
@@ -166,9 +345,7 @@ function ReviewPage() {
             checked={approved}
             onChange={(e) => setApproved(e.target.checked)}
           />
-          <span className="text-sm text-foreground/80 leading-snug">
-            {t("approveLabel")}
-          </span>
+          <span className="text-sm text-foreground/80 leading-snug">{t("approveLabel")}</span>
         </label>
 
         <PrimaryButton onClick={proceed} disabled={!approved || !pdfUrl}>
