@@ -46,7 +46,7 @@ export const Route = createFileRoute("/scan")({
 // Stability requirements — the document must be locked in on all 4 corners
 // for a sustained period before the camera captures, so we never fire too early.
 const STABLE_DELTA = 0.016; // normalized 0..1 — max smoothed corner movement to count as stable
-const DETECT_FRAMES = 5; // consecutive detections before we even consider it found
+const DETECT_FRAMES = 2; // show the detected frame quickly once all 4 corners exist
 const HOLD_FRAMES = 18; // ~0.6s — "Håll stilla" phase
 const READY_FRAMES = 45; // ~1.5s — "Dokument hittat" lock-in
 const STABLE_FRAMES = 75; // ~2.5s total before auto-capture
@@ -333,18 +333,20 @@ function ScanPage() {
     const pct = Math.max(0, Math.min(1, stableCount.current / STABLE_FRAMES));
     setProgress(pct);
 
-    // Wait for enough consecutive detections before showing anything as "found".
+    // Wait for enough consecutive detections before moving to "found" status.
+    // The frame itself is drawn as soon as a 4-corner quad exists, otherwise it
+    // feels like the scanner is doing nothing even when detection is active.
     if (detectCount.current < DETECT_FRAMES) {
-      drawOverlay(smoothed, false);
+      drawOverlay(smoothed, true);
       setStatus("searching");
       return;
     }
 
     if (stableCount.current < HOLD_FRAMES) {
-      drawOverlay(smoothed, false);
+      drawOverlay(smoothed, true);
       setStatus("align");
     } else if (stableCount.current < READY_FRAMES) {
-      drawOverlay(smoothed, false);
+      drawOverlay(smoothed, true);
       setStatus("hold");
     } else if (stableCount.current < STABLE_FRAMES) {
       drawOverlay(smoothed, true);
