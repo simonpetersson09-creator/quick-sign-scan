@@ -45,6 +45,7 @@ export interface ScanSession {
 const initial: ScanSession = {
   imageDataUrl: null,
   sourceDataUrl: null,
+  pages: [],
   detection: null,
   pdfDataUrl: null,
   signatureDataUrl: null,
