@@ -173,11 +173,11 @@ function SendPage() {
           navigate({ to: "/" });
         }, 2200);
       } else {
-        console.error("[send] failed:", result);
+        console.error(`[send] failed code=${result.code} status=${result.status ?? "n/a"}`);
         setInfo(t(`err_${result.code}`) ?? t("err_unknown"));
       }
     } catch (e) {
-      console.error(e);
+      console.error(`[send] unexpected error: ${e instanceof Error ? e.name : "unknown"}`);
       setInfo(t("err_unknown"));
     } finally {
       setSending(false);
