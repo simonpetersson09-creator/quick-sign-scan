@@ -115,7 +115,7 @@ function SendPage() {
     if (!pdfUrl) return;
     const parsed = emailSchema.safeParse(trimmedTo);
     if (!parsed.success) {
-      setEmailError(parsed.error.issues[0]?.message ?? "Ogiltig e-postadress");
+      setEmailError(parsed.error.issues[0]?.message ?? t("invalidEmail"));
       return;
     }
     const recipient = parsed.data;
