@@ -312,9 +312,9 @@ export function detectDocumentQuad(
   let candidateCount = 0;
 
   for (const component of components) {
-    if (component.pixels.length < total * 0.002) continue;
-    if (component.maxX - component.minX < width * 0.18) continue;
-    if (component.maxY - component.minY < height * 0.18) continue;
+    if (component.pixels.length < total * 0.0008) continue;
+    if (component.maxX - component.minX < width * 0.1) continue;
+    if (component.maxY - component.minY < height * 0.1) continue;
 
     const hull = convexHull(component.points);
     if (hull.length < 4) continue;
