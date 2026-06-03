@@ -1,4 +1,8 @@
-// User settings stored locally. No documents ever persisted.
+// User settings stored locally.
+//
+// Privacy requirement: documents, images, PDFs and signatures must NEVER
+// be persisted. Only non-sensitive preferences (default recipient/subject/
+// message text and recent recipient email addresses) live here.
 
 export interface Recipient {
   email: string;
@@ -9,7 +13,6 @@ export interface AppSettings {
   defaultRecipient: string;
   defaultSubject: string;
   defaultMessage: string;
-  savedSignature: string | null; // dataURL or null
   recipients: Recipient[];
 }
 
@@ -19,7 +22,6 @@ const defaults: AppSettings = {
   defaultRecipient: "",
   defaultSubject: "Dokument",
   defaultMessage: "Hej,\n\nBifogar dokumentet.\n\nVänliga hälsningar",
-  savedSignature: null,
   recipients: [],
 };
 
@@ -28,7 +30,22 @@ export function loadSettings(): AppSettings {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return defaults;
-    return { ...defaults, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw) as Partial<AppSettings> & {
+      savedSignature?: unknown;
+    };
+    // Strip any legacy persisted signature from older versions.
+    if (parsed && "savedSignature" in parsed) {
+      delete parsed.savedSignature;
+      try {
+        localStorage.setItem(
+          KEY,
+          JSON.stringify({ ...defaults, ...parsed }),
+        );
+      } catch {
+        /* ignore */
+      }
+    }
+    return { ...defaults, ...parsed };
   } catch {
     return defaults;
   }
@@ -36,5 +53,10 @@ export function loadSettings(): AppSettings {
 
 export function saveSettings(s: AppSettings) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(KEY, JSON.stringify(s));
+  // Defensive: never write a signature field even if a caller passes one.
+  const { defaultRecipient, defaultSubject, defaultMessage, recipients } = s;
+  localStorage.setItem(
+    KEY,
+    JSON.stringify({ defaultRecipient, defaultSubject, defaultMessage, recipients }),
+  );
 }
