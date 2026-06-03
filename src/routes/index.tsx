@@ -63,7 +63,7 @@ function Home() {
       </div>
 
       {/* CTA */}
-      <div className="flex items-center gap-2 pt-2 pb-4">
+      <div className="flex items-center justify-center gap-2 pt-2 pb-4">
         {/* Settings — vänster */}
         <Link to="/settings" className="block group">
           <div className="rounded-xl bg-card text-muted-foreground h-12 w-12 flex items-center justify-center shadow-[var(--shadow-soft)] border border-border transition active:scale-[0.98]">
@@ -71,21 +71,31 @@ function Home() {
           </div>
         </Link>
 
-        {/* Skanna — smalare, i mitten */}
+        {/* Skanna — lite bredare, i mitten */}
         <Link to="/scan" className="block group">
-          <div className="rounded-xl bg-primary text-primary-foreground h-12 px-5 shadow-[var(--shadow-card)] transition active:scale-[0.98] flex items-center justify-center gap-2.5">
+          <div className="rounded-xl bg-primary text-primary-foreground h-12 px-6 shadow-[var(--shadow-card)] transition active:scale-[0.98] flex items-center justify-center gap-2.5">
             <ScanLine className="h-[18px] w-[18px] shrink-0 opacity-90" strokeWidth={1.75} />
             <span className="text-[15px] font-semibold tracking-tight whitespace-nowrap">Skanna dokument</span>
           </div>
         </Link>
 
         {/* Flaggorna — lodrätt, total höjd = 48 px */}
-        <div className="flex flex-col h-12 w-10 gap-[2px]">
-          <div className="flex-1 rounded-lg bg-card border border-border flex items-center justify-center text-[16px] leading-none select-none">
-            🇸🇪
+        <div className="flex flex-col h-12 w-12 gap-[2px]">
+          <div className="flex-1 rounded-lg overflow-hidden border border-border transition active:scale-[0.98]">
+            <svg viewBox="0 0 36 24" className="w-full h-full">
+              <rect width="36" height="24" fill="#006AA7" />
+              <rect x="11" y="0" width="4" height="24" fill="#FECC00" />
+              <rect x="0" y="10" width="36" height="4" fill="#FECC00" />
+            </svg>
           </div>
-          <div className="flex-1 rounded-lg bg-card border border-border flex items-center justify-center text-[16px] leading-none select-none">
-            🇬🇧
+          <div className="flex-1 rounded-lg overflow-hidden border border-border transition active:scale-[0.98]">
+            <svg viewBox="0 0 36 24" className="w-full h-full">
+              <rect width="36" height="24" fill="#012169" />
+              <path d="M0 0 L36 24 M36 0 L0 24" stroke="#FFF" strokeWidth="4.8" />
+              <path d="M0 0 L36 24 M36 0 L0 24" stroke="#C8102E" strokeWidth="3.2" />
+              <path d="M18 0 V24 M0 12 H36" stroke="#FFF" strokeWidth="8" />
+              <path d="M18 0 V24 M0 12 H36" stroke="#C8102E" strokeWidth="4.8" />
+            </svg>
           </div>
         </div>
       </div>
