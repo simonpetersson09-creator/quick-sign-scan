@@ -4,7 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { loadSettings, saveSettings } from "@/lib/settings";
 import { useT } from "@/lib/i18n";
-import { Trash2 } from "lucide-react";
+
 
 export const Route = createFileRoute("/settings")({
   head: () => ({ meta: [{ title: "Inställningar" }] }),
