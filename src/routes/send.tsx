@@ -180,11 +180,11 @@ function SendPage() {
         }, 2200);
       } else {
         console.error("[send] failed:", result);
-        setInfo(ERROR_MESSAGES[result.code] ?? ERROR_MESSAGES.unknown);
+        setInfo(t(`err_${result.code}`) ?? t("err_unknown"));
       }
     } catch (e) {
       console.error(e);
-      setInfo(ERROR_MESSAGES.unknown);
+      setInfo(t("err_unknown"));
     } finally {
       setSending(false);
     }
