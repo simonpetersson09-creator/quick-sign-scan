@@ -281,7 +281,7 @@ export interface DocumentDetection {
 }
 
 const A4_RATIO = Math.SQRT2;
-export const MIN_DOCUMENT_CONFIDENCE = 0.22;
+export const MIN_DOCUMENT_CONFIDENCE = 0.16;
 
 // Detect the document from its contour: isolate candidate paper, extract the
 // outer boundary, reduce the convex contour to four real corners, then reject
@@ -708,34 +708,34 @@ function evaluateEdgeQuad(args: {
   const bboxArea = Math.max(1, (maxX - minX + 1) * (maxY - minY + 1));
   const polygonFill = bboxArea / Math.max(1, area);
 
-  // Relaxed gates — accept tilted A4 from a phone where ratio, perspective
-  // and side curvature are messier than the ideal scan-on-desk shot.
-  if (ratioError > 0.7) return null;
-  if (perspectiveError > 2.2) return null;
-  if (sideDeviation > 0.16) return null;
-  if (polygonFill < 0.55 || polygonFill > 1.8) return null;
+  // Very relaxed gates — accept a tilted A4 from a phone with shadows,
+  // uneven lighting and rough edges. Confidence ranks the survivors.
+  if (ratioError > 0.9) return null;
+  if (perspectiveError > 3.2) return null;
+  if (sideDeviation > 0.3) return null;
+  if (polygonFill < 0.42 || polygonFill > 2.6) return null;
 
   const stats = polygonImageStats(ordered, lum, width, height);
   const edgeScore = quadEdgeSupport(ordered, edges, width, height);
-  const a4Score = clamp01(1 - ratioError / 0.7);
-  const straightScore = clamp01(1 - sideDeviation / 0.16);
-  const perspectiveScore = clamp01(1 - perspectiveError / 2.2);
-  const brightnessScore = clamp01((stats.mean - 80) / 130);
+  const a4Score = clamp01(1 - ratioError / 0.9);
+  const straightScore = clamp01(1 - sideDeviation / 0.3);
+  const perspectiveScore = clamp01(1 - perspectiveError / 3.2);
+  const brightnessScore = clamp01((stats.mean - 70) / 140);
   const textScore = clamp01(stats.darkRatio / 0.055);
   const areaScore =
-    areaRatio <= 0.7 ? clamp01((areaRatio - 0.03) / 0.18) : clamp01((0.98 - areaRatio) / 0.2);
+    areaRatio <= 0.7 ? clamp01((areaRatio - 0.02) / 0.18) : clamp01((0.98 - areaRatio) / 0.2);
   const confidence =
-    0.32 * edgeScore +
+    0.28 * edgeScore +
     0.16 * straightScore +
     0.12 * a4Score +
     0.14 * brightnessScore +
     0.08 * textScore +
-    0.1 * perspectiveScore +
-    0.08 * areaScore;
+    0.12 * perspectiveScore +
+    0.1 * areaScore;
 
-  // Very loose final gate — anything with even weak edge support and
-  // some brightness counts as a candidate; confidence ranks them.
-  if (edgeScore < 0.08) return null;
+  // Final gate is very loose — even weak edge support is OK as long as
+  // brightness/area/straightness combine to a reasonable confidence.
+  if (edgeScore < 0.05) return null;
 
   return {
     corners: ordered,

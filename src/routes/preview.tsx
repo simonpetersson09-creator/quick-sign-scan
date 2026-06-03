@@ -5,7 +5,7 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
 import { analyzeDocumentQuality, QualityReport } from "@/lib/quality";
 import { useT } from "@/lib/i18n";
-import { Check, RefreshCw, AlertTriangle, ArrowRight } from "lucide-react";
+import { Check, RefreshCw, AlertTriangle, ArrowRight, Plus } from "lucide-react";
 
 export const Route = createFileRoute("/preview")({
   head: () => ({ meta: [{ title: "Förhandsgranska" }] }),
@@ -16,6 +16,7 @@ function PreviewPage() {
   const navigate = useNavigate();
   const t = useT();
   const [image, setImage] = useState<string | null>(null);
+  const [pages, setPages] = useState<string[]>([]);
   const [sourceImage, setSourceImage] = useState<string | null>(null);
   const [detection, setDetection] = useState<ReturnType<typeof scanStore.get>["detection"]>(null);
   const [report, setReport] = useState<QualityReport | null>(null);
@@ -30,6 +31,7 @@ function PreviewPage() {
     }
     const session = scanStore.get();
     setImage(img);
+    setPages(session.pages);
     setSourceImage(session.sourceDataUrl);
     setDetection(session.detection);
     setAnalyzing(true);
@@ -47,11 +49,17 @@ function PreviewPage() {
     scanStore.set({
       imageDataUrl: null,
       sourceDataUrl: null,
+      pages: [],
       detection: null,
       signatureDataUrl: null,
       signaturePosition: null,
       pdfDataUrl: null,
     });
+    navigate({ to: "/scan" });
+  }
+
+  function addPage() {
+    // Keep existing pages; jump back to scan to add another.
     navigate({ to: "/scan" });
   }
 
@@ -83,6 +91,22 @@ function PreviewPage() {
           />
         </div>
       </div>
+
+      {pages.length > 1 && (
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+          {pages.map((p, i) => (
+            <div
+              key={i}
+              className={`shrink-0 rounded-md overflow-hidden border-2 ${
+                p === image ? "border-primary" : "border-border"
+              } bg-white`}
+              style={{ width: 56, aspectRatio: "1 / 1.414" }}
+            >
+              <img src={p} alt="" className="w-full h-full object-contain" />
+            </div>
+          ))}
+        </div>
+      )}
 
       {!detection && (
         <div className="mt-4 rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm font-medium">
@@ -263,11 +287,18 @@ function PreviewPage() {
             {t("useDocument")} <ArrowRight className="h-5 w-5" />
           </span>
         </PrimaryButton>
-        <PrimaryButton variant="secondary" onClick={retake}>
-          <span className="inline-flex items-center justify-center gap-2">
-            <RefreshCw className="h-5 w-5" /> {t("retake")}
-          </span>
-        </PrimaryButton>
+        <div className="grid grid-cols-2 gap-3">
+          <PrimaryButton variant="secondary" onClick={addPage}>
+            <span className="inline-flex items-center justify-center gap-2">
+              <Plus className="h-5 w-5" /> {t("addPage")}
+            </span>
+          </PrimaryButton>
+          <PrimaryButton variant="secondary" onClick={retake}>
+            <span className="inline-flex items-center justify-center gap-2">
+              <RefreshCw className="h-5 w-5" /> {t("retake")}
+            </span>
+          </PrimaryButton>
+        </div>
       </div>
     </AppShell>
   );

@@ -11,7 +11,7 @@ import {
   warpQuadToRect,
 } from "@/lib/perspective";
 import { useT } from "@/lib/i18n";
-import { Camera, CameraOff, X, RefreshCw, ArrowLeft } from "lucide-react";
+import { Camera, CameraOff, X, RefreshCw, ArrowLeft, ArrowRight } from "lucide-react";
 
 type Status =
   | "starting"
@@ -45,11 +45,11 @@ export const Route = createFileRoute("/scan")({
 
 // Stability requirements — the document must be locked in on all 4 corners
 // for a sustained period before the camera captures, so we never fire too early.
-const STABLE_DELTA = 0.016; // normalized 0..1 — max smoothed corner movement to count as stable
+const STABLE_DELTA = 0.02; // normalized 0..1 — max smoothed corner movement to count as stable
 const DETECT_FRAMES = 2; // show the detected frame quickly once all 4 corners exist
-const HOLD_FRAMES = 18; // ~0.6s — "Håll stilla" phase
-const READY_FRAMES = 45; // ~1.5s — "Dokument hittat" lock-in
-const STABLE_FRAMES = 75; // ~2.5s total before auto-capture
+const HOLD_FRAMES = 8; // ~0.27s — "Håll stilla" phase
+const READY_FRAMES = 18; // ~0.6s — "Dokument hittat" lock-in
+const STABLE_FRAMES = 28; // ~0.95s total before auto-capture
 
 function ScanPage() {
   const t = useT();
@@ -76,6 +76,8 @@ function ScanPage() {
   const [error, setError] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<ErrorType | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
+  const [pageCount, setPageCount] = useState(() => scanStore.get().pages.length);
+  const [justCaptured, setJustCaptured] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<{
     vw: number;
     vh: number;
@@ -476,9 +478,12 @@ function ScanPage() {
 
       const dataUrl = warped.toDataURL("image/jpeg", 0.92);
       const sourceDataUrl = sourceCanvas.toDataURL("image/jpeg", 0.86);
+      const existing = scanStore.get().pages;
+      const nextPages = [...existing, dataUrl];
       scanStore.set({
         imageDataUrl: dataUrl,
         sourceDataUrl,
+        pages: nextPages,
         detection: {
           corners: normQuad,
           a4Ratio: meta.a4Ratio,
@@ -486,8 +491,7 @@ function ScanPage() {
           debug: meta.debug,
         },
       });
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-      navigate({ to: "/preview" });
+      finishPageCapture(dataUrl, nextPages.length);
     } catch (e) {
       console.error("[scan] capture warp failed, falling back to raw frame", e);
       // Reset the lock so captureRawFrame can take over.
@@ -537,9 +541,12 @@ function ScanPage() {
       { x: 1, y: 1 },
       { x: 0, y: 1 },
     ];
+    const existing = scanStore.get().pages;
+    const nextPages = [...existing, dataUrl];
     scanStore.set({
       imageDataUrl: dataUrl,
       sourceDataUrl: dataUrl,
+      pages: nextPages,
       detection: {
         corners: fullQuad,
         a4Ratio: 1,
@@ -559,6 +566,37 @@ function ScanPage() {
         },
       },
     });
+    finishPageCapture(dataUrl, nextPages.length);
+  }
+
+  // After a successful capture, freeze detection and show the in-camera review
+  // overlay. The stream stays alive so the user can immediately scan another
+  // page without re-asking for camera permissions.
+  function finishPageCapture(dataUrl: string, count: number) {
+    setPageCount(count);
+    setJustCaptured(dataUrl);
+    // Pause RAF/detection until the user chooses next action.
+    capturedRef.current = true;
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+  }
+
+  function scanAnotherPage() {
+    // Resume detection without tearing down the camera stream.
+    setJustCaptured(null);
+    stableCount.current = 0;
+    detectCount.current = 0;
+    missCount.current = 0;
+    smoothQuad.current = null;
+    lastRawQuad.current = null;
+    detectionMeta.current = null;
+    setProgress(0);
+    drawOverlay(null, false);
+    setStatus("searching");
+    capturedRef.current = false;
+    loop();
+  }
+
+  function finishScanning() {
     streamRef.current?.getTracks().forEach((tr) => tr.stop());
     navigate({ to: "/preview" });
   }
@@ -665,10 +703,17 @@ function ScanPage() {
             <span className="ml-2 opacity-80">{Math.round(progress * 100)}%</span>
           )}
         </div>
-        <div className="w-10" />
+        {pageCount > 0 ? (
+          <div className="px-3 py-1.5 rounded-full bg-success/90 text-success-foreground text-[12px] font-semibold tabular-nums">
+            {pageCount}
+          </div>
+        ) : (
+          <div className="w-10" />
+        )}
       </div>
 
       <div className="flex-1" />
+
 
       {/* Bottom hint / manual capture */}
       <div className="relative pb-safe px-5 pt-4 flex flex-col items-center gap-3">
@@ -740,6 +785,50 @@ function ScanPage() {
           </div>
         </div>
       )}
+
+      {/* Post-capture review overlay — shown after each page is captured.
+          User can scan another page (stream stays alive) or finish. */}
+      {justCaptured && status !== "error" && (
+        <div className="absolute inset-0 z-40 flex flex-col items-center justify-end bg-black/75 backdrop-blur-sm px-5 pb-safe pt-10">
+          <div className="w-full max-w-sm flex flex-col items-center gap-4">
+            <div className="text-center">
+              <p className="text-[13px] uppercase tracking-wide text-white/60 font-semibold">
+                {t("pageCaptured")}
+              </p>
+              <p className="text-2xl font-semibold tracking-tight mt-1">
+                {pageCount} {pageCount === 1 ? t("pageSingular") : t("pagePlural")}
+              </p>
+            </div>
+            <div
+              className="rounded-xl overflow-hidden border border-white/15 bg-white shadow-xl"
+              style={{ width: "min(60vw, 240px)", aspectRatio: "1 / 1.414" }}
+            >
+              <img
+                src={justCaptured}
+                alt={t("scannedAlt")}
+                className="w-full h-full object-contain bg-white"
+              />
+            </div>
+            <div className="w-full flex flex-col gap-3 pt-2 pb-4">
+              <button
+                onClick={scanAnotherPage}
+                className="w-full rounded-xl bg-white/15 border border-white/25 text-white py-3.5 px-4 font-medium text-[15px] tracking-tight flex items-center justify-center gap-2 active:scale-[0.98] transition"
+              >
+                <Camera className="h-5 w-5" />
+                {t("scanAnotherPage")}
+              </button>
+              <button
+                onClick={finishScanning}
+                className="w-full rounded-xl bg-white text-black py-3.5 px-4 font-semibold text-[15px] tracking-tight flex items-center justify-center gap-2 active:scale-[0.98] transition"
+              >
+                {t("finishScanning")} <ArrowRight className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
 
       {/* Permission / error overlay */}
       {status === "error" && (

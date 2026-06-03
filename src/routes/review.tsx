@@ -42,7 +42,8 @@ function ReviewPage() {
         s.signatureDataUrl && s.signaturePosition
           ? { dataUrl: s.signatureDataUrl, x: s.signaturePosition.x, y: s.signaturePosition.y }
           : null;
-      const url = await buildPdf(img, sig);
+      const allPages = s.pages.length > 0 ? s.pages : [img];
+      const url = await buildPdf(allPages, sig);
       if (cancelled) return;
       setPdfUrl(url);
       scanStore.set({ pdfDataUrl: url });

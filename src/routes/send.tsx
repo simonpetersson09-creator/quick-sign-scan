@@ -77,7 +77,7 @@ function SendPage() {
     // Rebuild the PDF every time the page mounts. We deliberately do NOT
     // persist the rendered PDF — only the source image + signature live
     // in sessionStorage to stay under the iOS quota.
-    const imageDataUrl = s.imageDataUrl;
+    const allPages = s.pages.length > 0 ? s.pages : [s.imageDataUrl];
     const sig =
       s.signatureDataUrl && s.signaturePosition
         ? {
@@ -87,7 +87,7 @@ function SendPage() {
           }
         : null;
     (async () => {
-      const url = await buildPdf(imageDataUrl, sig);
+      const url = await buildPdf(allPages, sig);
       setPdfUrl(url);
     })();
   }, [navigate]);
