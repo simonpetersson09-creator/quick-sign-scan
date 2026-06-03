@@ -95,9 +95,9 @@ function SignPage() {
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="font-medium">Använd sparad signatur</span>
+            <span className="font-medium">{t("useSavedSignature")}</span>
             <span className={`text-xs ${useSaved ? "text-primary" : "text-muted-foreground"}`}>
-              {useSaved ? "Vald" : "Tryck för att välja"}
+              {useSaved ? t("selected") : t("tapToSelect")}
             </span>
           </div>
           <img src={settings.savedSignature} alt="" className="h-12 mt-2 object-contain" />
