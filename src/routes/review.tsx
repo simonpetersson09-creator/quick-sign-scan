@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
@@ -26,7 +26,7 @@ function ReviewPage() {
   const [zoom, setZoom] = useState(1);
   const [approved, setApproved] = useState(false);
 
-  const signed = useMemo(() => !!scanStore.get().signatureDataUrl, []);
+  const signed = !!scanStore.get().signatureDataUrl;
 
   useEffect(() => {
     const s = scanStore.get();
