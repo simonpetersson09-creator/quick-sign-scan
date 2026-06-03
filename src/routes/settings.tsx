@@ -35,7 +35,7 @@ function SettingsPage() {
             type="email"
             value={s.userEmail}
             onChange={(e) => update("userEmail", e.target.value)}
-            placeholder={t("placeholderReply").replace(" (valfritt)", "").replace(" (optional)", "")}
+            placeholder="du@exempel.se"
             className="input"
           />
           <p className="text-[11px] text-muted-foreground mt-1.5 ml-1">
