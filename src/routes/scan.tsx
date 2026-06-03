@@ -709,7 +709,8 @@ function ScanPage() {
           </div>
         ) : (
           <div className="w-10" />
-        )}
+      </div>
+
 
       <div className="flex-1" />
 
