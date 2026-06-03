@@ -515,7 +515,24 @@ function ScanPage() {
     scanStore.set({
       imageDataUrl: dataUrl,
       sourceDataUrl: dataUrl,
-      detection: { corners: fullQuad, a4Ratio: 1, confidence: 0, debug: undefined },
+      detection: {
+        corners: fullQuad,
+        a4Ratio: 1,
+        confidence: 0,
+        debug: {
+          edgeThreshold: 0,
+          threshold: 0,
+          candidateCount: 0,
+          a4Score: 0,
+          edgeScore: 0,
+          brightnessScore: 0,
+          textScore: 0,
+          areaRatio: 1,
+          sideDeviation: 0,
+          perspectiveError: 0,
+          polygonFill: 1,
+        },
+      },
     });
     streamRef.current?.getTracks().forEach((tr) => tr.stop());
     navigate({ to: "/preview" });
