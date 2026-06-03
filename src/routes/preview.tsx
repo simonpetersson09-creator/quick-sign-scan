@@ -47,11 +47,17 @@ function PreviewPage() {
     scanStore.set({
       imageDataUrl: null,
       sourceDataUrl: null,
+      pages: [],
       detection: null,
       signatureDataUrl: null,
       signaturePosition: null,
       pdfDataUrl: null,
     });
+    navigate({ to: "/scan" });
+  }
+
+  function addPage() {
+    // Keep existing pages; jump back to scan to add another.
     navigate({ to: "/scan" });
   }
 
