@@ -95,7 +95,19 @@ function Home() {
         >
           <Globe className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
           <span className="text-[9px] font-semibold tracking-wide mt-0.5">
-            {lang === "sv" ? "SV | en" : "sv | EN"}
+            {lang === "sv" ? (
+              <>
+                <span className="text-foreground">SV</span>
+                <span> | </span>
+                <span className="opacity-50">EN</span>
+              </>
+            ) : (
+              <>
+                <span className="opacity-50">SV</span>
+                <span> | </span>
+                <span className="text-foreground">EN</span>
+              </>
+            )}
           </span>
         </button>
       </div>
