@@ -77,6 +77,7 @@ const sv: Dict = {
   metric_brightness: "Ljus",
   metric_complete: "Komplett",
   useDocument: "Använd dokument",
+  addPage: "Lägg till sida",
   verdict_ok: "Dokumentet ser bra ut",
   verdict_dark: "För mörkt",
   verdict_bright: "För ljust — exponeringen är överstyrd",
