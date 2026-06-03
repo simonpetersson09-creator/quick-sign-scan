@@ -455,7 +455,7 @@ function ScanPage() {
 
             {errorType === "permission_denied" && (
               <div className="w-full rounded-xl bg-white/8 border border-white/10 p-4 text-left">
-                <p className="text-[13px] font-medium text-white/90 mb-2">Så här aktiverar du kameran:</p>
+                <p className="text-[13px] font-medium text-white/90 mb-2">{t("howToEnable")}</p>
                 <PlatformInstructions />
               </div>
             )}
