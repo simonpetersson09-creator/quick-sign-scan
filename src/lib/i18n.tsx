@@ -116,6 +116,7 @@ const sv: Dict = {
   continueToEmail: "Fortsätt till e-post",
   moveSignature: "Flytta signatur",
   retake: "Ta om bild",
+  startOver: "Börja om",
   backToSign: "Tillbaka till signering",
 
   // send
@@ -280,6 +281,7 @@ const en: Dict = {
   continueToEmail: "Continue to email",
   moveSignature: "Move signature",
   retake: "Retake photo",
+  startOver: "Start over",
   backToSign: "Back to signing",
 
   // send
