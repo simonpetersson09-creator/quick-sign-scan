@@ -1,9 +1,10 @@
-// Scan session store, persisted to sessionStorage so an iOS background-kill
-// or page reload doesn't lose a scan between capture and send.
-// We only persist the *minimal* data needed to rebuild the PDF
-// (source image + signature) — large derived artifacts (pdfDataUrl,
-// sourceDataUrl, detection metadata) stay in memory only.
-// Data is cleared on tab close or after explicit clear().
+// In-memory only scan session store.
+//
+// Privacy requirement: documents, images, PDFs, signatures and related
+// metadata MUST NEVER be persisted. Nothing here touches localStorage,
+// sessionStorage, IndexedDB, cookies, or any other durable storage.
+// All data lives only in this module's memory for the lifetime of the tab,
+// and is wiped on reload / navigation away / tab close.
 
 type Listener = () => void;
 
@@ -47,106 +48,49 @@ const initial: ScanSession = {
   signaturePosition: null,
 };
 
-const STORAGE_KEY = "scanSession.v1";
-
-// Listeners notified when sessionStorage rejects a write (quota exceeded
-// is by far the most common cause on iOS Safari, ~5 MB cap).
-type QuotaListener = () => void;
-const quotaListeners = new Set<QuotaListener>();
-
-function hasSessionStorage(): boolean {
-  try {
-    return typeof window !== "undefined" && !!window.sessionStorage;
-  } catch {
-    return false;
-  }
-}
-
-// Only persist fields cheap enough to round-trip safely.
-type PersistedShape = Pick<
-  ScanSession,
-  "imageDataUrl" | "signatureDataUrl" | "signaturePosition"
->;
-
-function pickPersisted(s: ScanSession): PersistedShape {
-  return {
-    imageDataUrl: s.imageDataUrl,
-    signatureDataUrl: s.signatureDataUrl,
-    signaturePosition: s.signaturePosition,
-  };
-}
-
-function load(): ScanSession {
-  if (!hasSessionStorage()) return { ...initial };
-  try {
-    const raw = window.sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return { ...initial };
-    const parsed = JSON.parse(raw) as Partial<PersistedShape>;
-    return { ...initial, ...parsed };
-  } catch {
-    return { ...initial };
-  }
-}
-
-let quotaWarned = false;
-
-function persist(s: ScanSession) {
-  if (!hasSessionStorage()) return;
-  try {
-    window.sessionStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify(pickPersisted(s)),
-    );
-    quotaWarned = false;
-  } catch (e) {
-    // sessionStorage can throw QuotaExceededError. Fall back gracefully —
-    // the in-memory state still works for this session, but the user
-    // will lose the scan if iOS suspends the tab.
-    console.warn("[scanStore] could not persist to sessionStorage:", e);
-    if (!quotaWarned) {
-      quotaWarned = true;
-      quotaListeners.forEach((l) => {
-        try {
-          l();
-        } catch {
-          /* listener errors must not break the store */
-        }
-      });
-    }
-  }
-}
-
-let state: ScanSession = load();
+let state: ScanSession = { ...initial };
 const listeners = new Set<Listener>();
 
 function notify() {
   listeners.forEach((l) => l());
 }
 
+function wipe() {
+  // Overwrite references so large strings can be GC'd immediately and
+  // never linger as stale closures.
+  state = { ...initial };
+}
+
 export const scanStore = {
   get: () => state,
   set: (patch: Partial<ScanSession>) => {
     state = { ...state, ...patch };
-    persist(state);
     notify();
   },
   clear: () => {
-    state = { ...initial };
-    if (hasSessionStorage()) {
-      try {
-        window.sessionStorage.removeItem(STORAGE_KEY);
-      } catch {
-        // ignore
-      }
-    }
+    wipe();
     notify();
   },
   subscribe: (l: Listener) => {
     listeners.add(l);
     return () => listeners.delete(l);
   },
-  onQuotaExceeded: (l: QuotaListener) => {
-    quotaListeners.add(l);
-    return () => quotaListeners.delete(l);
-  },
+  // Kept for API compatibility with previous version. Always a no-op now
+  // since nothing is ever persisted.
+  onQuotaExceeded: (_l: () => void) => () => {},
 };
+
+// Auto-cleanup: if the user closes the tab, navigates away, refreshes,
+// or the page is hidden/backgrounded, drop all scan data immediately.
+if (typeof window !== "undefined") {
+  const cleanup = () => wipe();
+  window.addEventListener("pagehide", cleanup);
+  window.addEventListener("beforeunload", cleanup);
+  // Some mobile browsers only fire visibilitychange when backgrounded.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      // Intentionally NOT wiping on hidden — user may switch apps briefly
+      // mid-flow. We only wipe on real unload/pagehide.
+    }
+  });
+}
