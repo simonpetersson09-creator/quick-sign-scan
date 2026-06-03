@@ -92,12 +92,12 @@ function ReviewPage() {
             {pdfUrl ? (
               <iframe
                 src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0&view=Fit&zoom=page-fit`}
-                title="PDF-förhandsvisning"
+                title={t("pdfPreview")}
                 className="w-full h-full block"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground">
-                Skapar PDF…
+                {t("creatingPdf")}
               </div>
             )}
           </div>
