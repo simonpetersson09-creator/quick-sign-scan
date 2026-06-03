@@ -14,6 +14,7 @@ export const Route = createFileRoute("/preview")({
 
 function PreviewPage() {
   const navigate = useNavigate();
+  const t = useT();
   const [image, setImage] = useState<string | null>(null);
   const [sourceImage, setSourceImage] = useState<string | null>(null);
   const [detection, setDetection] = useState<ReturnType<typeof scanStore.get>["detection"]>(null);
