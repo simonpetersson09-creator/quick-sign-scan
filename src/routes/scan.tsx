@@ -629,24 +629,21 @@ function ScanPage() {
   }
 
   function scanAnotherPage() {
-    // Resume detection without tearing down the camera stream.
+    // Start a fresh camera session from this direct button click. This keeps
+    // mobile browser camera permissions in a user gesture and avoids stale
+    // video/detection state from the previous page.
     setJustCaptured(null);
-    stableCount.current = 0;
-    detectCount.current = 0;
-    missCount.current = 0;
-    smoothQuad.current = null;
-    lastRawQuad.current = null;
-    detectionMeta.current = null;
-    setProgress(0);
-    drawOverlay(null, false);
-    setStatus("searching");
-    capturedRef.current = false;
-    loop();
+    startCamera({ restartStream: true, skipPermissionPreflight: true });
   }
 
   function finishScanning() {
     streamRef.current?.getTracks().forEach((tr) => tr.stop());
     navigate({ to: "/preview" });
+  }
+
+  function cancelScan() {
+    streamRef.current?.getTracks().forEach((tr) => tr.stop());
+    navigate({ to: scanStore.get().pages.length > 0 ? "/preview" : "/" });
   }
 
   const statusText: Record<Status, string> = {
@@ -732,10 +729,7 @@ function ScanPage() {
       {/* Top bar */}
       <div className="relative pt-safe px-5 flex items-center justify-between">
         <button
-          onClick={() => {
-            streamRef.current?.getTracks().forEach((t) => t.stop());
-            navigate({ to: "/" });
-          }}
+          onClick={cancelScan}
           className="h-10 w-10 rounded-full bg-black/55 backdrop-blur flex items-center justify-center"
           aria-label={t("cancel")}
         >
@@ -927,7 +921,7 @@ function ScanPage() {
               )}
               {errorType === "permission_denied" && (
                 <button
-                  onClick={startCamera}
+                  onClick={() => startCamera({ restartStream: true, skipPermissionPreflight: true })}
                   className="w-full rounded-xl bg-white text-black py-3.5 px-4 font-semibold text-[15px] tracking-tight flex items-center justify-center gap-2 active:scale-[0.98] transition"
                 >
                   <RefreshCw className="h-4 w-4" strokeWidth={2} />
@@ -936,7 +930,7 @@ function ScanPage() {
               )}
               {errorType !== "permission_denied" && errorType !== "iframe_blocked" && (
                 <button
-                  onClick={startCamera}
+                  onClick={() => startCamera({ restartStream: true, skipPermissionPreflight: true })}
                   className="w-full rounded-xl bg-white text-black py-3.5 px-4 font-semibold text-[15px] tracking-tight flex items-center justify-center gap-2 active:scale-[0.98] transition"
                 >
                   <RefreshCw className="h-4 w-4" strokeWidth={2} />
@@ -944,10 +938,7 @@ function ScanPage() {
                 </button>
               )}
               <button
-                onClick={() => {
-                  streamRef.current?.getTracks().forEach((tr) => tr.stop());
-                  navigate({ to: "/" });
-                }}
+                onClick={cancelScan}
                 className="w-full rounded-xl bg-white/10 text-white py-3.5 px-4 font-medium text-[15px] tracking-tight flex items-center justify-center gap-2 active:scale-[0.98] transition"
               >
                 <ArrowLeft className="h-4 w-4" strokeWidth={2} />
