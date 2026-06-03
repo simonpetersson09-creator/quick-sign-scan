@@ -472,24 +472,70 @@ function ScanPage() {
   }
 
   function manualCapture() {
-    // Require a detected document — never capture the raw camera frame,
-    // otherwise the preview shows an un-cropped photo instead of a scan.
+    // Prefer a detected document quad for a clean perspective-corrected scan.
     const v = videoRef.current;
+    if (!cameraReady || !v || v.readyState < 2 || !v.videoWidth || !v.videoHeight) return;
     const q = smoothQuad.current;
-    if (
-      !cameraReady ||
-      !v ||
-      v.readyState < 2 ||
-      !v.videoWidth ||
-      !v.videoHeight ||
-      !q ||
-      !detectionMeta.current ||
-      detectionMeta.current.confidence < MIN_DOCUMENT_CONFIDENCE ||
-      detectCount.current < DETECT_FRAMES
-    )
-      return;
-    setStatus("capturing");
-    capture(q);
+    const hasGoodDetection =
+      q &&
+      detectionMeta.current &&
+      detectionMeta.current.confidence >= MIN_DOCUMENT_CONFIDENCE &&
+      detectCount.current >= DETECT_FRAMES;
+    if (hasGoodDetection && q) {
+      setStatus("capturing");
+      capture(q);
+    } else {
+      // Fallback: no document detected — capture the raw frame as-is so the
+      // user is never stuck if detection fails (poor lighting, low contrast,
+      // textured background, etc). User can crop manually on the preview.
+      setStatus("capturing");
+      captureRawFrame();
+    }
+  }
+
+  function captureRawFrame() {
+    if (capturedRef.current) return;
+    const video = videoRef.current;
+    if (!video || !video.videoWidth || !video.videoHeight) return;
+    capturedRef.current = true;
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    const canvas = document.createElement("canvas");
+    canvas.width = vw;
+    canvas.height = vh;
+    canvas.getContext("2d")!.drawImage(video, 0, 0, vw, vh);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+    // Use full-frame "quad" so downstream code has valid corners.
+    const fullQuad: [Point, Point, Point, Point] = [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 1, y: 1 },
+      { x: 0, y: 1 },
+    ];
+    scanStore.set({
+      imageDataUrl: dataUrl,
+      sourceDataUrl: dataUrl,
+      detection: {
+        corners: fullQuad,
+        a4Ratio: 1,
+        confidence: 0,
+        debug: {
+          edgeThreshold: 0,
+          threshold: 0,
+          candidateCount: 0,
+          a4Score: 0,
+          edgeScore: 0,
+          brightnessScore: 0,
+          textScore: 0,
+          areaRatio: 1,
+          sideDeviation: 0,
+          perspectiveError: 0,
+          polygonFill: 1,
+        },
+      },
+    });
+    streamRef.current?.getTracks().forEach((tr) => tr.stop());
+    navigate({ to: "/preview" });
   }
 
   const statusText: Record<Status, string> = {
