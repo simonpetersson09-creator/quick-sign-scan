@@ -69,6 +69,16 @@ function ScanPage() {
   const [status, setStatus] = useState<Status>("starting");
   const [error, setError] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<ErrorType | null>(null);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<{
+    vw: number;
+    vh: number;
+    dpr: number;
+    ready: boolean;
+    lastCapture: number | null;
+  }>({ vw: 0, vh: 0, dpr: 1, ready: false, lastCapture: null });
+  const debugEnabled =
+    typeof window !== "undefined" && /[?&]debug=1\b/.test(window.location.search);
   const cancelledRef = useRef(false);
 
   const startCamera = useCallback(async () => {
@@ -141,14 +151,44 @@ function ScanPage() {
         return;
       }
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+      const videoEl = videoRef.current;
+      if (videoEl) {
+        videoEl.srcObject = stream;
+        // Wait for the video to actually have frame data before allowing
+        // detection / capture. Without this, the first ticks of the RAF
+        // loop hit a 0x0 video and we draw a blank canvas.
+        const waitReady = new Promise<void>((resolve) => {
+          if (videoEl.readyState >= 2 && videoEl.videoWidth > 0) {
+            resolve();
+            return;
+          }
+          const onReady = () => {
+            if (videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
+              videoEl.removeEventListener("loadedmetadata", onReady);
+              videoEl.removeEventListener("canplay", onReady);
+              resolve();
+            }
+          };
+          videoEl.addEventListener("loadedmetadata", onReady);
+          videoEl.addEventListener("canplay", onReady);
+        });
         try {
-          await videoRef.current.play();
+          await videoEl.play();
         } catch {
           // iOS Safari can reject play() if the gesture context was lost.
-          // Surface as a recoverable error rather than crashing.
         }
+        // Race readiness against a short timeout — if metadata never arrives
+        // we still let detect() bail safely on its own readyState check.
+        await Promise.race([
+          waitReady,
+          new Promise<void>((r) => setTimeout(r, 4000)),
+        ]);
+        if (cancelledRef.current) {
+          stream.getTracks().forEach((tr) => tr.stop());
+          streamRef.current = null;
+          return;
+        }
+        setCameraReady(videoEl.videoWidth > 0 && videoEl.videoHeight > 0);
       }
       if (cancelledRef.current) {
         stream.getTracks().forEach((tr) => tr.stop());
@@ -360,11 +400,26 @@ function ScanPage() {
       setStatus("uncertain");
       return;
     }
-    capturedRef.current = true;
     const video = videoRef.current;
-    if (!video) return;
+    // Hard guard: refuse to capture unless the video element actually has
+    // a current frame with real dimensions. Prevents black/empty captures
+    // on slow iOS Safari startup where the stream is attached but no
+    // frame has been decoded yet.
+    if (
+      !video ||
+      video.readyState < 2 ||
+      !video.videoWidth ||
+      !video.videoHeight
+    ) {
+      setStatus("searching");
+      return;
+    }
+    capturedRef.current = true;
     const vw = video.videoWidth;
     const vh = video.videoHeight;
+    if (debugEnabled) {
+      setDebugInfo((d) => ({ ...d, vw, vh, ready: true, lastCapture: Date.now() }));
+    }
 
     // Inset corners ~1.8% toward centroid as a safety margin so background,
     // bordskanter eller skuggor utanför pappret aldrig läcker in i resultatet.
@@ -419,8 +474,14 @@ function ScanPage() {
   function manualCapture() {
     // Require a detected document — never capture the raw camera frame,
     // otherwise the preview shows an un-cropped photo instead of a scan.
+    const v = videoRef.current;
     const q = smoothQuad.current;
     if (
+      !cameraReady ||
+      !v ||
+      v.readyState < 2 ||
+      !v.videoWidth ||
+      !v.videoHeight ||
       !q ||
       !detectionMeta.current ||
       detectionMeta.current.confidence < MIN_DOCUMENT_CONFIDENCE ||
@@ -451,6 +512,30 @@ function ScanPage() {
           ref={videoRef}
           playsInline
           muted
+          autoPlay
+          // iOS Safari ignores playsInline unless it's also a literal attribute.
+          // eslint-disable-next-line react/no-unknown-property
+          {...({ "webkit-playsinline": "true", "x-webkit-airplay": "deny" } as Record<string, string>)}
+          disablePictureInPicture
+          onLoadedMetadata={(e) => {
+            const v = e.currentTarget;
+            if (v.videoWidth > 0 && v.videoHeight > 0) {
+              setCameraReady(true);
+              if (debugEnabled) {
+                setDebugInfo((d) => ({
+                  ...d,
+                  vw: v.videoWidth,
+                  vh: v.videoHeight,
+                  dpr: window.devicePixelRatio || 1,
+                  ready: true,
+                }));
+              }
+            }
+          }}
+          onCanPlay={(e) => {
+            const v = e.currentTarget;
+            if (v.videoWidth > 0 && v.videoHeight > 0) setCameraReady(true);
+          }}
           className="absolute inset-0 w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-black/25 pointer-events-none" />
@@ -512,6 +597,7 @@ function ScanPage() {
         <button
           onClick={manualCapture}
           disabled={
+            !cameraReady ||
             status === "starting" ||
             status === "error" ||
             status === "capturing" ||
@@ -529,6 +615,20 @@ function ScanPage() {
           {t("scanHint")}
         </p>
       </div>
+
+      {/* Debug overlay — enable with ?debug=1 in the URL */}
+      {debugEnabled && (
+        <div className="absolute top-16 left-3 z-40 rounded-lg bg-black/80 text-white text-[11px] font-mono leading-tight px-3 py-2 pointer-events-none space-y-0.5">
+          <div>video: {debugInfo.vw}×{debugInfo.vh}</div>
+          <div>readyState: {videoRef.current?.readyState ?? 0}</div>
+          <div>dpr: {debugInfo.dpr || (typeof window !== "undefined" ? window.devicePixelRatio : 1)}</div>
+          <div>cameraReady: {String(cameraReady)}</div>
+          <div>status: {status}</div>
+          <div>detect: {detectCount.current} / stable: {stableCount.current}</div>
+          <div>conf: {detectionMeta.current?.confidence?.toFixed(2) ?? "—"}</div>
+          <div>lastCapture: {debugInfo.lastCapture ? new Date(debugInfo.lastCapture).toLocaleTimeString() : "—"}</div>
+        </div>
+      )}
 
       {/* Permission / error overlay */}
       {status === "error" && (
