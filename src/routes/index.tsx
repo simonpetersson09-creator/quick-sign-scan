@@ -20,6 +20,7 @@ const steps = [
 ];
 
 function Home() {
+  const [lang, setLang] = useState<"sv" | "en">("sv");
   return (
     <div className="min-h-screen flex flex-col bg-background pt-safe pb-safe px-5">
       {/* Center everything vertically */}
