@@ -10,6 +10,7 @@ import {
   maxCornerDelta,
   warpQuadToRect,
 } from "@/lib/perspective";
+import { useT } from "@/lib/i18n";
 import { Camera, CameraOff, X, RefreshCw, ArrowLeft } from "lucide-react";
 
 type Status =
