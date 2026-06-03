@@ -78,7 +78,7 @@ function PreviewPage() {
         >
           <img
             src={image}
-            alt="Skannat dokument"
+            alt={t("scannedAlt")}
             className="w-full h-full object-contain bg-white"
           />
         </div>
