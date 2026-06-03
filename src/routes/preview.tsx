@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
-import { analyzeDocumentQuality, QualityReport, VERDICT_MESSAGE } from "@/lib/quality";
+import { analyzeDocumentQuality, QualityReport } from "@/lib/quality";
+import { useT } from "@/lib/i18n";
 import { Check, RefreshCw, AlertTriangle, ArrowRight } from "lucide-react";
 
 export const Route = createFileRoute("/preview")({
