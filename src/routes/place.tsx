@@ -61,7 +61,7 @@ function PlacePage() {
           className="relative rounded-2xl overflow-hidden shadow-[var(--shadow-card)] border border-border bg-white touch-none select-none"
           style={{ width: "min(82vw, 360px)", aspectRatio: "1 / 1.414" }}
         >
-          <img src={image} alt="Skannat dokument" className="absolute inset-0 w-full h-full object-cover" />
+          <img src={image} alt={t("scannedAlt")} className="absolute inset-0 w-full h-full object-cover" />
           <div
             className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none"
             style={{ left: `${sigPos.x * 100}%`, top: `${sigPos.y * 100}%` }}
