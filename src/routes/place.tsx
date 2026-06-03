@@ -71,11 +71,14 @@ function PlacePage() {
       <div className="flex-1 flex items-center justify-center">
         <div
           ref={containerRef}
-          onPointerDown={moveTo}
+          onPointerDown={onDown}
+          onPointerMove={onMove}
+          onPointerUp={onUp}
+          onPointerCancel={onUp}
           className="relative rounded-2xl overflow-hidden shadow-[var(--shadow-card)] border border-border bg-white touch-none select-none"
           style={{ width: "min(82vw, 360px)", aspectRatio: "1 / 1.414" }}
         >
-          <img src={image} alt={t("scannedAlt")} className="absolute inset-0 w-full h-full object-cover" />
+          <img src={image} alt={t("scannedAlt")} className="absolute inset-0 w-full h-full object-contain" />
           <div
             className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none"
             style={{ left: `${sigPos.x * 100}%`, top: `${sigPos.y * 100}%` }}
