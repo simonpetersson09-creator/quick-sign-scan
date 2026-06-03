@@ -283,7 +283,7 @@ function SendPage() {
         <PrimaryButton onClick={send} disabled={!emailValid || !pdfUrl || sending}>
           <span className="inline-flex items-center justify-center gap-2">
             <Mail className="h-5 w-5" />
-            {sending ? "Förbereder…" : "Skicka PDF"}
+            {sending ? t("preparing") : t("sendPdf")}
           </span>
         </PrimaryButton>
         <PrimaryButton
@@ -292,13 +292,13 @@ function SendPage() {
           disabled={!pdfUrl}
           className="h-12 text-[15px]"
         >
-          Ladda ned PDF
+          {t("downloadPdf")}
         </PrimaryButton>
         {info ? (
           <p className="text-center text-xs text-destructive mt-1">{info}</p>
         ) : (
           <p className="text-center text-xs text-muted-foreground mt-1">
-            PDF:en bifogas och skickas direkt från servern till mottagaren.
+            {t("sendFootnote")}
           </p>
         )}
       </div>
