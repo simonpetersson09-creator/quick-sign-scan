@@ -127,7 +127,7 @@ function SignPage() {
           disabled={!hasInk || useSaved}
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground disabled:opacity-40 px-2 py-1"
         >
-          <RotateCcw className="h-4 w-4" /> Rensa
+          <RotateCcw className="h-4 w-4" /> {t("clear")}
         </button>
       </div>
 
@@ -135,11 +135,11 @@ function SignPage() {
 
       <div className="flex flex-col gap-3 pt-5">
         <PrimaryButton onClick={() => done(false)} disabled={!hasInk && !useSaved}>
-          Klar — fortsätt
+          {t("doneContinue")}
         </PrimaryButton>
         {!useSaved && (
           <PrimaryButton variant="ghost" onClick={() => done(true)} disabled={!hasInk}>
-            Klar & spara signaturen
+            {t("doneAndSave")}
           </PrimaryButton>
         )}
       </div>
