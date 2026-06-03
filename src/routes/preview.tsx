@@ -66,9 +66,9 @@ function PreviewPage() {
   const polygonPoints = detection?.corners.map((p) => `${p.x * 100},${p.y * 100}`).join(" ");
 
   return (
-    <AppShell title="Förhandsgranska" back="/">
+    <AppShell title={t("previewTitle")} back="/">
       <p className="text-sm text-muted-foreground mt-1 mb-3">
-        Kontrollera att dokumentet är skarpt och komplett.
+        {t("previewHint")}
       </p>
 
       <div className="flex items-center justify-center">
