@@ -241,6 +241,7 @@ const en: Dict = {
   metric_brightness: "Brightness",
   metric_complete: "Complete",
   useDocument: "Use document",
+  addPage: "Add page",
   verdict_ok: "The document looks good",
   verdict_dark: "Too dark",
   verdict_bright: "Too bright — exposure is blown out",
