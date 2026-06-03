@@ -13,14 +13,17 @@ import {
   type SendErrorCode,
   type SendScanEmailResult,
 } from "@/lib/email.functions";
+import { useT } from "@/lib/i18n";
 import { Check, Mail } from "lucide-react";
 
-const emailSchema = z
-  .string()
-  .trim()
-  .min(1, { message: "Ange en e-postadress" })
-  .max(255, { message: "E-postadressen är för lång" })
-  .email({ message: "Ogiltig e-postadress" });
+function makeEmailSchema(t: (k: string) => string) {
+  return z
+    .string()
+    .trim()
+    .min(1, { message: t("enterEmail") })
+    .max(255, { message: t("emailTooLong") })
+    .email({ message: t("invalidEmail") });
+}
 
 const optionalEmailSchema = z
   .string()
@@ -29,21 +32,6 @@ const optionalEmailSchema = z
   .email()
   .optional()
   .or(z.literal(""));
-
-const ERROR_MESSAGES: Record<SendErrorCode, string> = {
-  attachment_too_large:
-    "PDF:en är för stor för att skickas. Tryck \"Ladda ned PDF\" och skicka manuellt.",
-  invalid_recipient:
-    "Mottagaradressen avvisades. Kontrollera stavningen och försök igen.",
-  rate_limited:
-    "För många utskick på kort tid. Vänta en stund och försök igen.",
-  network_error:
-    "Nätverksfel – kontrollera anslutningen och försök igen.",
-  unauthorized:
-    "E-posttjänsten är inte korrekt konfigurerad. Kontakta administratör.",
-  unknown:
-    "Kunde inte skicka mailet. Försök igen, eller tryck \"Ladda ned PDF\" och skicka manuellt.",
-};
 
 export const Route = createFileRoute("/send")({
   head: () => ({ meta: [{ title: "Skicka" }] }),
