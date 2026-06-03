@@ -64,13 +64,13 @@ function PreviewPage() {
 
       <div className="flex items-center justify-center">
         <div
-          className="rounded-2xl overflow-hidden shadow-[var(--shadow-card)] border border-border bg-white"
+          className="rounded-2xl overflow-hidden shadow-[var(--shadow-card)] border border-border bg-muted/30 p-3"
           style={{ width: "min(78vw, 340px)", aspectRatio: "1 / 1.414" }}
         >
           <img
             src={image}
             alt={t("scannedAlt")}
-            className="w-full h-full object-contain bg-white"
+            className="w-full h-full object-contain bg-white shadow-sm"
           />
         </div>
       </div>
