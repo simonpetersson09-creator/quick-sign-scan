@@ -111,6 +111,11 @@ function PreviewPage() {
             </span>
           </PrimaryButton>
         </div>
+        <PrimaryButton variant="ghost" onClick={startOver}>
+          <span className="inline-flex items-center justify-center gap-2">
+            <RotateCcw className="h-5 w-5" /> {t("startOver")}
+          </span>
+        </PrimaryButton>
       </div>
     </AppShell>
   );
