@@ -489,40 +489,40 @@ function ScanPage() {
 }
 
 function PlatformInstructions() {
+  const t = useT();
   const ua = navigator.userAgent;
   const isIOS = /iPad|iPhone|iPod/.test(ua);
   const isAndroid = /Android/.test(ua);
 
-  if (isIOS) {
+  const renderStep = (key: string) => {
+    const raw = t(key);
+    const parts = raw.split(/(\{b\}.*?\{\/b\})/g);
     return (
-      <ol className="text-[13px] text-white/65 leading-relaxed list-decimal list-inside space-y-1">
-        <li>Öppna <strong className="text-white/85">Inställningar</strong> på din iPhone/iPad</li>
-        <li>Scrolla ner till <strong className="text-white/85">Safari</strong></li>
-        <li>Tryck på <strong className="text-white/85">Kamera</strong></li>
-        <li>Välj <strong className="text-white/85">Tillåt</strong></li>
-        <li>Gå tillbaka till appen och tryck <strong className="text-white/85">Försök igen</strong></li>
-      </ol>
+      <>
+        {parts.map((p, i) =>
+          p.startsWith("{b}") ? (
+            <strong key={i} className="text-white/85">
+              {p.slice(3, -4)}
+            </strong>
+          ) : (
+            <span key={i}>{p}</span>
+          ),
+        )}
+      </>
     );
-  }
+  };
 
-  if (isAndroid) {
-    return (
-      <ol className="text-[13px] text-white/65 leading-relaxed list-decimal list-inside space-y-1">
-        <li>Tryck på <strong className="text-white/85">🔒</strong> (låsikonen) i adressfältet</li>
-        <li>Tryck på <strong className="text-white/85">Behörigheter</strong></li>
-        <li>Välj <strong className="text-white/85">Kamera → Tillåt</strong></li>
-        <li>Gå tillbaka till appen och tryck <strong className="text-white/85">Försök igen</strong></li>
-      </ol>
-    );
-  }
+  const keys = isIOS
+    ? ["iosStep1", "iosStep2", "iosStep3", "iosStep4", "iosStep5"]
+    : isAndroid
+      ? ["andStep1", "andStep2", "andStep3", "andStep4"]
+      : ["genStep1", "genStep2", "genStep3", "genStep4", "genStep5"];
 
   return (
     <ol className="text-[13px] text-white/65 leading-relaxed list-decimal list-inside space-y-1">
-      <li>Öppna webbläsarens inställningar</li>
-      <li>Hitta <strong className="text-white/85">Sekretess och säkerhet</strong></li>
-      <li>Välj <strong className="text-white/85">Webbplatsbehörigheter</strong></li>
-      <li>Tillåt <strong className="text-white/85">Kamera</strong> för den här webbplatsen</li>
-      <li>Gå tillbaka till appen och tryck <strong className="text-white/85">Försök igen</strong></li>
+      {keys.map((k) => (
+        <li key={k}>{renderStep(k)}</li>
+      ))}
     </ol>
   );
 }
