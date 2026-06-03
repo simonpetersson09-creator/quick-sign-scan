@@ -23,7 +23,15 @@ type Status =
   | "capturing"
   | "error";
 
-type ErrorType = "permission_denied" | "not_found" | "unknown";
+type ErrorType = "permission_denied" | "not_found" | "iframe_blocked" | "insecure_context" | "unknown";
+
+function isInIframe() {
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+}
 
 export const Route = createFileRoute("/scan")({
   head: () => ({ meta: [{ title: "Skanna dokument" }] }),
@@ -68,26 +76,39 @@ function ScanPage() {
     setError(null);
     setErrorType(null);
 
+    // Secure context check — getUserMedia only works on HTTPS/localhost.
+    if (typeof window !== "undefined" && !window.isSecureContext) {
+      setErrorType("insecure_context");
+      setError(t("errUnknown"));
+      setStatus("error");
+      return;
+    }
+
+    // getUserMedia is not available at all (older browsers, restricted contexts).
+    if (!navigator.mediaDevices?.getUserMedia) {
+      // In an iframe without allow="camera" Chrome strips mediaDevices entirely.
+      setErrorType(isInIframe() ? "iframe_blocked" : "unknown");
+      setError(t("errUnknown"));
+      setStatus("error");
+      return;
+    }
+
     // Try to read the current permission state. On browsers where this is
     // unsupported or limited (notably Safari/iOS), we fall through and just
     // call getUserMedia — which either resolves immediately (granted) or
     // shows the native prompt (first time).
     let knownState: PermissionState | null = null;
     try {
-      // "camera" may not be in all TS lib versions
       const status = await navigator.permissions?.query?.({ name: "camera" as PermissionName });
       if (status?.state === "granted" || status?.state === "denied" || status?.state === "prompt") {
         knownState = status.state;
       }
     } catch {
-      // Permissions API not available or doesn't support "camera" — ignore
-      // and rely on getUserMedia. Never treat this as "denied".
+      // ignore
     }
 
     if (cancelledRef.current) return;
 
-    // If we *know* permission is denied, skip the getUserMedia call which
-    // would otherwise re-trigger nothing on iOS and silently fail.
     if (knownState === "denied") {
       setErrorType("permission_denied");
       setError(t("errPermissionDenied"));
@@ -144,23 +165,28 @@ function ScanPage() {
         setErrorType("not_found");
         setError(t("errNotFound"));
       } else if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-        // Could be a real denial OR a dismissed prompt on Safari/iOS.
-        // Re-check Permissions API: only show "denied" if we can confirm it.
-        // If state is still "prompt" (user dismissed), stay in a recoverable
-        // error state instead of falsely accusing them of blocking the camera.
-        let confirmed: PermissionState | null = null;
-        try {
-          const status = await navigator.permissions?.query?.({ name: "camera" as PermissionName });
-          if (status?.state) confirmed = status.state as PermissionState;
-        } catch {
-          // ignore
-        }
-        if (confirmed === "prompt") {
-          setErrorType("unknown");
+        // In a sandboxed iframe without allow="camera", Chrome rejects with
+        // NotAllowedError immediately and never shows a prompt. Detect that
+        // case so we can surface a useful "open in new tab" path instead of
+        // accusing the user of having denied permission they never saw.
+        if (isInIframe()) {
+          setErrorType("iframe_blocked");
           setError(t("errUnknown"));
         } else {
-          setErrorType("permission_denied");
-          setError(t("errPermissionDenied"));
+          let confirmed: PermissionState | null = null;
+          try {
+            const status = await navigator.permissions?.query?.({ name: "camera" as PermissionName });
+            if (status?.state) confirmed = status.state as PermissionState;
+          } catch {
+            // ignore
+          }
+          if (confirmed === "prompt") {
+            setErrorType("unknown");
+            setError(t("errUnknown"));
+          } else {
+            setErrorType("permission_denied");
+            setError(t("errPermissionDenied"));
+          }
         }
       } else {
         setErrorType("unknown");
@@ -518,12 +544,20 @@ function ScanPage() {
                   ? t("errPermissionTitle")
                   : errorType === "not_found"
                     ? t("errNotFoundTitle")
-                    : t("errUnknownTitle")}
+                    : errorType === "iframe_blocked"
+                      ? "Förhandsvisning blockerar kameran"
+                      : errorType === "insecure_context"
+                        ? "Osäker anslutning"
+                        : t("errUnknownTitle")}
               </h2>
               <p className="text-[15px] text-white/70 leading-relaxed">
                 {errorType === "permission_denied"
                   ? t("errPermissionDesc")
-                  : error}
+                  : errorType === "iframe_blocked"
+                    ? "Appen körs i Lovables förhandsvisning (en iframe) som inte tillåter kameraåtkomst. Öppna appen i en egen flik så kan webbläsaren be om kamerabehörighet."
+                    : errorType === "insecure_context"
+                      ? "Kameran kräver HTTPS. Öppna appen via en säker (https://) adress."
+                      : error}
               </p>
             </div>
 
@@ -535,7 +569,24 @@ function ScanPage() {
             )}
 
             <div className="flex flex-col w-full gap-3 mt-1">
+              {errorType === "iframe_blocked" && (
+                <button
+                  onClick={() => window.open(window.location.href, "_blank", "noopener,noreferrer")}
+                  className="w-full rounded-xl bg-white text-black py-3.5 px-4 font-semibold text-[15px] tracking-tight flex items-center justify-center gap-2 active:scale-[0.98] transition"
+                >
+                  Öppna i ny flik
+                </button>
+              )}
               {errorType === "permission_denied" && (
+                <button
+                  onClick={startCamera}
+                  className="w-full rounded-xl bg-white text-black py-3.5 px-4 font-semibold text-[15px] tracking-tight flex items-center justify-center gap-2 active:scale-[0.98] transition"
+                >
+                  <RefreshCw className="h-4 w-4" strokeWidth={2} />
+                  {t("retry")}
+                </button>
+              )}
+              {errorType !== "permission_denied" && errorType !== "iframe_blocked" && (
                 <button
                   onClick={startCamera}
                   className="w-full rounded-xl bg-white text-black py-3.5 px-4 font-semibold text-[15px] tracking-tight flex items-center justify-center gap-2 active:scale-[0.98] transition"
