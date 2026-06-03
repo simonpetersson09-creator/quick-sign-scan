@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
 import { ScanLine, PenLine, Mail, CheckCircle2, Settings as SettingsIcon, ArrowDown, Globe } from "lucide-react";
+import { useLang } from "@/lib/i18n";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -12,15 +12,16 @@ export const Route = createFileRoute("/")({
   component: Home,
 });
 
-const steps = [
-  { icon: ScanLine, label: "Skanna" },
-  { icon: PenLine, label: "Signera" },
-  { icon: Mail, label: "Skicka" },
-  { icon: CheckCircle2, label: "Färdig" },
-];
-
 function Home() {
-  const [lang, setLang] = useState<"sv" | "en">("sv");
+  const { lang, toggle, t } = useLang();
+
+  const steps = [
+    { icon: ScanLine, label: t("step_scan") },
+    { icon: PenLine, label: t("step_sign") },
+    { icon: Mail, label: t("step_send") },
+    { icon: CheckCircle2, label: t("step_done") },
+  ];
+
   return (
     <div className="min-h-screen flex flex-col bg-background pt-safe pb-safe px-5">
       {/* Center everything vertically */}
@@ -33,7 +34,7 @@ function Home() {
         {/* Flow */}
         <div className="flex flex-col items-center">
           <p className="text-[12px] text-muted-foreground uppercase tracking-widest mb-5">
-            Så här fungerar det
+            {t("howItWorks")}
           </p>
           <ol className="flex flex-col items-center gap-0.5">
             {steps.map((s, i) => {
@@ -66,7 +67,7 @@ function Home() {
 
       {/* Trust tagline */}
       <p className="text-center text-[11px] text-muted-foreground/60 tracking-wide pb-1">
-        Inga utskrifter. Ingen lagring. Bara signering.
+        {t("appTagline")}
       </p>
 
       {/* CTA */}
@@ -82,15 +83,15 @@ function Home() {
         <Link to="/scan" className="block group">
           <div className="rounded-xl bg-primary text-primary-foreground h-12 px-6 shadow-[var(--shadow-card)] transition active:scale-[0.98] flex items-center justify-center gap-2.5">
             <ScanLine className="h-[18px] w-[18px] shrink-0 opacity-90" strokeWidth={1.75} />
-            <span className="text-[15px] font-semibold tracking-tight whitespace-nowrap">Skanna dokument</span>
+            <span className="text-[15px] font-semibold tracking-tight whitespace-nowrap">{t("scanDocument")}</span>
           </div>
         </Link>
 
         {/* Språkväxlare */}
         <button
           type="button"
-          onClick={() => setLang((l) => (l === "sv" ? "en" : "sv"))}
-          aria-label="Byt språk"
+          onClick={toggle}
+          aria-label={t("changeLanguage")}
           className="flex flex-col items-center justify-center rounded-xl bg-card text-muted-foreground h-12 w-12 shadow-[var(--shadow-soft)] border border-border transition active:scale-[0.98]"
         >
           <Globe className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
