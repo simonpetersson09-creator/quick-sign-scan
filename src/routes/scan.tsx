@@ -72,6 +72,7 @@ function ScanPage() {
   const capturedRef = useRef(false);
 
   const [status, setStatus] = useState<Status>("starting");
+  const [progress, setProgress] = useState(0); // 0..1 — visual lock-in progress
   const [error, setError] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<ErrorType | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
@@ -299,6 +300,7 @@ function ScanPage() {
         smoothQuad.current = null;
         lastRawQuad.current = null;
         drawOverlay(null, false);
+        setProgress(0);
       }
       setStatus((s) => (s === "starting" ? s : missCount.current > 45 ? "uncertain" : "searching"));
       return;
@@ -326,6 +328,10 @@ function ScanPage() {
 
     if (delta < STABLE_DELTA) stableCount.current++;
     else stableCount.current = Math.max(0, stableCount.current - 1);
+
+    // Progress 0..1 — fills up as the document stays stable, hits 1.0 right before capture.
+    const pct = Math.max(0, Math.min(1, stableCount.current / STABLE_FRAMES));
+    setProgress(pct);
 
     // Wait for enough consecutive detections before showing anything as "found".
     if (detectCount.current < DETECT_FRAMES) {
@@ -590,19 +596,8 @@ function ScanPage() {
           className="absolute inset-0 w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-black/25 pointer-events-none" />
-        {statusActive && (
-          <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center px-8 pt-24 pb-36">
-            <div
-              className="relative w-[min(82vw,46vh)] max-w-[360px] aspect-[1/1.4142] rounded-[10px] border-2 border-success shadow-[0_0_0_1px_var(--scan-frame-outline),0_0_26px_var(--scan-frame-active-glow)] transition"
-              aria-hidden="true"
-            >
-              <span className="absolute left-[-2px] top-[-2px] h-10 w-10 border-l-4 border-t-4 border-success" />
-              <span className="absolute right-[-2px] top-[-2px] h-10 w-10 border-r-4 border-t-4 border-success" />
-              <span className="absolute bottom-[-2px] right-[-2px] h-10 w-10 border-b-4 border-r-4 border-success" />
-              <span className="absolute bottom-[-2px] left-[-2px] h-10 w-10 border-b-4 border-l-4 border-success" />
-            </div>
-          </div>
-        )}
+        {/* Detected document frame is rendered by the SVG polygon below.
+            No static guide frame — the frame only appears when 4 corners are detected. */}
         <svg
           ref={svgRef}
           className="absolute inset-0 z-20 w-full h-full pointer-events-none"
@@ -644,11 +639,14 @@ function ScanPage() {
           <X className="h-5 w-5" />
         </button>
         <div
-          className={`px-4 py-2 rounded-full text-[13px] font-medium backdrop-blur transition ${
+          className={`px-4 py-2 rounded-full text-[13px] font-medium backdrop-blur transition tabular-nums ${
             statusActive ? "bg-success/90 text-success-foreground" : "bg-black/55 text-white"
           }`}
         >
           {statusText[status]}
+          {progress > 0 && status !== "capturing" && (
+            <span className="ml-2 opacity-80">{Math.round(progress * 100)}%</span>
+          )}
         </div>
         <div className="w-10" />
       </div>
@@ -660,16 +658,46 @@ function ScanPage() {
         {error && status !== "error" && (
           <p className="text-center text-sm text-red-200 max-w-xs">{error}</p>
         )}
-        <button
-          onClick={manualCapture}
-          disabled={
-            !cameraReady || status === "starting" || status === "error" || status === "capturing"
-          }
-          className="h-16 w-16 rounded-full bg-white text-black flex items-center justify-center shadow-lg active:scale-95 disabled:opacity-40"
-          aria-label={t("manualCapture")}
-        >
-          <Camera className="h-7 w-7" />
-        </button>
+        <div className="relative h-20 w-20 flex items-center justify-center">
+          {/* Progress ring — fills as the document locks in, hits 100% then auto-captures */}
+          <svg
+            className="absolute inset-0 h-full w-full -rotate-90 pointer-events-none"
+            viewBox="0 0 80 80"
+            aria-hidden="true"
+          >
+            <circle
+              cx="40"
+              cy="40"
+              r="36"
+              fill="none"
+              stroke="rgba(255,255,255,0.18)"
+              strokeWidth="3"
+            />
+            <circle
+              cx="40"
+              cy="40"
+              r="36"
+              fill="none"
+              stroke="var(--success)"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeDasharray={2 * Math.PI * 36}
+              strokeDashoffset={2 * Math.PI * 36 * (1 - progress)}
+              style={{ transition: "stroke-dashoffset 120ms linear, opacity 200ms" }}
+              opacity={progress > 0 ? 1 : 0}
+            />
+          </svg>
+          <button
+            onClick={manualCapture}
+            disabled={
+              !cameraReady || status === "starting" || status === "error" || status === "capturing"
+            }
+            className="h-16 w-16 rounded-full bg-white text-black flex items-center justify-center shadow-lg active:scale-95 disabled:opacity-40"
+            aria-label={t("manualCapture")}
+          >
+            <Camera className="h-7 w-7" />
+          </button>
+        </div>
         <p className="text-xs text-white/75 text-center max-w-[260px]">{t("scanHint")}</p>
       </div>
 
