@@ -29,13 +29,27 @@ function PlacePage() {
     scanStore.set({ signaturePosition: { x: 0.5, y: 0.86 } });
   }, [navigate]);
 
-  function moveTo(e: React.PointerEvent<HTMLDivElement>) {
+  const dragging = useRef(false);
+
+  function updateFromEvent(e: React.PointerEvent<HTMLDivElement>) {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
     const x = Math.max(0.05, Math.min(0.95, (e.clientX - rect.left) / rect.width));
     const y = Math.max(0.05, Math.min(0.95, (e.clientY - rect.top) / rect.height));
     setSigPos({ x, y });
     scanStore.set({ signaturePosition: { x, y } });
+  }
+  function onDown(e: React.PointerEvent<HTMLDivElement>) {
+    dragging.current = true;
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    updateFromEvent(e);
+  }
+  function onMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!dragging.current) return;
+    updateFromEvent(e);
+  }
+  function onUp() {
+    dragging.current = false;
   }
 
   function goSign() {
