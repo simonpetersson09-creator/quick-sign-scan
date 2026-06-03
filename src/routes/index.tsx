@@ -62,6 +62,11 @@ function Home() {
         </div>
       </div>
 
+      {/* Trust tagline */}
+      <p className="text-center text-[13px] text-muted-foreground/70 tracking-tight pb-1">
+        Inga utskrifter. Ingen lagring. Bara signering.
+      </p>
+
       {/* CTA */}
       <div className="flex items-center justify-center gap-2 pt-2 pb-4">
         {/* Settings — vänster */}
