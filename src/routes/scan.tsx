@@ -83,7 +83,7 @@ function ScanPage() {
       setStatus("searching");
       loop();
     } catch (e) {
-      console.error(e);
+      console.error(`[scan] camera error: ${(e as Error)?.name ?? "unknown"}`);
       const err = e as Error;
       if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
         setErrorType("permission_denied");
