@@ -11,7 +11,7 @@ export const Route = createFileRoute("/place")({
   component: PlacePage,
 });
 
-const MIN_ZOOM = 1;
+const MIN_ZOOM = 0.6;
 const MAX_ZOOM = 4;
 const ZOOM_STEP = 0.5;
 
@@ -130,27 +130,28 @@ function PlacePage() {
           onPointerMove={onMove}
           onPointerUp={onUp}
           onPointerCancel={onUp}
-          className="relative rounded-2xl overflow-hidden shadow-[var(--shadow-card)] border border-border bg-white touch-none select-none"
+          className="relative rounded-2xl overflow-hidden shadow-[var(--shadow-card)] border border-border bg-muted/30 touch-none select-none"
           style={{ width: "min(82vw, 360px)", aspectRatio: "1 / 1.414" }}
         >
           <div
-            className="absolute inset-0"
+            className="absolute inset-0 p-3"
             style={{
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
               transformOrigin: "center center",
               transition: pointer.current.id === null ? "transform 120ms ease" : "none",
             }}
           >
-            <img
-              src={image}
-              alt={t("scannedAlt")}
-              className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-              draggable={false}
-            />
-            <div
-              className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-              style={{ left: `${sigPos.x * 100}%`, top: `${sigPos.y * 100}%` }}
-            >
+            <div className="relative w-full h-full">
+              <img
+                src={image}
+                alt={t("scannedAlt")}
+                className="absolute inset-0 w-full h-full object-contain pointer-events-none bg-white shadow-sm"
+                draggable={false}
+              />
+              <div
+                className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                style={{ left: `${sigPos.x * 100}%`, top: `${sigPos.y * 100}%` }}
+              >
               <div
                 className="rounded-md border-2 border-dashed border-primary/80 bg-primary/10 flex items-center justify-center"
                 style={{
@@ -168,8 +169,11 @@ function PlacePage() {
                 </span>
               </div>
             </div>
+            </div>
           </div>
         </div>
+
+
 
         <div className="inline-flex items-center gap-1 rounded-full border border-border bg-card p-1 shadow-[var(--shadow-soft)]">
           <ZoomButton
