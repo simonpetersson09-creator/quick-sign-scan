@@ -20,7 +20,7 @@ export function AppShell({ title, back, children, rightSlot }: Props) {
             <Link
               to={back}
               className="-ml-2 inline-flex items-center justify-center h-10 w-10 rounded-full text-foreground/70 hover:bg-secondary transition"
-              aria-label="Tillbaka"
+              aria-label={t("back")}
             >
               <ChevronLeft className="h-6 w-6" />
             </Link>
