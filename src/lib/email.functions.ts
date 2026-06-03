@@ -120,8 +120,7 @@ export const sendScanEmail = createServerFn({ method: "POST" })
         // Network-level failure (DNS, TCP reset, abort, TLS, etc.) — retryable.
         lastNetworkError = err;
         console.error(
-          `[sendScanEmail] attempt ${attempt}/${maxAttempts} network error:`,
-          err,
+          `[sendScanEmail] ${requestId} attempt ${attempt}/${maxAttempts} network error: ${err instanceof Error ? err.name : "unknown"}`,
         );
         if (attempt === maxAttempts) {
           return {
