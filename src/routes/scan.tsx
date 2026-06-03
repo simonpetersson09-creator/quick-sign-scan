@@ -942,7 +942,7 @@ function ScanPage() {
                 className="w-full rounded-xl bg-white/10 text-white py-3.5 px-4 font-medium text-[15px] tracking-tight flex items-center justify-center gap-2 active:scale-[0.98] transition"
               >
                 <ArrowLeft className="h-4 w-4" strokeWidth={2} />
-                {t("backHome")}
+                {pageCount > 0 ? t("back") : t("backHome")}
               </button>
             </div>
           </div>
