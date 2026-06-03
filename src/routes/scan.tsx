@@ -478,9 +478,12 @@ function ScanPage() {
 
       const dataUrl = warped.toDataURL("image/jpeg", 0.92);
       const sourceDataUrl = sourceCanvas.toDataURL("image/jpeg", 0.86);
+      const existing = scanStore.get().pages;
+      const nextPages = [...existing, dataUrl];
       scanStore.set({
         imageDataUrl: dataUrl,
         sourceDataUrl,
+        pages: nextPages,
         detection: {
           corners: normQuad,
           a4Ratio: meta.a4Ratio,
@@ -488,8 +491,7 @@ function ScanPage() {
           debug: meta.debug,
         },
       });
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-      navigate({ to: "/preview" });
+      finishPageCapture(dataUrl, nextPages.length);
     } catch (e) {
       console.error("[scan] capture warp failed, falling back to raw frame", e);
       // Reset the lock so captureRawFrame can take over.
