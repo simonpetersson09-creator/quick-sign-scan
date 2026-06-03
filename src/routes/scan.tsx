@@ -74,7 +74,7 @@ function ScanPage() {
     let knownState: PermissionState | null = null;
     try {
       // "camera" may not be in all TS lib versions
-      const status = await navigator.permissions?.query?.({ name: "camera" });
+      const status = await navigator.permissions?.query?.({ name: "camera" as PermissionName });
       if (status?.state === "granted" || status?.state === "denied" || status?.state === "prompt") {
         knownState = status.state;
       }
@@ -122,7 +122,7 @@ function ScanPage() {
         let confirmed: PermissionState | null = null;
         try {
           // "camera" may not be in all TS lib versions
-          const status = await navigator.permissions?.query?.({ name: "camera" });
+          const status = await navigator.permissions?.query?.({ name: "camera" as PermissionName });
           if (status?.state) confirmed = status.state as PermissionState;
         } catch {
           // ignore
