@@ -118,7 +118,7 @@ function ReviewPage() {
           <ZoomButton
             onClick={() => setZoom((z) => Math.min(MAX_ZOOM, +(z + ZOOM_STEP).toFixed(2)))}
             disabled={zoom >= MAX_ZOOM}
-            aria-label="Zooma in"
+            aria-label={t("zoomIn")}
           >
             <Plus className="h-4 w-4" />
           </ZoomButton>
@@ -142,13 +142,13 @@ function ReviewPage() {
             onChange={(e) => setApproved(e.target.checked)}
           />
           <span className="text-sm text-foreground/80 leading-snug">
-            Jag har granskat dokumentet och godkänner att det skickas.
+            {t("approveLabel")}
           </span>
         </label>
 
         <PrimaryButton onClick={proceed} disabled={!approved || !pdfUrl}>
           <span className="inline-flex items-center justify-center gap-2">
-            <Mail className="h-5 w-5" /> Fortsätt till e-post
+            <Mail className="h-5 w-5" /> {t("continueToEmail")}
           </span>
         </PrimaryButton>
 
@@ -159,7 +159,7 @@ function ReviewPage() {
             className="h-12 text-[15px]"
           >
             <span className="inline-flex items-center justify-center gap-2">
-              <PenLine className="h-4 w-4" /> Flytta signatur
+              <PenLine className="h-4 w-4" /> {t("moveSignature")}
             </span>
           </PrimaryButton>
           <PrimaryButton
@@ -171,7 +171,7 @@ function ReviewPage() {
             className="h-12 text-[15px]"
           >
             <span className="inline-flex items-center justify-center gap-2">
-              <Camera className="h-4 w-4" /> Ta om bild
+              <Camera className="h-4 w-4" /> {t("retake")}
             </span>
           </PrimaryButton>
         </div>
@@ -180,7 +180,7 @@ function ReviewPage() {
           onClick={() => navigate({ to: "/sign" })}
           className="inline-flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition py-1"
         >
-          <ArrowLeft className="h-3.5 w-3.5" /> Tillbaka till signering
+          <ArrowLeft className="h-3.5 w-3.5" /> {t("backToSign")}
         </button>
       </div>
     </AppShell>
