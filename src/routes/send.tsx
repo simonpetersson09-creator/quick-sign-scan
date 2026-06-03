@@ -149,9 +149,7 @@ function SendPage() {
         `[send] PDF size: ~${approxMb.toFixed(2)} MB (${approxBytes} bytes)`,
       );
       if (approxMb > 5) {
-        setInfo(
-          `Varning: PDF:en är ${approxMb.toFixed(1)} MB. Stora bilagor kan blockeras av mottagarens server – om utskicket misslyckas, använd "Ladda ned PDF" och skicka manuellt.`,
-        );
+        setInfo(t("largePdfWarning", { mb: approxMb.toFixed(1) }));
       }
 
       let result: SendScanEmailResult;
