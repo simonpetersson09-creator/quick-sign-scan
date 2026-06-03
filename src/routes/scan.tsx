@@ -658,16 +658,46 @@ function ScanPage() {
         {error && status !== "error" && (
           <p className="text-center text-sm text-red-200 max-w-xs">{error}</p>
         )}
-        <button
-          onClick={manualCapture}
-          disabled={
-            !cameraReady || status === "starting" || status === "error" || status === "capturing"
-          }
-          className="h-16 w-16 rounded-full bg-white text-black flex items-center justify-center shadow-lg active:scale-95 disabled:opacity-40"
-          aria-label={t("manualCapture")}
-        >
-          <Camera className="h-7 w-7" />
-        </button>
+        <div className="relative h-20 w-20 flex items-center justify-center">
+          {/* Progress ring — fills as the document locks in, hits 100% then auto-captures */}
+          <svg
+            className="absolute inset-0 h-full w-full -rotate-90 pointer-events-none"
+            viewBox="0 0 80 80"
+            aria-hidden="true"
+          >
+            <circle
+              cx="40"
+              cy="40"
+              r="36"
+              fill="none"
+              stroke="rgba(255,255,255,0.18)"
+              strokeWidth="3"
+            />
+            <circle
+              cx="40"
+              cy="40"
+              r="36"
+              fill="none"
+              stroke="var(--success)"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeDasharray={2 * Math.PI * 36}
+              strokeDashoffset={2 * Math.PI * 36 * (1 - progress)}
+              style={{ transition: "stroke-dashoffset 120ms linear, opacity 200ms" }}
+              opacity={progress > 0 ? 1 : 0}
+            />
+          </svg>
+          <button
+            onClick={manualCapture}
+            disabled={
+              !cameraReady || status === "starting" || status === "error" || status === "capturing"
+            }
+            className="h-16 w-16 rounded-full bg-white text-black flex items-center justify-center shadow-lg active:scale-95 disabled:opacity-40"
+            aria-label={t("manualCapture")}
+          >
+            <Camera className="h-7 w-7" />
+          </button>
+        </div>
         <p className="text-xs text-white/75 text-center max-w-[260px]">{t("scanHint")}</p>
       </div>
 
