@@ -512,6 +512,32 @@ function ScanPage() {
           ref={videoRef}
           playsInline
           muted
+          autoPlay
+          // iOS Safari ignores playsInline unless it's also a literal attribute,
+          // and disablePictureInPicture avoids the camera being yanked into PiP.
+          // @ts-expect-error — non-standard attributes accepted by Safari
+          // eslint-disable-next-line react/no-unknown-property
+          {...{ "webkit-playsinline": "true", "x-webkit-airplay": "deny" }}
+          disablePictureInPicture
+          onLoadedMetadata={(e) => {
+            const v = e.currentTarget;
+            if (v.videoWidth > 0 && v.videoHeight > 0) {
+              setCameraReady(true);
+              if (debugEnabled) {
+                setDebugInfo((d) => ({
+                  ...d,
+                  vw: v.videoWidth,
+                  vh: v.videoHeight,
+                  dpr: window.devicePixelRatio || 1,
+                  ready: true,
+                }));
+              }
+            }
+          }}
+          onCanPlay={(e) => {
+            const v = e.currentTarget;
+            if (v.videoWidth > 0 && v.videoHeight > 0) setCameraReady(true);
+          }}
           className="absolute inset-0 w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-black/25 pointer-events-none" />
