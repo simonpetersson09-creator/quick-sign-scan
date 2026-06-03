@@ -281,7 +281,7 @@ export interface DocumentDetection {
 }
 
 const A4_RATIO = Math.SQRT2;
-export const MIN_DOCUMENT_CONFIDENCE = 0.4;
+export const MIN_DOCUMENT_CONFIDENCE = 0.22;
 
 // Detect the document from its contour: isolate candidate paper, extract the
 // outer boundary, reduce the convex contour to four real corners, then reject
@@ -312,9 +312,9 @@ export function detectDocumentQuad(
   let candidateCount = 0;
 
   for (const component of components) {
-    if (component.pixels.length < total * 0.002) continue;
-    if (component.maxX - component.minX < width * 0.18) continue;
-    if (component.maxY - component.minY < height * 0.18) continue;
+    if (component.pixels.length < total * 0.0008) continue;
+    if (component.maxX - component.minX < width * 0.1) continue;
+    if (component.maxY - component.minY < height * 0.1) continue;
 
     const hull = convexHull(component.points);
     if (hull.length < 4) continue;
@@ -674,7 +674,7 @@ function evaluateEdgeQuad(args: {
 
   const area = Math.abs(polygonArea(ordered));
   const areaRatio = area / frameArea;
-  if (areaRatio < 0.1 || areaRatio > 0.9) return null;
+  if (areaRatio < 0.04 || areaRatio > 0.95) return null;
 
   const top = dist(ordered[0], ordered[1]);
   const right = dist(ordered[1], ordered[2]);
@@ -694,30 +694,34 @@ function evaluateEdgeQuad(args: {
   const bboxArea = Math.max(1, (maxX - minX + 1) * (maxY - minY + 1));
   const polygonFill = bboxArea / Math.max(1, area);
 
-  if (ratioError > 0.45) return null;
-  if (perspectiveError > 1.6) return null;
-  if (sideDeviation > 0.1) return null;
-  if (polygonFill < 0.7 || polygonFill > 1.55) return null;
+  // Relaxed gates — accept tilted A4 from a phone where ratio, perspective
+  // and side curvature are messier than the ideal scan-on-desk shot.
+  if (ratioError > 0.7) return null;
+  if (perspectiveError > 2.2) return null;
+  if (sideDeviation > 0.16) return null;
+  if (polygonFill < 0.55 || polygonFill > 1.8) return null;
 
   const stats = polygonImageStats(ordered, lum, width, height);
   const edgeScore = quadEdgeSupport(ordered, edges, width, height);
-  const a4Score = clamp01(1 - ratioError / 0.45);
-  const straightScore = clamp01(1 - sideDeviation / 0.1);
-  const perspectiveScore = clamp01(1 - perspectiveError / 1.6);
-  const brightnessScore = clamp01((stats.mean - 105) / 105);
+  const a4Score = clamp01(1 - ratioError / 0.7);
+  const straightScore = clamp01(1 - sideDeviation / 0.16);
+  const perspectiveScore = clamp01(1 - perspectiveError / 2.2);
+  const brightnessScore = clamp01((stats.mean - 80) / 130);
   const textScore = clamp01(stats.darkRatio / 0.055);
   const areaScore =
-    areaRatio <= 0.7 ? clamp01((areaRatio - 0.05) / 0.18) : clamp01((0.95 - areaRatio) / 0.2);
+    areaRatio <= 0.7 ? clamp01((areaRatio - 0.03) / 0.18) : clamp01((0.98 - areaRatio) / 0.2);
   const confidence =
-    0.3 * edgeScore +
-    0.18 * straightScore +
-    0.14 * a4Score +
-    0.16 * brightnessScore +
-    0.1 * textScore +
-    0.07 * perspectiveScore +
-    0.05 * areaScore;
+    0.32 * edgeScore +
+    0.16 * straightScore +
+    0.12 * a4Score +
+    0.14 * brightnessScore +
+    0.08 * textScore +
+    0.1 * perspectiveScore +
+    0.08 * areaScore;
 
-  if (edgeScore < 0.18 || brightnessScore < 0.1) return null;
+  // Very loose final gate — anything with even weak edge support and
+  // some brightness counts as a candidate; confidence ranks them.
+  if (edgeScore < 0.08) return null;
 
   return {
     corners: ordered,
