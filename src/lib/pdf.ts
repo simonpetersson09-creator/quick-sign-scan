@@ -7,21 +7,28 @@ function detectImageFormat(dataUrl: string): "PNG" | "JPEG" {
   return m[1].toLowerCase() === "png" ? "PNG" : "JPEG";
 }
 
-// Build an A4 PDF from an image dataURL, optionally with a signature overlay.
+// Build an A4 PDF from one or more image dataURLs, optionally with a
+// signature overlay rendered on the last page.
 export async function buildPdf(
-  imageDataUrl: string,
+  images: string | string[],
   signature?: { dataUrl: string; x: number; y: number } | null,
 ): Promise<string> {
+  const pages = Array.isArray(images) ? images.filter(Boolean) : [images];
+  if (pages.length === 0) {
+    throw new Error("buildPdf: at least one image is required");
+  }
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageW = 210;
   const pageH = 297;
 
-  // Add the document image, fit to full A4. Format must match the dataURL,
-  // otherwise jsPDF may emit warnings or produce a corrupt image.
-  const imgFormat = detectImageFormat(imageDataUrl);
-  pdf.addImage(imageDataUrl, imgFormat, 0, 0, pageW, pageH, undefined, "FAST");
+  pages.forEach((imageDataUrl, idx) => {
+    if (idx > 0) pdf.addPage("a4", "portrait");
+    const imgFormat = detectImageFormat(imageDataUrl);
+    pdf.addImage(imageDataUrl, imgFormat, 0, 0, pageW, pageH, undefined, "FAST");
+  });
 
   if (signature && signature.dataUrl) {
+    // Signature is placed on the last page.
     const sigW = 60; // mm
     const sigH = 25;
     const cx = signature.x * pageW;
