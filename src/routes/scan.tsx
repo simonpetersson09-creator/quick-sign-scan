@@ -96,7 +96,10 @@ function ScanPage() {
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      // Race getUserMedia against a 15s timeout — on iOS Safari the promise
+      // can hang indefinitely if the user dismisses the permission prompt
+      // without choosing. Without a timeout the UI is stuck on "starting".
+      const gumPromise = navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: { ideal: "environment" },
           width: { ideal: 1920 },
@@ -104,6 +107,12 @@ function ScanPage() {
         },
         audio: false,
       });
+      const stream = await Promise.race([
+        gumPromise,
+        new Promise<MediaStream>((_, reject) =>
+          setTimeout(() => reject(Object.assign(new Error("timeout"), { name: "TimeoutError" })), 15000),
+        ),
+      ]);
       // If the user navigated away while getUserMedia was pending, immediately
       // shut down the stream so the camera light never lingers.
       if (cancelledRef.current) {
