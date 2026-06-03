@@ -786,6 +786,50 @@ function ScanPage() {
         </div>
       )}
 
+      {/* Post-capture review overlay — shown after each page is captured.
+          User can scan another page (stream stays alive) or finish. */}
+      {justCaptured && status !== "error" && (
+        <div className="absolute inset-0 z-40 flex flex-col items-center justify-end bg-black/75 backdrop-blur-sm px-5 pb-safe pt-10">
+          <div className="w-full max-w-sm flex flex-col items-center gap-4">
+            <div className="text-center">
+              <p className="text-[13px] uppercase tracking-wide text-white/60 font-semibold">
+                {t("pageCaptured")}
+              </p>
+              <p className="text-2xl font-semibold tracking-tight mt-1">
+                {pageCount} {pageCount === 1 ? t("pageSingular") : t("pagePlural")}
+              </p>
+            </div>
+            <div
+              className="rounded-xl overflow-hidden border border-white/15 bg-white shadow-xl"
+              style={{ width: "min(60vw, 240px)", aspectRatio: "1 / 1.414" }}
+            >
+              <img
+                src={justCaptured}
+                alt={t("scannedAlt")}
+                className="w-full h-full object-contain bg-white"
+              />
+            </div>
+            <div className="w-full flex flex-col gap-3 pt-2 pb-4">
+              <button
+                onClick={scanAnotherPage}
+                className="w-full rounded-xl bg-white/15 border border-white/25 text-white py-3.5 px-4 font-medium text-[15px] tracking-tight flex items-center justify-center gap-2 active:scale-[0.98] transition"
+              >
+                <Camera className="h-5 w-5" />
+                {t("scanAnotherPage")}
+              </button>
+              <button
+                onClick={finishScanning}
+                className="w-full rounded-xl bg-white text-black py-3.5 px-4 font-semibold text-[15px] tracking-tight flex items-center justify-center gap-2 active:scale-[0.98] transition"
+              >
+                {t("finishScanning")} <ArrowRight className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+
       {/* Permission / error overlay */}
       {status === "error" && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm px-6">
