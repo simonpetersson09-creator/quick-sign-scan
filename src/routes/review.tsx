@@ -61,15 +61,15 @@ function ReviewPage() {
   }
 
   return (
-    <AppShell title="Granska PDF" back="/sign">
+    <AppShell title={t("reviewTitle")} back="/sign">
       {/* Status row */}
       <div className="mt-1 mb-3 flex flex-wrap items-center gap-2">
-        <StatusChip tone="success" label="Dokument klart" />
+        <StatusChip tone="success" label={t("documentReady")} />
         <StatusChip
           tone={signed ? "success" : "muted"}
-          label={signed ? "Signerad" : "Ej signerad"}
+          label={signed ? t("signed") : t("notSigned")}
         />
-        <StatusChip tone="muted" label={`${pages} ${pages === 1 ? "sida" : "sidor"}`} />
+        <StatusChip tone="muted" label={`${pages} ${pages === 1 ? t("pageSingular") : t("pagePlural")}`} />
         <StatusChip
           tone="muted"
           label={sizeBytes ? formatBytes(sizeBytes) : "…"}
