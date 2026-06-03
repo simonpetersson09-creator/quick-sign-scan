@@ -19,8 +19,7 @@ function SignPage() {
   const drawing = useRef(false);
   const last = useRef<{ x: number; y: number } | null>(null);
   const [hasInk, setHasInk] = useState(false);
-  const [useSaved, setUseSaved] = useState(false);
-  const settings = loadSettings();
+
 
   useEffect(() => {
     const canvas = canvasRef.current;
