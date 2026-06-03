@@ -69,6 +69,16 @@ function ScanPage() {
   const [status, setStatus] = useState<Status>("starting");
   const [error, setError] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<ErrorType | null>(null);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<{
+    vw: number;
+    vh: number;
+    dpr: number;
+    ready: boolean;
+    lastCapture: number | null;
+  }>({ vw: 0, vh: 0, dpr: 1, ready: false, lastCapture: null });
+  const debugEnabled =
+    typeof window !== "undefined" && /[?&]debug=1\b/.test(window.location.search);
   const cancelledRef = useRef(false);
 
   const startCamera = useCallback(async () => {
