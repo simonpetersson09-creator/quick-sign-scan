@@ -24,16 +24,32 @@ function SignPage() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    const ctx = canvas.getContext("2d")!;
-    ctx.scale(dpr, dpr);
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.strokeStyle = "#000000";
-    ctx.lineWidth = 2.5;
+    const setup = () => {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+      // Preserve existing strokes across resize/rotation
+      const prev = hasInk ? canvas.toDataURL() : null;
+      canvas.width = Math.round(rect.width * dpr);
+      canvas.height = Math.round(rect.height * dpr);
+      const ctx = canvas.getContext("2d")!;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dpr, dpr);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = "#000000";
+      ctx.lineWidth = 2.5;
+      if (prev) {
+        const img = new Image();
+        img.onload = () => ctx.drawImage(img, 0, 0, rect.width, rect.height);
+        img.src = prev;
+      }
+    };
+    setup();
+    const ro = new ResizeObserver(() => setup());
+    ro.observe(canvas);
+    return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function getPoint(e: React.PointerEvent) {

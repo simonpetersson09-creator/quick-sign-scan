@@ -61,6 +61,7 @@ function ScanPage() {
   const [status, setStatus] = useState<Status>("starting");
   const [error, setError] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<ErrorType | null>(null);
+  const cancelledRef = useRef(false);
 
   const startCamera = useCallback(async () => {
     setStatus("starting");
@@ -83,6 +84,8 @@ function ScanPage() {
       // and rely on getUserMedia. Never treat this as "denied".
     }
 
+    if (cancelledRef.current) return;
+
     // If we *know* permission is denied, skip the getUserMedia call which
     // would otherwise re-trigger nothing on iOS and silently fail.
     if (knownState === "denied") {
@@ -101,14 +104,31 @@ function ScanPage() {
         },
         audio: false,
       });
+      // If the user navigated away while getUserMedia was pending, immediately
+      // shut down the stream so the camera light never lingers.
+      if (cancelledRef.current) {
+        stream.getTracks().forEach((tr) => tr.stop());
+        return;
+      }
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+        try {
+          await videoRef.current.play();
+        } catch {
+          // iOS Safari can reject play() if the gesture context was lost.
+          // Surface as a recoverable error rather than crashing.
+        }
+      }
+      if (cancelledRef.current) {
+        stream.getTracks().forEach((tr) => tr.stop());
+        streamRef.current = null;
+        return;
       }
       setStatus("searching");
       loop();
     } catch (e) {
+      if (cancelledRef.current) return;
       console.error(`[scan] camera error: ${(e as Error)?.name ?? "unknown"}`);
       const err = e as Error;
       if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
@@ -121,14 +141,12 @@ function ScanPage() {
         // error state instead of falsely accusing them of blocking the camera.
         let confirmed: PermissionState | null = null;
         try {
-          // "camera" may not be in all TS lib versions
           const status = await navigator.permissions?.query?.({ name: "camera" as PermissionName });
           if (status?.state) confirmed = status.state as PermissionState;
         } catch {
           // ignore
         }
         if (confirmed === "prompt") {
-          // User dismissed the prompt — not a hard denial. Allow retry.
           setErrorType("unknown");
           setError(t("errUnknown"));
         } else {
@@ -144,12 +162,15 @@ function ScanPage() {
   }, [t]);
 
   useEffect(() => {
-    let cancelled = false;
+    cancelledRef.current = false;
     startCamera();
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
+      capturedRef.current = true; // stop RAF loop
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current?.getTracks().forEach((tr) => tr.stop());
+      streamRef.current = null;
+      if (videoRef.current) videoRef.current.srcObject = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
