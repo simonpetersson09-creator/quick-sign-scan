@@ -4,7 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
 import { useT } from "@/lib/i18n";
-import { RefreshCw, ArrowRight, Plus } from "lucide-react";
+import { RefreshCw, ArrowRight, Plus, RotateCcw } from "lucide-react";
 
 export const Route = createFileRoute("/preview")({
   head: () => ({ meta: [{ title: "Förhandsgranska" }] }),
@@ -39,6 +39,11 @@ function PreviewPage() {
       pdfDataUrl: null,
     });
     navigate({ to: "/scan" });
+  }
+
+  function startOver() {
+    scanStore.clear();
+    navigate({ to: "/" });
   }
 
   function addPage() {
@@ -106,6 +111,11 @@ function PreviewPage() {
             </span>
           </PrimaryButton>
         </div>
+        <PrimaryButton variant="ghost" onClick={startOver}>
+          <span className="inline-flex items-center justify-center gap-2">
+            <RotateCcw className="h-5 w-5" /> {t("startOver")}
+          </span>
+        </PrimaryButton>
       </div>
     </AppShell>
   );
