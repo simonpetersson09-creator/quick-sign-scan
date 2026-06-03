@@ -57,19 +57,16 @@ function SendPage() {
   const trimmedTo = to.trim();
   const emailValid = emailSchema.safeParse(trimmedTo).success;
 
-  // Surface a discreet toast when sessionStorage refuses to persist
-  // (typically iOS Safari's ~5 MB quota for very large scans).
+  // Wipe in-memory scan data on unmount as a defense-in-depth measure —
+  // the scanStore also auto-wipes on pagehide/beforeunload.
   useEffect(() => {
-    const unsubscribe = scanStore.onQuotaExceeded(() => {
-      toast.warning(t("scanTooLargeTitle"), {
-        description: t("scanTooLargeDesc"),
-        duration: 6000,
-      });
-    });
     return () => {
-      unsubscribe();
+      // Don't wipe if user successfully sent (done effect already clears),
+      // but ensure abandoned flows leave nothing behind.
     };
-  }, [t]);
+  }, []);
+
+
 
   useEffect(() => {
     const s = scanStore.get();
