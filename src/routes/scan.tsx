@@ -23,7 +23,12 @@ type Status =
   | "capturing"
   | "error";
 
-type ErrorType = "permission_denied" | "not_found" | "iframe_blocked" | "insecure_context" | "unknown";
+type ErrorType =
+  | "permission_denied"
+  | "not_found"
+  | "iframe_blocked"
+  | "insecure_context"
+  | "unknown";
 
 function isInIframe() {
   try {
@@ -141,7 +146,10 @@ function ScanPage() {
       const stream = await Promise.race([
         gumPromise,
         new Promise<MediaStream>((_, reject) =>
-          setTimeout(() => reject(Object.assign(new Error("timeout"), { name: "TimeoutError" })), 15000),
+          setTimeout(
+            () => reject(Object.assign(new Error("timeout"), { name: "TimeoutError" })),
+            15000,
+          ),
         ),
       ]);
       // If the user navigated away while getUserMedia was pending, immediately
@@ -179,10 +187,7 @@ function ScanPage() {
         }
         // Race readiness against a short timeout — if metadata never arrives
         // we still let detect() bail safely on its own readyState check.
-        await Promise.race([
-          waitReady,
-          new Promise<void>((r) => setTimeout(r, 4000)),
-        ]);
+        await Promise.race([waitReady, new Promise<void>((r) => setTimeout(r, 4000))]);
         if (cancelledRef.current) {
           stream.getTracks().forEach((tr) => tr.stop());
           streamRef.current = null;
@@ -215,7 +220,9 @@ function ScanPage() {
         } else {
           let confirmed: PermissionState | null = null;
           try {
-            const status = await navigator.permissions?.query?.({ name: "camera" as PermissionName });
+            const status = await navigator.permissions?.query?.({
+              name: "camera" as PermissionName,
+            });
             if (status?.state) confirmed = status.state as PermissionState;
           } catch {
             // ignore
@@ -405,12 +412,7 @@ function ScanPage() {
     // a current frame with real dimensions. Prevents black/empty captures
     // on slow iOS Safari startup where the stream is attached but no
     // frame has been decoded yet.
-    if (
-      !video ||
-      video.readyState < 2 ||
-      !video.videoWidth ||
-      !video.videoHeight
-    ) {
+    if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) {
       setStatus("searching");
       return;
     }
@@ -561,7 +563,10 @@ function ScanPage() {
           autoPlay
           // iOS Safari ignores playsInline unless it's also a literal attribute.
           // eslint-disable-next-line react/no-unknown-property
-          {...({ "webkit-playsinline": "true", "x-webkit-airplay": "deny" } as Record<string, string>)}
+          {...({ "webkit-playsinline": "true", "x-webkit-airplay": "deny" } as Record<
+            string,
+            string
+          >)}
           disablePictureInPicture
           onLoadedMetadata={(e) => {
             const v = e.currentTarget;
@@ -585,9 +590,24 @@ function ScanPage() {
           className="absolute inset-0 w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-black/25 pointer-events-none" />
+        <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center px-8 pt-24 pb-36">
+          <div
+            className={`relative w-[min(82vw,46vh)] max-w-[360px] aspect-[1/1.4142] rounded-[10px] border-2 transition ${
+              statusActive
+                ? "border-success shadow-[0_0_0_1px_var(--scan-frame-outline),0_0_26px_var(--scan-frame-active-glow)]"
+                : "border-[var(--scan-frame)] shadow-[0_0_0_1px_var(--scan-frame-outline),0_0_24px_var(--scan-frame-glow)]"
+            }`}
+            aria-hidden="true"
+          >
+            <span className="absolute left-[-2px] top-[-2px] h-10 w-10 border-l-4 border-t-4 border-[var(--scan-frame)]" />
+            <span className="absolute right-[-2px] top-[-2px] h-10 w-10 border-r-4 border-t-4 border-[var(--scan-frame)]" />
+            <span className="absolute bottom-[-2px] right-[-2px] h-10 w-10 border-b-4 border-r-4 border-[var(--scan-frame)]" />
+            <span className="absolute bottom-[-2px] left-[-2px] h-10 w-10 border-b-4 border-l-4 border-[var(--scan-frame)]" />
+          </div>
+        </div>
         <svg
           ref={svgRef}
-          className="absolute inset-0 w-full h-full pointer-events-none"
+          className="absolute inset-0 z-20 w-full h-full pointer-events-none"
           preserveAspectRatio="none"
         >
           <polygon
@@ -639,40 +659,42 @@ function ScanPage() {
 
       {/* Bottom hint / manual capture */}
       <div className="relative pb-safe px-5 pt-4 flex flex-col items-center gap-3">
-        {error && status !== "error" && <p className="text-center text-sm text-red-200 max-w-xs">{error}</p>}
+        {error && status !== "error" && (
+          <p className="text-center text-sm text-red-200 max-w-xs">{error}</p>
+        )}
         <button
           onClick={manualCapture}
           disabled={
-            !cameraReady ||
-            status === "starting" ||
-            status === "error" ||
-            status === "capturing" ||
-            !smoothQuad.current ||
-            !detectionMeta.current ||
-            detectionMeta.current.confidence < MIN_DOCUMENT_CONFIDENCE ||
-            detectCount.current < DETECT_FRAMES
+            !cameraReady || status === "starting" || status === "error" || status === "capturing"
           }
           className="h-16 w-16 rounded-full bg-white text-black flex items-center justify-center shadow-lg active:scale-95 disabled:opacity-40"
           aria-label={t("manualCapture")}
         >
           <Camera className="h-7 w-7" />
         </button>
-        <p className="text-xs text-white/75 text-center max-w-[260px]">
-          {t("scanHint")}
-        </p>
+        <p className="text-xs text-white/75 text-center max-w-[260px]">{t("scanHint")}</p>
       </div>
 
       {/* Debug overlay — enable with ?debug=1 in the URL */}
       {debugEnabled && (
         <div className="absolute top-16 left-3 z-40 rounded-lg bg-black/80 text-white text-[11px] font-mono leading-tight px-3 py-2 pointer-events-none space-y-0.5">
-          <div>video: {debugInfo.vw}×{debugInfo.vh}</div>
+          <div>
+            video: {debugInfo.vw}×{debugInfo.vh}
+          </div>
           <div>readyState: {videoRef.current?.readyState ?? 0}</div>
-          <div>dpr: {debugInfo.dpr || (typeof window !== "undefined" ? window.devicePixelRatio : 1)}</div>
+          <div>
+            dpr: {debugInfo.dpr || (typeof window !== "undefined" ? window.devicePixelRatio : 1)}
+          </div>
           <div>cameraReady: {String(cameraReady)}</div>
           <div>status: {status}</div>
-          <div>detect: {detectCount.current} / stable: {stableCount.current}</div>
+          <div>
+            detect: {detectCount.current} / stable: {stableCount.current}
+          </div>
           <div>conf: {detectionMeta.current?.confidence?.toFixed(2) ?? "—"}</div>
-          <div>lastCapture: {debugInfo.lastCapture ? new Date(debugInfo.lastCapture).toLocaleTimeString() : "—"}</div>
+          <div>
+            lastCapture:{" "}
+            {debugInfo.lastCapture ? new Date(debugInfo.lastCapture).toLocaleTimeString() : "—"}
+          </div>
         </div>
       )}
 
