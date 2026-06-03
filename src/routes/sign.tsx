@@ -115,7 +115,7 @@ function SignPage() {
         />
         {!hasInk && !useSaved && (
           <div className="absolute inset-0 flex items-end justify-center pb-3 pointer-events-none">
-            <span className="text-xs text-muted-foreground">Signera här</span>
+            <span className="text-xs text-muted-foreground">{t("signHere")}</span>
           </div>
         )}
         <div className="absolute left-4 right-4 bottom-3 border-b border-dashed border-muted-foreground/40 pointer-events-none" />
