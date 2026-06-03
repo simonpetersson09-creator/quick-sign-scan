@@ -82,15 +82,13 @@ export const sendScanEmail = createServerFn({ method: "POST" })
     }
 
     const approxBytes = Math.floor((data.pdfBase64.length * 3) / 4);
-    const approxMb = (approxBytes / (1024 * 1024)).toFixed(2);
-    console.log(
-      `[sendScanEmail] PDF size: ~${approxMb} MB (${approxBytes} bytes), to=${data.to}`,
-    );
-    if (approxBytes > 5 * 1024 * 1024) {
-      console.warn(
-        `[sendScanEmail] WARNING: PDF is large (~${approxMb} MB). Resend may reject attachments over ~10 MB.`,
-      );
-    }
+    const approxKb = Math.round(approxBytes / 1024);
+    const requestId = `req_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    // Privacy: never log recipient, subject, message, filename or any
+    // attachment bytes. Only technical status (request id + size bucket).
+    const sizeBucket =
+      approxKb < 512 ? "small" : approxKb < 2048 ? "medium" : approxKb < 8192 ? "large" : "xlarge";
+    console.log(`[sendScanEmail] ${requestId} attempt start size=${sizeBucket}`);
 
     const body = JSON.stringify({
       from: FROM,
@@ -122,8 +120,7 @@ export const sendScanEmail = createServerFn({ method: "POST" })
         // Network-level failure (DNS, TCP reset, abort, TLS, etc.) — retryable.
         lastNetworkError = err;
         console.error(
-          `[sendScanEmail] attempt ${attempt}/${maxAttempts} network error:`,
-          err,
+          `[sendScanEmail] ${requestId} attempt ${attempt}/${maxAttempts} network error: ${err instanceof Error ? err.name : "unknown"}`,
         );
         if (attempt === maxAttempts) {
           return {
@@ -146,8 +143,7 @@ export const sendScanEmail = createServerFn({ method: "POST" })
       lastBody = result;
       const retryable = response.status === 429 || response.status >= 500;
       console.error(
-        `[sendScanEmail] attempt ${attempt}/${maxAttempts} failed: ${response.status}`,
-        result,
+        `[sendScanEmail] ${requestId} attempt ${attempt}/${maxAttempts} failed status=${response.status}`,
       );
 
       if (!retryable || attempt === maxAttempts) break;

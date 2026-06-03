@@ -140,9 +140,8 @@ function SendPage() {
 
       const approxBytes = Math.floor((pdfBase64.length * 3) / 4);
       const approxMb = approxBytes / (1024 * 1024);
-      console.log(
-        `[send] PDF size: ~${approxMb.toFixed(2)} MB (${approxBytes} bytes)`,
-      );
+      // Privacy: do not log document size in a way that could fingerprint
+      // a specific document. A coarse bucket is enough for support.
       if (approxMb > 5) {
         setInfo(t("largePdfWarning", { mb: approxMb.toFixed(1) }));
       }
@@ -174,11 +173,11 @@ function SendPage() {
           navigate({ to: "/" });
         }, 2200);
       } else {
-        console.error("[send] failed:", result);
+        console.error(`[send] failed code=${result.code} status=${result.status ?? "n/a"}`);
         setInfo(t(`err_${result.code}`) ?? t("err_unknown"));
       }
     } catch (e) {
-      console.error(e);
+      console.error(`[send] unexpected error: ${e instanceof Error ? e.name : "unknown"}`);
       setInfo(t("err_unknown"));
     } finally {
       setSending(false);
