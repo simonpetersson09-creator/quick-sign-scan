@@ -165,23 +165,28 @@ function ScanPage() {
         setErrorType("not_found");
         setError(t("errNotFound"));
       } else if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-        // Could be a real denial OR a dismissed prompt on Safari/iOS.
-        // Re-check Permissions API: only show "denied" if we can confirm it.
-        // If state is still "prompt" (user dismissed), stay in a recoverable
-        // error state instead of falsely accusing them of blocking the camera.
-        let confirmed: PermissionState | null = null;
-        try {
-          const status = await navigator.permissions?.query?.({ name: "camera" as PermissionName });
-          if (status?.state) confirmed = status.state as PermissionState;
-        } catch {
-          // ignore
-        }
-        if (confirmed === "prompt") {
-          setErrorType("unknown");
+        // In a sandboxed iframe without allow="camera", Chrome rejects with
+        // NotAllowedError immediately and never shows a prompt. Detect that
+        // case so we can surface a useful "open in new tab" path instead of
+        // accusing the user of having denied permission they never saw.
+        if (isInIframe()) {
+          setErrorType("iframe_blocked");
           setError(t("errUnknown"));
         } else {
-          setErrorType("permission_denied");
-          setError(t("errPermissionDenied"));
+          let confirmed: PermissionState | null = null;
+          try {
+            const status = await navigator.permissions?.query?.({ name: "camera" as PermissionName });
+            if (status?.state) confirmed = status.state as PermissionState;
+          } catch {
+            // ignore
+          }
+          if (confirmed === "prompt") {
+            setErrorType("unknown");
+            setError(t("errUnknown"));
+          } else {
+            setErrorType("permission_denied");
+            setError(t("errPermissionDenied"));
+          }
         }
       } else {
         setErrorType("unknown");
