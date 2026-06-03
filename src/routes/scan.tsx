@@ -452,31 +452,46 @@ function ScanPage() {
     // Yield to UI so the "capturing" state renders
     await new Promise((r) => requestAnimationFrame(() => r(null)));
 
-    const warped = warpQuadToRect(video, vw, vh, srcQuad, outW, outH);
+    // Wrap warp + enhance in try/catch. If anything throws (degenerate quad,
+    // OOM, canvas error) we MUST still hand the user a usable scan and
+    // navigate them onward — otherwise capturedRef is locked, the stream
+    // is dead, and the only escape is the back button → tillbaka till start.
+    try {
+      const warped = warpQuadToRect(video, vw, vh, srcQuad, outW, outH);
 
-    // Paper enhancement: normalize lighting and stretch whites so the
-    // document looks like a clean scanned A4 (white paper, dark ink).
-    enhancePaper(warped);
+      // Paper enhancement: normalize lighting and stretch whites so the
+      // document looks like a clean scanned A4 (white paper, dark ink).
+      try {
+        enhancePaper(warped);
+      } catch (e) {
+        console.error("[scan] enhancePaper failed, using raw warp", e);
+      }
 
-    const sourceCanvas = document.createElement("canvas");
-    sourceCanvas.width = vw;
-    sourceCanvas.height = vh;
-    sourceCanvas.getContext("2d")!.drawImage(video, 0, 0, vw, vh);
+      const sourceCanvas = document.createElement("canvas");
+      sourceCanvas.width = vw;
+      sourceCanvas.height = vh;
+      sourceCanvas.getContext("2d")!.drawImage(video, 0, 0, vw, vh);
 
-    const dataUrl = warped.toDataURL("image/jpeg", 0.92);
-    const sourceDataUrl = sourceCanvas.toDataURL("image/jpeg", 0.86);
-    scanStore.set({
-      imageDataUrl: dataUrl,
-      sourceDataUrl,
-      detection: {
-        corners: normQuad,
-        a4Ratio: meta.a4Ratio,
-        confidence: meta.confidence,
-        debug: meta.debug,
-      },
-    });
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    navigate({ to: "/preview" });
+      const dataUrl = warped.toDataURL("image/jpeg", 0.92);
+      const sourceDataUrl = sourceCanvas.toDataURL("image/jpeg", 0.86);
+      scanStore.set({
+        imageDataUrl: dataUrl,
+        sourceDataUrl,
+        detection: {
+          corners: normQuad,
+          a4Ratio: meta.a4Ratio,
+          confidence: meta.confidence,
+          debug: meta.debug,
+        },
+      });
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      navigate({ to: "/preview" });
+    } catch (e) {
+      console.error("[scan] capture warp failed, falling back to raw frame", e);
+      // Reset the lock so captureRawFrame can take over.
+      capturedRef.current = false;
+      captureRawFrame();
+    }
   }
 
   function manualCapture() {
