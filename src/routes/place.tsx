@@ -169,8 +169,11 @@ function PlacePage() {
                 </span>
               </div>
             </div>
+            </div>
           </div>
         </div>
+
+
 
         <div className="inline-flex items-center gap-1 rounded-full border border-border bg-card p-1 shadow-[var(--shadow-soft)]">
           <ZoomButton
