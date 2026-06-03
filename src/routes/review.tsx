@@ -101,9 +101,9 @@ function ReviewPage() {
               transition: "width 150ms ease",
             }}
           >
-            {pdfUrl ? (
+            {pdfBlobUrl ? (
               <iframe
-                src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0&view=Fit&zoom=page-fit`}
+                src={`${pdfBlobUrl}#toolbar=0&navpanes=0&scrollbar=0&view=Fit&zoom=page-fit`}
                 title={t("pdfPreview")}
                 className="w-full h-full block"
               />
