@@ -82,9 +82,9 @@ function SignPage() {
   }
 
   return (
-    <AppShell title="Signera" back="/place">
+    <AppShell title={t("signTitle")} back="/place">
       <p className="text-sm text-muted-foreground mt-1">
-        Skriv din signatur med fingret i rutan nedan.
+        {t("signHint")}
       </p>
 
       {settings.savedSignature && (
