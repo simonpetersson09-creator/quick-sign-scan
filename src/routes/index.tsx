@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ScanLine, PenLine, Mail, CheckCircle2, Settings as SettingsIcon, ArrowDown } from "lucide-react";
+import { useState } from "react";
+import { ScanLine, PenLine, Mail, CheckCircle2, Settings as SettingsIcon, ArrowDown, Globe } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -19,6 +20,7 @@ const steps = [
 ];
 
 function Home() {
+  const [lang, setLang] = useState<"sv" | "en">("sv");
   return (
     <div className="min-h-screen flex flex-col bg-background pt-safe pb-safe px-5">
       {/* Center everything vertically */}
@@ -84,33 +86,18 @@ function Home() {
           </div>
         </Link>
 
-        {/* Flaggorna — lodrätt glaspill, total höjd = 48 px */}
-        <div className="flex flex-col items-center justify-center gap-1.5 p-1 h-12 rounded-full bg-white/20 backdrop-blur-md border border-white/40 shadow-[var(--shadow-soft)]">
-          <button
-            type="button"
-            aria-label="Svenska"
-            className="w-[26px] h-[26px] rounded-full overflow-hidden border-2 border-white ring-2 ring-white/40 shadow-sm transition active:scale-90"
-          >
-            <svg viewBox="0 0 16 10" preserveAspectRatio="xMidYMid slice" className="w-full h-full scale-150">
-              <rect width="16" height="10" fill="#006AA7" />
-              <rect x="5" width="2" height="10" fill="#FECC00" />
-              <rect y="4" width="16" height="2" fill="#FECC00" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            aria-label="English"
-            className="w-[26px] h-[26px] rounded-full overflow-hidden border-2 border-transparent opacity-60 transition hover:opacity-100 hover:border-white/30 active:scale-90"
-          >
-            <svg viewBox="0 0 50 30" preserveAspectRatio="xMidYMid slice" className="w-full h-full scale-150">
-              <rect width="50" height="30" fill="#012169" />
-              <path d="M0,0 L50,30 M50,0 L0,30" stroke="#FFF" strokeWidth="6" />
-              <path d="M0,0 L50,30 M50,0 L0,30" stroke="#C8102E" strokeWidth="4" />
-              <path d="M25,0 V30 M0,15 H50" stroke="#FFF" strokeWidth="10" />
-              <path d="M25,0 V30 M0,15 H50" stroke="#C8102E" strokeWidth="6" />
-            </svg>
-          </button>
-        </div>
+        {/* Språkväxlare */}
+        <button
+          type="button"
+          onClick={() => setLang((l) => (l === "sv" ? "en" : "sv"))}
+          aria-label="Byt språk"
+          className="flex flex-col items-center justify-center rounded-xl bg-card text-muted-foreground h-12 w-12 shadow-[var(--shadow-soft)] border border-border transition active:scale-[0.98]"
+        >
+          <Globe className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
+          <span className="text-[9px] font-semibold tracking-wide mt-0.5">
+            {lang === "sv" ? "SV | en" : "sv | EN"}
+          </span>
+        </button>
       </div>
     </div>
   );
