@@ -76,26 +76,39 @@ function ScanPage() {
     setError(null);
     setErrorType(null);
 
+    // Secure context check — getUserMedia only works on HTTPS/localhost.
+    if (typeof window !== "undefined" && !window.isSecureContext) {
+      setErrorType("insecure_context");
+      setError(t("errUnknown"));
+      setStatus("error");
+      return;
+    }
+
+    // getUserMedia is not available at all (older browsers, restricted contexts).
+    if (!navigator.mediaDevices?.getUserMedia) {
+      // In an iframe without allow="camera" Chrome strips mediaDevices entirely.
+      setErrorType(isInIframe() ? "iframe_blocked" : "unknown");
+      setError(t("errUnknown"));
+      setStatus("error");
+      return;
+    }
+
     // Try to read the current permission state. On browsers where this is
     // unsupported or limited (notably Safari/iOS), we fall through and just
     // call getUserMedia — which either resolves immediately (granted) or
     // shows the native prompt (first time).
     let knownState: PermissionState | null = null;
     try {
-      // "camera" may not be in all TS lib versions
       const status = await navigator.permissions?.query?.({ name: "camera" as PermissionName });
       if (status?.state === "granted" || status?.state === "denied" || status?.state === "prompt") {
         knownState = status.state;
       }
     } catch {
-      // Permissions API not available or doesn't support "camera" — ignore
-      // and rely on getUserMedia. Never treat this as "denied".
+      // ignore
     }
 
     if (cancelledRef.current) return;
 
-    // If we *know* permission is denied, skip the getUserMedia call which
-    // would otherwise re-trigger nothing on iOS and silently fail.
     if (knownState === "denied") {
       setErrorType("permission_denied");
       setError(t("errPermissionDenied"));
