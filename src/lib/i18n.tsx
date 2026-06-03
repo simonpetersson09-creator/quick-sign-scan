@@ -299,8 +299,6 @@ const en: Dict = {
 
   // settings
   settingsTitle: "Settings",
-  yourEmailLabel: "Your email address (Reply-To)",
-  yourEmailHint: "Used as the reply address, so the recipient can reply to you directly.",
   defaultRecipientLabel: "Default recipient",
   defaultSubjectLabel: "Default subject",
   defaultMessageLabel: "Default message",
