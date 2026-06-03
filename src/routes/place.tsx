@@ -50,9 +50,9 @@ function PlacePage() {
   if (!image) return null;
 
   return (
-    <AppShell title="Placera signatur" back="/preview">
+    <AppShell title={t("placeTitle")} back="/preview">
       <p className="text-sm text-muted-foreground mt-1 mb-3">
-        Tryck där signaturen ska placeras på dokumentet.
+        {t("placeHint")}
       </p>
       <div className="flex-1 flex items-center justify-center">
         <div
