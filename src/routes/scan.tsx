@@ -678,8 +678,14 @@ function ScanPage() {
       setStatus("ready");
     } else {
       drawOverlay(smoothed, "ready");
+      const isShaky =
+        motionAvailableRef.current && motionMagRef.current > MOTION_STILL_THRESHOLD;
       if (performance.now() < armedAtRef.current) {
         // Re-aim cooldown after a saved page — show "ready" but don't snap yet.
+        setStatus("ready");
+        stableCount.current = Math.min(stableCount.current, STABLE_FRAMES - 1);
+      } else if (isShaky) {
+        // Phone is moving — keep "ready" but don't auto-capture this frame.
         setStatus("ready");
         stableCount.current = Math.min(stableCount.current, STABLE_FRAMES - 1);
       } else {
