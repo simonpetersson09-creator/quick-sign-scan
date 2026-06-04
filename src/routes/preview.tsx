@@ -4,7 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
 import { useT } from "@/lib/i18n";
-import { ArrowRight, Plus, RotateCcw, Trash2, ChevronUp, ChevronDown, ScanLine } from "lucide-react";
+import { ArrowRight, Plus, RotateCcw, Trash2, ScanLine, ChevronLeft, ChevronRight } from "lucide-react";
 
 export const Route = createFileRoute("/preview")({
   head: () => ({ meta: [{ title: "Förhandsgranska" }] }),
