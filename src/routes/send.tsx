@@ -25,13 +25,6 @@ function makeEmailSchema(t: (k: string) => string) {
     .email({ message: t("invalidEmail") });
 }
 
-const optionalEmailSchema = z
-  .string()
-  .trim()
-  .max(255)
-  .email()
-  .optional()
-  .or(z.literal(""));
 
 export const Route = createFileRoute("/send")({
   head: () => ({ meta: [{ title: "Skicka" }] }),
