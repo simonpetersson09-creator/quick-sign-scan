@@ -320,21 +320,20 @@ export function autoOrientAndDeskewDocument(
 ): HTMLCanvasElement {
   const sample = scaleCanvas(canvas, 420);
   const rotations = [0, 90, 180, 270] as const;
-  // Default: trust the source orientation. The perspective warp already aligns
-  // the document with the natural up-direction of how the user framed it, so
-  // 0° is the right answer unless we have strong evidence otherwise.
-  let bestRotation: (typeof rotations)[number] = 0;
-  let foundText = false;
+  // IMPORTANT: The perspective warp at capture-time already orients the
+  // document the way the user framed it (the output aspect is chosen from
+  // the detected quad geometry, so portrait stays portrait and landscape
+  // stays landscape). Any 0°/90°/180°/270° rotation here was historically
+  // driven by an unreliable text-direction heuristic that frequently
+  // flipped pages upside-down. We disable it: do NOT auto-rotate by
+  // 90/180/270 anymore. Only the fine deskew (< a few degrees) is kept
+  // below, which is what produces "perfectly straight" A4 output.
+  const bestRotation: (typeof rotations)[number] = 0;
   const orientationCandidates: DocumentAlignmentDiagnostics["orientationCandidates"] = [];
-  const scoresByRotation = new Map<number, number>();
-
+  // Run analysis purely for diagnostics — never act on it for rotation.
   for (const rotation of rotations) {
     const rotatedSample = rotateCanvas(sample, rotation);
     const analysis = estimateTextSkew(rotatedSample, 7, 0.5);
-    const portraitBias = rotatedSample.height >= rotatedSample.width ? 1.06 : 0.9;
-    const score = analysis.hasText
-      ? analysis.score * analysis.uprightScore * portraitBias
-      : portraitBias;
     orientationCandidates.push({
       rotation,
       width: rotatedSample.width,
@@ -343,30 +342,11 @@ export function autoOrientAndDeskewDocument(
       textScore: analysis.score,
       uprightScore: analysis.uprightScore,
       hasText: analysis.hasText,
-      score,
+      score: analysis.hasText ? analysis.score * analysis.uprightScore : 0,
     });
-    scoresByRotation.set(rotation, score);
-    if (analysis.hasText) foundText = true;
   }
+  const foundText = orientationCandidates.some((c) => c.hasText);
 
-  // Only deviate from 0° if SOME rotation produced real text evidence AND its
-  // score is meaningfully higher than 0°'s score. This prevents accidental
-  // 180° flips when text detection is unreliable.
-  if (foundText) {
-    const baseScore = scoresByRotation.get(0) ?? 0;
-    const margin = 1.18; // require ~18% better than 0° to override
-    let challengerScore = baseScore;
-    for (const rotation of rotations) {
-      if (rotation === 0) continue;
-      const s = scoresByRotation.get(rotation) ?? 0;
-      const cand = orientationCandidates.find((c) => c.rotation === rotation);
-      if (!cand?.hasText) continue;
-      if (s > challengerScore && s > baseScore * margin) {
-        challengerScore = s;
-        bestRotation = rotation;
-      }
-    }
-  }
 
   let oriented = rotateCanvas(canvas, bestRotation);
   const skew = estimateTextSkew(oriented, 7, 0.25);
@@ -779,7 +759,8 @@ export interface DocumentDetection {
 }
 
 const A4_RATIO = Math.SQRT2;
-export const MIN_DOCUMENT_CONFIDENCE = 0.16;
+export const MIN_DOCUMENT_CONFIDENCE = 0.1;
+
 
 // Detect the document from its contour: isolate candidate paper, extract the
 // outer boundary, reduce the convex contour to four real corners, then reject
