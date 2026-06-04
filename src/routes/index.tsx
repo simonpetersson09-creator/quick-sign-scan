@@ -3,6 +3,7 @@ import { useRef } from "react";
 import { ScanLine, PenLine, Mail, CheckCircle2, Settings as SettingsIcon, ArrowDown, Globe, FileUp } from "lucide-react";
 import { useLang } from "@/lib/i18n";
 import { scanStore } from "@/lib/scanStore";
+import { pdfFileToImages } from "@/lib/pdfToImages";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -81,20 +82,29 @@ function Home() {
           type="file"
           accept="image/*,.pdf"
           className="hidden"
-          onChange={(e) => {
+          onChange={async (e) => {
             const file = e.target.files?.[0];
             if (!file) return;
-            const reader = new FileReader();
-            reader.onload = () => {
-              const dataUrl = reader.result as string;
-              scanStore.clear();
-              scanStore.set({
-                pages: [dataUrl],
-                imageDataUrl: dataUrl,
-              });
-              navigate({ to: "/preview" });
-            };
-            reader.readAsDataURL(file);
+            try {
+              if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) {
+                const pages = await pdfFileToImages(file);
+                if (pages.length === 0) return;
+                scanStore.clear();
+                scanStore.set({ pages, imageDataUrl: pages[0] });
+                navigate({ to: "/preview" });
+                return;
+              }
+              const reader = new FileReader();
+              reader.onload = () => {
+                const dataUrl = reader.result as string;
+                scanStore.clear();
+                scanStore.set({ pages: [dataUrl], imageDataUrl: dataUrl });
+                navigate({ to: "/preview" });
+              };
+              reader.readAsDataURL(file);
+            } finally {
+              e.target.value = "";
+            }
           }}
         />
         <button
