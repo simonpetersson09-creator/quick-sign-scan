@@ -159,7 +159,7 @@ function PreviewPage() {
               <Plus className="h-4 w-4" /> {t("addPage")}
             </span>
           </PrimaryButton>
-          <PrimaryButton variant="ghost" onClick={startOver} className="h-12 text-[15px]">
+          <PrimaryButton variant="secondary" onClick={startOver} className="h-12 text-[15px]">
             <span className="inline-flex items-center justify-center gap-2">
               <RotateCcw className="h-4 w-4" /> {t("startOver")}
             </span>
