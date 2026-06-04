@@ -201,6 +201,7 @@ const en: Dict = {
   step_send: "Send",
   step_done: "Done",
   scanDocument: "Scan document",
+  attachFile: "Attach file",
   changeLanguage: "Change language",
 
   // scan
