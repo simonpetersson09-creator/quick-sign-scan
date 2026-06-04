@@ -871,6 +871,12 @@ function ScanPage() {
               >
                 {t("finishScanning")} <ArrowRight className="h-5 w-5" />
               </button>
+              <button
+                onClick={startOverScan}
+                className="w-full rounded-xl bg-transparent border border-white/15 text-white/70 py-3 px-4 font-medium text-[14px] tracking-tight active:scale-[0.98] transition"
+              >
+                {t("startOver")}
+              </button>
             </div>
           </div>
         </div>
