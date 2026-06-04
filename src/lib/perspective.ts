@@ -1230,19 +1230,32 @@ export const MIN_EDGE_TIGHTNESS_FOR_CAPTURE = 0.55;
 // Detect the document from its contour: isolate candidate paper, extract the
 // outer boundary, reduce the convex contour to four real corners, then reject
 // shapes with curved sides, non-A4 proportions, or extreme perspective.
+export interface DetectOptions {
+  /** Previous detection corners (in source pixel coords) — used to
+   *  temporally bias scoring so the frame doesn't jump between objects. */
+  prefer?: [Point, Point, Point, Point];
+}
+
 export function detectDocumentQuad(
   data: Uint8ClampedArray,
   width: number,
   height: number,
+  options: DetectOptions = {},
 ): DocumentDetection | null {
   const total = width * height;
-  const lum = new Uint8ClampedArray(total);
-  const hist = new Uint32Array(256);
+  const rawLum = new Uint8ClampedArray(total);
+  const rawHist = new Uint32Array(256);
   for (let i = 0, j = 0; i < data.length; i += 4, j++) {
     const l = (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) | 0;
-    lum[j] = l;
-    hist[l]++;
+    rawLum[j] = l;
+    rawHist[l]++;
   }
+
+  // Adaptive contrast normalization — percentile stretch so dim scenes
+  // gain enough local contrast for Canny + brightness masking. Critical
+  // for detecting white A4 on a dark wooden desk under weak room light.
+  // We compute the 2nd/98th percentiles and linearly remap to [0..255].
+  const { lum, hist } = stretchContrast(rawLum, rawHist, total);
 
   const blurred = gaussianBlur(lum, width, height);
   const { edges, highThreshold } = cannyEdges(blurred, width, height);
@@ -1252,7 +1265,10 @@ export function detectDocumentQuad(
   const gradMag = sobelMagnitude(blurred, width, height);
   const connectedEdges = closeEdgeGaps(edges, width, height);
   const components = edgeComponents(connectedEdges, width, height);
-  const brightThreshold = Math.max(95, Math.min(225, otsuThreshold(hist, total) + 12));
+  // Lowered floor (95 → 70) so darker grayish-white paper still segments
+  // from a dark background. Otsu still picks the actual threshold when
+  // contrast is healthy; the floor only matters in low light.
+  const brightThreshold = Math.max(70, Math.min(225, otsuThreshold(hist, total) + 8));
   const paperMask = buildBrightPaperMask(lum, width, height, brightThreshold);
   components.push(...edgeComponents(maskBoundary(paperMask, width, height), width, height));
   const allDetections: DocumentDetection[] = [];
@@ -1313,6 +1329,16 @@ export function detectDocumentQuad(
   const frameCx = width / 2;
   const frameCy = height / 2;
   const diag = Math.hypot(width, height);
+  // Optional previous-frame centroid for temporal stabilization — boosts
+  // candidates whose centroid is close to where the doc was last frame,
+  // so the polygon doesn't hop between competing objects.
+  let prevCx: number | null = null;
+  let prevCy: number | null = null;
+  if (options.prefer) {
+    const q = options.prefer;
+    prevCx = (q[0].x + q[1].x + q[2].x + q[3].x) / 4;
+    prevCy = (q[0].y + q[1].y + q[2].y + q[3].y) / 4;
+  }
   let best: DocumentDetection | null = null;
   let bestScore = 0;
   for (const det of outerDetections) {
@@ -1322,15 +1348,22 @@ export function detectDocumentQuad(
     const cx = (det.corners[0].x + det.corners[1].x + det.corners[2].x + det.corners[3].x) / 4;
     const cy = (det.corners[0].y + det.corners[1].y + det.corners[2].y + det.corners[3].y) / 4;
     const centerScore = clamp01(1 - (Math.hypot(cx - frameCx, cy - frameCy) / diag) * 2);
+    // Temporal bias — 0 when no previous quad, otherwise 1.0 when centroid
+    // overlaps the previous one and falls off over ~30% of the frame diag.
+    const tempScore =
+      prevCx !== null && prevCy !== null
+        ? clamp01(1 - (Math.hypot(cx - prevCx, cy - prevCy) / diag) / 0.3)
+        : 0;
     // Outer-prioritized confidence: area dominates, then A4 match, then
-    // edge support, then centeredness. Original confidence is folded in
-    // at a small weight so we still reward clean edges over noise.
+    // edge support, then centeredness, with a small temporal-stability
+    // bias to keep the frame locked on the same object across frames.
     const outerConfidence =
-      0.45 * areaScore +
+      0.4 * areaScore +
       0.2 * a4Score +
-      0.15 * det.debug.edgeScore +
+      0.13 * det.debug.edgeScore +
       0.1 * centerScore +
-      0.1 * det.confidence;
+      0.1 * det.confidence +
+      0.07 * tempScore;
     // Keep the original `confidence` field on the returned object so the
     // MIN_DOCUMENT_CONFIDENCE gate and downstream logging stay meaningful,
     // but pick the winner by outerConfidence.
@@ -1399,6 +1432,50 @@ function pointInQuad(p: Point, quad: [Point, Point, Point, Point]): boolean {
   return inside;
 }
 
+
+// Percentile-based contrast stretch. Finds the 2nd and 98th percentiles of
+// the luminance histogram and linearly remaps that range to [0..255]. This
+// is the cheapest form of adaptive normalization and dramatically improves
+// edge/mask detection on dimly lit scenes where the whole histogram is
+// squeezed into the middle of the range (white paper at ~140 instead of
+// ~230). If contrast is already healthy we skip the remap so well-lit
+// frames behave exactly as before.
+function stretchContrast(
+  lum: Uint8ClampedArray,
+  hist: Uint32Array,
+  total: number,
+): { lum: Uint8ClampedArray; hist: Uint32Array } {
+  const lowCut = Math.floor(total * 0.02);
+  const highCut = Math.floor(total * 0.02);
+  let acc = 0;
+  let lo = 0;
+  for (let i = 0; i < 256; i++) {
+    acc += hist[i];
+    if (acc > lowCut) { lo = i; break; }
+  }
+  acc = 0;
+  let hi = 255;
+  for (let i = 255; i >= 0; i--) {
+    acc += hist[i];
+    if (acc > highCut) { hi = i; break; }
+  }
+  const span = hi - lo;
+  // Skip remap when contrast is already good — avoids touching well-lit frames.
+  if (span >= 170) return { lum, hist };
+  if (span < 20) return { lum, hist }; // degenerate / nearly flat image — leave untouched
+  const out = new Uint8ClampedArray(lum.length);
+  const outHist = new Uint32Array(256);
+  const scale = 255 / span;
+  for (let i = 0; i < lum.length; i++) {
+    let v = (lum[i] - lo) * scale;
+    if (v < 0) v = 0;
+    else if (v > 255) v = 255;
+    const vi = v | 0;
+    out[i] = vi;
+    outHist[vi]++;
+  }
+  return { lum: out, hist: outHist };
+}
 
 function gaussianBlur(lum: Uint8ClampedArray, width: number, height: number): Uint8ClampedArray {
   const out = new Uint8ClampedArray(lum.length);
