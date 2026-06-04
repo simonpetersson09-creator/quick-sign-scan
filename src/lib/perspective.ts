@@ -419,7 +419,9 @@ export function measureQuadGeometry(quad: [Point, Point, Point, Point]): QuadGeo
 }
 
 function renderToA4Portrait(source: HTMLCanvasElement): HTMLCanvasElement {
-  const outW = 1000;
+  // 300 DPI A4 portrait (210 × 297 mm). Matches the capture resolution so
+  // the final page stays sharp end-to-end with no extra downscale.
+  const outW = 2480;
   const outH = Math.round(outW * Math.SQRT2);
   const out = document.createElement("canvas");
   out.width = outW;
@@ -435,6 +437,7 @@ function renderToA4Portrait(source: HTMLCanvasElement): HTMLCanvasElement {
   ctx.drawImage(source, (outW - drawW) / 2, (outH - drawH) / 2, drawW, drawH);
   return out;
 }
+
 
 function rotateCanvas(source: HTMLCanvasElement, degrees: number): HTMLCanvasElement {
   const normalized = ((degrees % 360) + 360) % 360;
