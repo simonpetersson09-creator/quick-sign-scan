@@ -3,8 +3,10 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { scanStore } from "@/lib/scanStore";
 import {
   autoOrientAndDeskewDocument,
+  canvasLaplacianVariance,
   cleanPaperEdges,
   detectDocumentQuad,
+  laplacianVariance,
   MIN_DOCUMENT_CONFIDENCE,
   measureQuadGeometry,
   orderQuad,
@@ -24,6 +26,8 @@ type Status =
   | "uncertain"
   | "align"
   | "hold"
+  | "focusing"
+  | "moveBack"
   | "ready"
   | "capturing"
   | "error";
@@ -55,6 +59,12 @@ const DETECT_FRAMES = 2; // show the detected frame quickly once all 4 corners e
 const HOLD_FRAMES = 15; // ~0.5s — "Håll stilla" phase
 const READY_FRAMES = 35; // ~1.2s — "Dokument hittat" lock-in
 const STABLE_FRAMES = 60; // ~2.0s total before auto-capture
+// Sharpness gates — Laplacian variance computed on a 200px detect frame
+// (in-camera) and the warped doc (post-capture). Tuned conservatively so a
+// blurry doc never gets saved.
+const SHARPNESS_LIVE_MIN = 35;
+const SHARPNESS_CAPTURE_MIN = 80;
+const BLUR_HINT_FRAMES = 75; // ~2.5s of blur before suggesting "move back"
 
 type StartCameraOptions = {
   restartStream?: boolean;
@@ -80,6 +90,9 @@ function ScanPage() {
   const detectCount = useRef(0);
   const missCount = useRef(0);
   const capturedRef = useRef(false);
+  const sharpnessRef = useRef(0);
+  const blurFramesRef = useRef(0);
+  const captureRetryRef = useRef(0);
 
   const [status, setStatus] = useState<Status>("starting");
   const [progress, setProgress] = useState(0); // 0..1 — visual lock-in progress
@@ -111,6 +124,9 @@ function ScanPage() {
         if (videoRef.current) videoRef.current.srcObject = null;
       }
       capturedRef.current = false;
+      sharpnessRef.current = 0;
+      blurFramesRef.current = 0;
+      captureRetryRef.current = 0;
       stableCount.current = 0;
       detectCount.current = 0;
       missCount.current = 0;
@@ -177,8 +193,10 @@ function ScanPage() {
         const gumPromise = navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: "environment" },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
+            width: { ideal: 3840 },
+            height: { ideal: 2160 },
+            // @ts-expect-error — non-standard but honored on iOS/Android
+            focusMode: "continuous",
           },
           audio: false,
         });
@@ -198,6 +216,29 @@ function ScanPage() {
           return;
         }
         streamRef.current = stream;
+        // Try to lock the rear camera into continuous autofocus and request
+        // the highest resolution the device will give us. These constraints
+        // are non-standard but honored by mobile Safari/Chrome — failing here
+        // is fine, we fall back to the default focus behavior.
+        try {
+          const track = stream.getVideoTracks()[0];
+          const caps = (track.getCapabilities?.() ?? {}) as Record<string, unknown>;
+          const advanced: MediaTrackConstraintSet[] = [];
+          if (Array.isArray(caps.focusMode) && (caps.focusMode as string[]).includes("continuous")) {
+            advanced.push({ focusMode: "continuous" } as MediaTrackConstraintSet);
+          }
+          if (Array.isArray(caps.exposureMode) && (caps.exposureMode as string[]).includes("continuous")) {
+            advanced.push({ exposureMode: "continuous" } as MediaTrackConstraintSet);
+          }
+          if (Array.isArray(caps.whiteBalanceMode) && (caps.whiteBalanceMode as string[]).includes("continuous")) {
+            advanced.push({ whiteBalanceMode: "continuous" } as MediaTrackConstraintSet);
+          }
+          if (advanced.length) {
+            await track.applyConstraints({ advanced }).catch(() => {});
+          }
+        } catch {
+          // ignore — camera will still work with defaults
+        }
         const videoEl = videoRef.current;
         if (videoEl) {
           videoEl.srcObject = stream;
@@ -369,6 +410,26 @@ function ScanPage() {
     if (delta < STABLE_DELTA) stableCount.current++;
     else stableCount.current = Math.max(0, stableCount.current - 1);
 
+    // Measure sharpness within the detected quad. If the doc is too blurry
+    // we must not auto-capture — wait for continuous autofocus to settle.
+    let xs = smoothed.map((p) => p.x * dw);
+    let ys = smoothed.map((p) => p.y * dh);
+    const sharpness = laplacianVariance(data, dw, dh, {
+      x0: Math.min(...xs),
+      y0: Math.min(...ys),
+      x1: Math.max(...xs),
+      y1: Math.max(...ys),
+    });
+    sharpnessRef.current = sharpness;
+    const isSharp = sharpness >= SHARPNESS_LIVE_MIN;
+    if (!isSharp) {
+      blurFramesRef.current++;
+      // Hold back stability progress while the camera is still refocusing.
+      stableCount.current = Math.min(stableCount.current, READY_FRAMES - 1);
+    } else {
+      blurFramesRef.current = 0;
+    }
+
     // Progress 0..1 — fills up as the document stays stable, hits 1.0 right before capture.
     const pct = Math.max(0, Math.min(1, stableCount.current / STABLE_FRAMES));
     setProgress(pct);
@@ -385,6 +446,11 @@ function ScanPage() {
     if (stableCount.current < HOLD_FRAMES) {
       drawOverlay(smoothed, true);
       setStatus("align");
+    } else if (!isSharp) {
+      drawOverlay(smoothed, true);
+      // After ~2.5s of unsharp frames, prompt the user to back off — usually
+      // the document is closer than the minimum focus distance.
+      setStatus(blurFramesRef.current > BLUR_HINT_FRAMES ? "moveBack" : "focusing");
     } else if (stableCount.current < READY_FRAMES) {
       drawOverlay(smoothed, true);
       setStatus("hold");
@@ -521,6 +587,27 @@ function ScanPage() {
       } catch (e) {
         console.error("[scan] enhance/orient failed, using raw warp", e);
       }
+
+      // Post-capture sharpness gate. If the warped doc is blurry we abandon
+      // this capture and let auto-focus retry — better to wait a second
+      // longer than to save an unreadable PDF page. Bail after a few retries
+      // so the user is never stuck.
+      const postSharpness = canvasLaplacianVariance(warped);
+      logScanStage("post-capture-sharpness", {
+        value: postSharpness,
+        threshold: SHARPNESS_CAPTURE_MIN,
+        retries: captureRetryRef.current,
+      });
+      if (postSharpness < SHARPNESS_CAPTURE_MIN && captureRetryRef.current < 3) {
+        captureRetryRef.current++;
+        capturedRef.current = false;
+        stableCount.current = 0;
+        blurFramesRef.current = BLUR_HINT_FRAMES + 1;
+        setProgress(0);
+        setStatus("focusing");
+        return;
+      }
+      captureRetryRef.current = 0;
 
       const sourceCanvas = document.createElement("canvas");
       sourceCanvas.width = vw;
@@ -670,6 +757,8 @@ function ScanPage() {
     uncertain: t("statusUncertain"),
     align: t("statusAlign"),
     hold: t("statusHold"),
+    focusing: t("statusFocusing"),
+    moveBack: t("statusMoveBack"),
     ready: t("statusReady"),
     capturing: t("statusCapturing"),
     error: t("statusError"),

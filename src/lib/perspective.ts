@@ -1645,3 +1645,62 @@ export function maxCornerDelta(
   }
   return m;
 }
+
+/**
+ * Laplacian-variance sharpness measure. Higher = sharper. A blurry frame on
+ * a normalized 200–400px grayscale region typically scores <30, a clean
+ * scan of text scores >100. Computed on RGBA `data` using a 4-neighbour
+ * Laplacian kernel; restrict to `bbox` to ignore background pixels.
+ */
+export function laplacianVariance(
+  data: Uint8ClampedArray,
+  w: number,
+  h: number,
+  bbox?: { x0: number; y0: number; x1: number; y1: number },
+): number {
+  const x0 = Math.max(1, Math.floor(bbox?.x0 ?? 1));
+  const y0 = Math.max(1, Math.floor(bbox?.y0 ?? 1));
+  const x1 = Math.min(w - 1, Math.ceil(bbox?.x1 ?? w - 1));
+  const y1 = Math.min(h - 1, Math.ceil(bbox?.y1 ?? h - 1));
+  if (x1 <= x0 + 2 || y1 <= y0 + 2) return 0;
+  const stride = w * 4;
+  let sum = 0;
+  let sumSq = 0;
+  let n = 0;
+  for (let y = y0; y < y1; y++) {
+    for (let x = x0; x < x1; x++) {
+      const i = y * stride + x * 4;
+      const c = (data[i] + data[i + 1] + data[i + 2]) * (1 / 3);
+      const u = (data[i - stride] + data[i - stride + 1] + data[i - stride + 2]) * (1 / 3);
+      const d = (data[i + stride] + data[i + stride + 1] + data[i + stride + 2]) * (1 / 3);
+      const l = (data[i - 4] + data[i - 3] + data[i - 2]) * (1 / 3);
+      const r = (data[i + 4] + data[i + 5] + data[i + 6]) * (1 / 3);
+      const lap = u + d + l + r - 4 * c;
+      sum += lap;
+      sumSq += lap * lap;
+      n++;
+    }
+  }
+  if (!n) return 0;
+  const mean = sum / n;
+  return Math.max(0, sumSq / n - mean * mean);
+}
+
+/**
+ * Downscale a canvas and compute Laplacian variance on its central 80%.
+ * Used after warp to verify the saved document is actually sharp.
+ */
+export function canvasLaplacianVariance(canvas: HTMLCanvasElement): number {
+  const targetW = 400;
+  const w = Math.min(targetW, canvas.width);
+  const h = Math.max(1, Math.round((canvas.height / canvas.width) * w));
+  const tmp = document.createElement("canvas");
+  tmp.width = w;
+  tmp.height = h;
+  const ctx = tmp.getContext("2d", { willReadFrequently: true })!;
+  ctx.drawImage(canvas, 0, 0, w, h);
+  const id = ctx.getImageData(0, 0, w, h);
+  const mx = Math.round(w * 0.1);
+  const my = Math.round(h * 0.1);
+  return laplacianVariance(id.data, w, h, { x0: mx, y0: my, x1: w - mx, y1: h - my });
+}
