@@ -141,7 +141,7 @@ function SendPage() {
             message: message || "",
             filename,
             pdfBase64,
-            ...(replyToValue ? { replyTo: replyToValue } : {}),
+            
           },
         })) as SendScanEmailResult;
       } catch (e) {
