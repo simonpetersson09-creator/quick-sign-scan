@@ -160,7 +160,7 @@ function ScanPage() {
       detectionMeta.current = null;
       setProgress(0);
       setCameraReady(false);
-      drawOverlay(null, false);
+      drawOverlay(null, "search");
       setStatus("starting");
       setError(null);
       setErrorType(null);
@@ -838,7 +838,7 @@ function ScanPage() {
     lockBreakFramesRef.current = 0;
     lowLightFramesRef.current = 0;
     setProgress(0);
-    drawOverlay(null, false);
+    drawOverlay(null, "search");
 
     // Short cool-down so the user perceives the capture, then resume the
     // detection loop on the same live stream.
