@@ -59,18 +59,17 @@ export const Route = createFileRoute("/scan")({
 // STABLE_DELTA är medvetet tillåtande: små handrörelser (några pixlar i 280px
 // detekteringsramen) ska inte bryta stabiliteten — skärpe- och ljusgrindarna
 // nedan ser till att kvaliteten ändå hålls hög.
-const STABLE_DELTA = 0.03; // normalized 0..1 — tål små handvibrationer
-const DETECT_FRAMES = 2; // show the detected frame quickly once all 4 corners exist
-const HOLD_FRAMES = 9; // ~0.3s — "Håll stilla" phase
-const READY_FRAMES = 20; // ~0.7s — "Dokument hittat" lock-in
-const STABLE_FRAMES = 34; // ~1.1s total before auto-capture
-// Adaptive smoothing — gentle pre-lock, very stable post-lock.
-// Once the quad is "locked", the overlay barely moves frame-to-frame (acts
-// like a KLT tracker visually) and outliers are rejected outright.
-const ALPHA_PRE_LOCK = 0.32;
-const ALPHA_POST_LOCK = 0.12;
-const OUTLIER_DELTA = 0.11; // raw frames further than this from smoothed are rejected
-const LOCK_BREAK_DELTA = 0.17; // sustained delta this large breaks the lock and re-detects
+const STABLE_DELTA = 0.035; // normalized 0..1 — tål små handvibrationer
+const DETECT_FRAMES = 4; // mjukare intro innan ramen visas
+const HOLD_FRAMES = 16; // ~0.55s — "Håll stilla" phase
+const READY_FRAMES = 34; // ~1.15s — "Dokument hittat" lock-in
+const STABLE_FRAMES = 56; // ~1.9s total before auto-capture
+// Adaptive smoothing — mjukare och mindre ryckig rörelse på ramen.
+// Lägre alpha = långsammare följning = lugnare upplevelse.
+const ALPHA_PRE_LOCK = 0.18;
+const ALPHA_POST_LOCK = 0.07;
+const OUTLIER_DELTA = 0.13; // raw frames further than this from smoothed are rejected
+const LOCK_BREAK_DELTA = 0.2; // sustained delta this large breaks the lock and re-detects
 // Sharpness gates — Laplacian variance computed on a 280px detect frame
 // (in-camera) and the warped doc (post-capture). Tuned conservatively så
 // en suddig sida aldrig sparas, oavsett hur snabbt användaren rör mobilen.
