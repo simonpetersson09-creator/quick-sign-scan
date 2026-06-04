@@ -2,8 +2,11 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { scanStore } from "@/lib/scanStore";
 import {
+  autoOrientAndDeskewDocument,
+  cleanPaperEdges,
   detectDocumentQuad,
   MIN_DOCUMENT_CONFIDENCE,
+  orderQuad,
   Point,
   emaQuad,
   enhancePaper,
