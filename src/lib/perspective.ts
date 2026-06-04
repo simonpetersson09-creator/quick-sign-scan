@@ -320,7 +320,7 @@ export function autoOrientAndDeskewDocument(
 ): HTMLCanvasElement {
   const sample = scaleCanvas(canvas, 420);
   const rotations = [0, 90, 180, 270] as const;
-  let bestRotation = canvas.height >= canvas.width ? 0 : 90;
+  let bestRotation: (typeof rotations)[number] = canvas.height >= canvas.width ? 0 : 90;
   let bestScore = -Infinity;
   let foundText = false;
   const orientationCandidates: DocumentAlignmentDiagnostics["orientationCandidates"] = [];
