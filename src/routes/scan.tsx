@@ -227,6 +227,45 @@ function ScanPage() {
     }
   }, [status]);
 
+  // Meter exposure toward the detected document. Throttled to METER_INTERVAL_MS
+  // so we don't thrash the camera ISP. Uses pointsOfInterest when available;
+  // also nudges exposureCompensation based on the measured paper luminance
+  // (target ~165) so backlit pages get brightened and over-lit pages dimmed.
+  function meterTowardsDoc(nx: number, ny: number, docLum: number) {
+    if (lockedRef.current || exposureLockedRef.current) return;
+    const now = performance.now();
+    if (now - lastMeterAtRef.current < METER_INTERVAL_MS) return;
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    const caps = trackCapsRef.current as {
+      pointsOfInterest?: unknown;
+      exposureCompensation?: { min?: number; max?: number; step?: number };
+    };
+    const advanced: MediaTrackConstraintSet[] = [];
+    if (caps.pointsOfInterest !== undefined) {
+      advanced.push({
+        pointsOfInterest: [{ x: nx, y: ny }],
+      } as unknown as MediaTrackConstraintSet);
+    }
+    const ec = caps.exposureCompensation;
+    if (ec && typeof ec.min === "number" && typeof ec.max === "number") {
+      const step = Math.max(0.1, ec.step ?? 0.33);
+      const diff = METER_TARGET_LUM - docLum;
+      const magnitude = Math.min(Math.abs(diff) / 40, 1);
+      const delta = Math.sign(diff) * magnitude * step * 2;
+      const next = Math.max(ec.min, Math.min(ec.max, ecAppliedRef.current + delta));
+      if (Math.abs(next - ecAppliedRef.current) >= step * 0.5) {
+        ecAppliedRef.current = next;
+        advanced.push({ exposureCompensation: next } as unknown as MediaTrackConstraintSet);
+      }
+    }
+    if (!advanced.length) return;
+    lastMeterAtRef.current = now;
+    track.applyConstraints({ advanced }).catch(() => {});
+  }
+
+
+
 
   const startCamera = useCallback(
     async (options: StartCameraOptions = {}) => {
