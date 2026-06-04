@@ -627,9 +627,11 @@ function ScanPage() {
   }
 
   function startOverScan() {
-    streamRef.current?.getTracks().forEach((tr) => tr.stop());
     scanStore.clear();
-    navigate({ to: "/" });
+    setJustCaptured(null);
+    setPageCount(0);
+    setStatus("searching");
+    startCamera({ restartStream: true });
   }
 
   function cancelScan() {
