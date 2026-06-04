@@ -204,6 +204,7 @@ const en: Dict = {
   statusHold: "Hold still…",
   statusFocusing: "Focusing…",
   statusMoveBack: "Move the phone slightly further from the document.",
+  statusLowLight: "Too little light — move to a brighter spot.",
   statusReady: "Document found",
   statusCapturing: "Scanning and straightening…",
   statusError: "Error",
