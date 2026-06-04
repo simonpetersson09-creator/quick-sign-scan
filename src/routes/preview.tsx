@@ -223,7 +223,7 @@ function PreviewPage() {
             <img
               src={displayUrl ?? originalImage}
               alt={t("scannedAlt")}
-              className="w-full h-full object-contain bg-white shadow-sm"
+              className="w-full h-full object-contain bg-white"
             />
             {filtering && (
               <div className="absolute inset-3 flex items-center justify-center bg-white/60 backdrop-blur-sm rounded-xl">

@@ -32,8 +32,9 @@ export async function buildPdf(
       imageFormat: imgFormat,
       dataUrlBytes: imageDataUrl.length,
     });
-    // SLOW = best quality compression in jsPDF (uses higher-quality DCT).
-    pdf.addImage(imageDataUrl, imgFormat, 0, 0, pageW, pageH, undefined, "SLOW");
+    // PNG keeps exact edge pixels; JPEG pages use SLOW as best-quality DCT.
+    const compression = imgFormat === "JPEG" ? "SLOW" : undefined;
+    pdf.addImage(imageDataUrl, imgFormat, 0, 0, pageW, pageH, undefined, compression);
 
   });
 
