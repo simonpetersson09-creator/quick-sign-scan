@@ -31,6 +31,7 @@ const sv: Dict = {
   statusHold: "Håll stilla…",
   statusFocusing: "Fokuserar…",
   statusMoveBack: "Flytta telefonen något längre från dokumentet.",
+  statusLowLight: "För lite ljus — flytta till en ljusare plats.",
   statusReady: "Dokument hittat",
   statusCapturing: "Skannar och rätar upp…",
   statusError: "Fel",
