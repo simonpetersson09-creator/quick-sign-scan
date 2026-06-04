@@ -1594,6 +1594,28 @@ function cross(a: Point, b: Point, c: Point): number {
   return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 }
 
+function segmentAngle(a: Point, b: Point): number {
+  return normalizeToHalfTurn((Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI);
+}
+
+function normalizeToHalfTurn(angle: number): number {
+  let a = ((angle + 90) % 180) - 90;
+  if (a < -90) a += 180;
+  return a;
+}
+
+function averageAngles(angles: number[]): number {
+  if (!angles.length) return 0;
+  let sx = 0;
+  let sy = 0;
+  for (const angle of angles) {
+    const doubled = (angle * 2 * Math.PI) / 180;
+    sx += Math.cos(doubled);
+    sy += Math.sin(doubled);
+  }
+  return normalizeToHalfTurn((Math.atan2(sy, sx) * 90) / Math.PI);
+}
+
 function dist(a: Point, b: Point): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
