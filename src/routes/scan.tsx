@@ -873,21 +873,14 @@ function ScanPage() {
     finishPageCapture(dataUrl, nextPages.length);
   }
 
-  // After a successful capture: brief visual flash + thumbnail update, then
-  // automatically resume detection so the user can scan the next page without
-  // leaving the camera. The camera stream stays alive the entire time.
+  // After a successful capture: show the cropped A4 page full-screen with a
+  // small "Sparar sida…" spinner, then softly fade it out and resume the
+  // camera for the next page. No black flash, no preview detour.
   function finishPageCapture(dataUrl: string, count: number) {
     setPageCount(count);
     setLastThumbnail(dataUrl);
-    // Visual confirmation flash
-    setFlashOn(true);
-    if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current);
-    flashTimerRef.current = window.setTimeout(() => setFlashOn(false), 200);
 
     // Reset detection state so auto-capture starts fresh for the next page.
-    // We deliberately keep `smoothQuad.current` for one frame as a soft hint
-    // — but clear it for a clean slate so page 2 doesn't lock onto a stale
-    // quad from page 1's final frame.
     stableCount.current = 0;
     detectCount.current = 0;
     missCount.current = 0;
@@ -903,22 +896,33 @@ function ScanPage() {
     setProgress(0);
     drawOverlay(null, "search");
 
-    // Smart transition: show a brief "Sida sparad ✓" confirmation so the
-    // user knows page N landed before the camera goes back to hunting. This
-    // turns the previously abrupt jump into a clear beat.
     setStatus("saved");
 
-    // Phase 1 (0–450ms): user sees the saved confirmation, no detection.
-    // Phase 2 (450–700ms): silently pre-warm the detector so page 2 has the
-    //   same detection quality as page 1 the moment the user places it.
-    // Phase 3 (700ms+): full auto-capture loop resumes.
-    window.setTimeout(() => {
+    // Phase 1: present the captured A4 page full-screen with the spinner.
+    if (savedTimer1Ref.current) window.clearTimeout(savedTimer1Ref.current);
+    if (savedTimer2Ref.current) window.clearTimeout(savedTimer2Ref.current);
+    if (savedTimer3Ref.current) window.clearTimeout(savedTimer3Ref.current);
+    setSavedOverlay({ dataUrl, visible: true });
+
+    // Phase 2 (~750ms): start the soft fade-out of the page overlay.
+    savedTimer1Ref.current = window.setTimeout(() => {
       if (cancelledRef.current) return;
-      // Pre-warm: allow detect() to run but block any capture firing.
+      setSavedOverlay((s) => (s ? { ...s, visible: false } : s));
+    }, 750);
+
+    // Phase 3 (~1150ms): overlay finished fading — resume detection loop.
+    savedTimer2Ref.current = window.setTimeout(() => {
+      if (cancelledRef.current) return;
       capturedRef.current = false;
       setStatus("searching");
       loop();
-    }, 700);
+    }, 1150);
+
+    // Phase 4 (~1450ms): unmount the overlay node entirely.
+    savedTimer3Ref.current = window.setTimeout(() => {
+      if (cancelledRef.current) return;
+      setSavedOverlay(null);
+    }, 1450);
   }
 
 
