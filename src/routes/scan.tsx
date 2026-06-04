@@ -639,8 +639,14 @@ function ScanPage() {
       setStatus("ready");
     } else {
       drawOverlay(smoothed, "ready");
-      setStatus("capturing");
-      capture(smoothed);
+      if (performance.now() < armedAtRef.current) {
+        // Re-aim cooldown after a saved page — show "ready" but don't snap yet.
+        setStatus("ready");
+        stableCount.current = Math.min(stableCount.current, STABLE_FRAMES - 1);
+      } else {
+        setStatus("capturing");
+        capture(smoothed);
+      }
     }
   }
 
