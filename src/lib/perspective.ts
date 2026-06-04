@@ -314,12 +314,16 @@ export function cleanPaperEdges(canvas: HTMLCanvasElement): HTMLCanvasElement {
   return canvas;
 }
 
-export function autoOrientAndDeskewDocument(canvas: HTMLCanvasElement): HTMLCanvasElement {
+export function autoOrientAndDeskewDocument(
+  canvas: HTMLCanvasElement,
+  onDiagnostics?: (diagnostics: DocumentAlignmentDiagnostics) => void,
+): HTMLCanvasElement {
   const sample = scaleCanvas(canvas, 420);
   const rotations = [0, 90, 180, 270] as const;
   let bestRotation = canvas.height >= canvas.width ? 0 : 90;
   let bestScore = -Infinity;
   let foundText = false;
+  const orientationCandidates: DocumentAlignmentDiagnostics["orientationCandidates"] = [];
 
   for (const rotation of rotations) {
     const rotatedSample = rotateCanvas(sample, rotation);
@@ -328,6 +332,16 @@ export function autoOrientAndDeskewDocument(canvas: HTMLCanvasElement): HTMLCanv
     const score = analysis.hasText
       ? analysis.score * analysis.uprightScore * portraitBias
       : portraitBias;
+    orientationCandidates.push({
+      rotation,
+      width: rotatedSample.width,
+      height: rotatedSample.height,
+      textAngle: analysis.angle,
+      textScore: analysis.score,
+      uprightScore: analysis.uprightScore,
+      hasText: analysis.hasText,
+      score,
+    });
     if (analysis.hasText) foundText = true;
     if (score > bestScore) {
       bestScore = score;
@@ -336,16 +350,75 @@ export function autoOrientAndDeskewDocument(canvas: HTMLCanvasElement): HTMLCanv
   }
 
   let oriented = rotateCanvas(canvas, bestRotation);
-  const skew = estimateTextSkew(oriented, 7, 0.35);
-  if ((foundText || skew.hasText) && Math.abs(skew.angle) > 0.25) {
-    oriented = rotateCanvas(oriented, skew.angle);
+  const skew = estimateTextSkew(oriented, 7, 0.25);
+  const edgeSkew = estimateVerticalPaperEdgeSkew(oriented);
+  const documentAngleBeforeDeskew = bestRotation + (edgeSkew.confidence > 0 ? edgeSkew.angle : 0);
+  let appliedDeskewAngle = 0;
+  let appliedDeskewSource: DocumentAlignmentDiagnostics["appliedDeskewSource"] = "none";
+
+  if (edgeSkew.confidence >= 0.55 && Math.abs(edgeSkew.angle) > 0.5) {
+    appliedDeskewAngle = edgeSkew.angle;
+    appliedDeskewSource = "vertical-edges";
+  } else if ((foundText || skew.hasText) && Math.abs(skew.angle) > 0.2) {
+    appliedDeskewAngle = skew.angle;
+    appliedDeskewSource = "text";
+  }
+
+  if (Math.abs(appliedDeskewAngle) > 0.001) {
+    oriented = rotateCanvas(oriented, appliedDeskewAngle);
   }
 
   // Viktigt: vi padda INTE upp till en fast A4-ruta här. Sidan behåller sin
   // egna proportion från quaden, så preview = PDF och inga konstgjorda
   // marginaler smyger in (vilket annars syns som asymmetriska kanter).
   cleanPaperEdges(oriented);
+  onDiagnostics?.({
+    input: { width: canvas.width, height: canvas.height },
+    orientationCandidates,
+    selectedOrientationRotation: bestRotation,
+    documentAngleBeforeDeskew,
+    textSkewAngle: skew.angle,
+    textSkewScore: skew.score,
+    textHasText: skew.hasText,
+    verticalEdgeSkewAngle: edgeSkew.angle,
+    verticalEdgeConfidence: edgeSkew.confidence,
+    leftEdgeAngle: edgeSkew.leftAngle,
+    rightEdgeAngle: edgeSkew.rightAngle,
+    appliedDeskewAngle,
+    appliedDeskewSource,
+    output: { width: oriented.width, height: oriented.height },
+  });
   return oriented;
+}
+
+export function measureQuadGeometry(quad: [Point, Point, Point, Point]): QuadGeometryDiagnostics {
+  const ordered = orderQuad(quad);
+  const topAngle = segmentAngle(ordered[0], ordered[1]);
+  const bottomAngle = segmentAngle(ordered[3], ordered[2]);
+  const leftRaw = segmentAngle(ordered[0], ordered[3]);
+  const rightRaw = segmentAngle(ordered[1], ordered[2]);
+  const leftAngleFromVertical = normalizeToHalfTurn(leftRaw - 90);
+  const rightAngleFromVertical = normalizeToHalfTurn(rightRaw - 90);
+  const topWidth = dist(ordered[0], ordered[1]);
+  const bottomWidth = dist(ordered[3], ordered[2]);
+  const leftHeight = dist(ordered[0], ordered[3]);
+  const rightHeight = dist(ordered[1], ordered[2]);
+  const width = (topWidth + bottomWidth) / 2;
+  const height = (leftHeight + rightHeight) / 2;
+  return {
+    topAngle,
+    bottomAngle,
+    leftAngleFromVertical,
+    rightAngleFromVertical,
+    documentAngle: averageAngles([topAngle, bottomAngle]),
+    topWidth,
+    bottomWidth,
+    leftHeight,
+    rightHeight,
+    width,
+    height,
+    aspect: height / Math.max(1, width),
+  };
 }
 
 function renderToA4Portrait(source: HTMLCanvasElement): HTMLCanvasElement {
