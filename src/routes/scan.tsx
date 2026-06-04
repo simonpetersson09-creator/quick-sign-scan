@@ -904,25 +904,25 @@ function ScanPage() {
     if (savedTimer3Ref.current) window.clearTimeout(savedTimer3Ref.current);
     setSavedOverlay({ dataUrl, visible: true });
 
-    // Phase 2 (~750ms): start the soft fade-out of the page overlay.
+    // Phase 2 (~1800ms): start the soft fade-out of the page overlay.
     savedTimer1Ref.current = window.setTimeout(() => {
       if (cancelledRef.current) return;
       setSavedOverlay((s) => (s ? { ...s, visible: false } : s));
-    }, 750);
+    }, 1800);
 
-    // Phase 3 (~1150ms): overlay finished fading — resume detection loop.
+    // Phase 3 (~2400ms): overlay finished fading — resume detection loop.
     savedTimer2Ref.current = window.setTimeout(() => {
       if (cancelledRef.current) return;
       capturedRef.current = false;
       setStatus("searching");
       loop();
-    }, 1150);
+    }, 2400);
 
-    // Phase 4 (~1450ms): unmount the overlay node entirely.
+    // Phase 4 (~2800ms): unmount the overlay node entirely.
     savedTimer3Ref.current = window.setTimeout(() => {
       if (cancelledRef.current) return;
       setSavedOverlay(null);
-    }, 1450);
+    }, 2800);
   }
 
 
