@@ -937,10 +937,11 @@ function ScanPage() {
     lowLight: t("statusLowLight"),
     ready: t("statusReady"),
     capturing: t("statusCapturing"),
+    saved: t("statusSaved"),
     error: t("statusError"),
   };
 
-  const statusActive = status === "ready" || status === "capturing";
+  const statusActive = status === "ready" || status === "capturing" || status === "saved";
 
   return (
     <div className="fixed inset-0 bg-black text-white flex flex-col">
