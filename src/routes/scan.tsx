@@ -443,6 +443,36 @@ function ScanPage() {
   useEffect(() => {
     cancelledRef.current = false;
     startCamera();
+
+    // Listen to device motion as a stillness signal. iOS 13+ requires an
+    // explicit permission request (gated behind a user gesture) — we ask
+    // once on mount and silently fall back if denied; the scanner still
+    // works without gyro data, just without this extra gate.
+    const onMotion = (e: DeviceMotionEvent) => {
+      const a = e.acceleration ?? e.accelerationIncludingGravity;
+      if (!a) return;
+      const mag = Math.sqrt((a.x ?? 0) ** 2 + (a.y ?? 0) ** 2 + (a.z ?? 0) ** 2);
+      motionAvailableRef.current = true;
+      // EMA — heavy weight on history so brief spikes still register but
+      // sustained calm wins quickly.
+      motionMagRef.current = motionMagRef.current * 0.7 + mag * 0.3;
+    };
+    type IOSMotionEvent = typeof DeviceMotionEvent & {
+      requestPermission?: () => Promise<"granted" | "denied">;
+    };
+    const dme = (typeof DeviceMotionEvent !== "undefined"
+      ? (DeviceMotionEvent as IOSMotionEvent)
+      : null);
+    if (dme?.requestPermission) {
+      dme.requestPermission()
+        .then((res) => {
+          if (res === "granted") window.addEventListener("devicemotion", onMotion);
+        })
+        .catch(() => {});
+    } else if (typeof window !== "undefined" && "DeviceMotionEvent" in window) {
+      window.addEventListener("devicemotion", onMotion);
+    }
+
     return () => {
       cancelledRef.current = true;
       capturedRef.current = true; // stop RAF loop
@@ -450,6 +480,7 @@ function ScanPage() {
       streamRef.current?.getTracks().forEach((tr) => tr.stop());
       streamRef.current = null;
       if (videoRef.current) videoRef.current.srcObject = null;
+      window.removeEventListener("devicemotion", onMotion);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
