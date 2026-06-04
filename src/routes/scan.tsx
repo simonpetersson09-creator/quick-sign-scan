@@ -96,6 +96,8 @@ function ScanPage() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const polyRef = useRef<SVGPolygonElement | null>(null);
+  const glowRef = useRef<SVGPolygonElement | null>(null);
+  const tracePolyRef = useRef<SVGPolygonElement | null>(null);
   const cornerRefs = useRef<SVGCircleElement[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -559,11 +561,21 @@ function ScanPage() {
   ) {
     const svg = svgRef.current;
     const poly = polyRef.current;
+    const glow = glowRef.current;
+    const trace = tracePolyRef.current;
     if (!svg || !poly) return;
 
     if (!quad) {
       poly.setAttribute("points", "");
       poly.style.opacity = "0";
+      if (glow) {
+        glow.setAttribute("points", "");
+        glow.style.opacity = "0";
+      }
+      if (trace) {
+        trace.setAttribute("points", "");
+        trace.style.opacity = "0";
+      }
       cornerRefs.current.forEach((c) => c && (c.style.opacity = "0"));
       return;
     }
@@ -588,35 +600,52 @@ function ScanPage() {
     const pts = quad.map((p) => `${offX + p.x * dispW},${offY + p.y * dispH}`).join(" ");
     poly.setAttribute("points", pts);
     poly.style.opacity = "1";
+    if (glow) {
+      glow.setAttribute("points", pts);
+    }
+    if (trace) {
+      trace.setAttribute("points", pts);
+    }
 
-    // Color phases: white (searching) → yellow (held, focusing) → green (ready)
-    const stroke =
-      phase === "ready"
-        ? "var(--success)"
-        : phase === "hold"
-          ? "rgb(250,204,21)" // amber-400 — clear yellow signal
-          : "rgba(255,255,255,0.95)";
+    // Soft Genius Scan-style palette — always warm yellow, only intensity
+    // and glow change across phases. Searching = subtle hint, hold = clear
+    // yellow frame, ready = thicker glowing yellow with animated trace.
+    const YELLOW = "rgb(255,193,7)"; // amber — warm, soft
+    const YELLOW_SOFT = "rgb(255,214,90)";
+
+    const stroke = phase === "search" ? YELLOW_SOFT : YELLOW;
     const fill =
       phase === "ready"
-        ? "color-mix(in oklab, var(--success) 18%, transparent)"
+        ? "color-mix(in oklab, rgb(255,193,7) 14%, transparent)"
         : phase === "hold"
-          ? "color-mix(in oklab, rgb(250,204,21) 14%, transparent)"
-          : "rgba(255,255,255,0.06)";
+          ? "color-mix(in oklab, rgb(255,193,7) 9%, transparent)"
+          : "color-mix(in oklab, rgb(255,214,90) 5%, transparent)";
+
     poly.setAttribute("stroke", stroke);
     poly.setAttribute("fill", fill);
+    poly.setAttribute("stroke-width", phase === "ready" ? "4.5" : phase === "hold" ? "3.5" : "2.5");
+    poly.style.opacity = phase === "search" ? "0.85" : "1";
 
-    quad.forEach((p, i) => {
-      const c = cornerRefs.current[i];
-      if (!c) return;
-      c.setAttribute("cx", String(offX + p.x * dispW));
-      c.setAttribute("cy", String(offY + p.y * dispH));
-      c.setAttribute(
-        "fill",
-        phase === "ready" ? "var(--success)" : phase === "hold" ? "rgb(250,204,21)" : "white",
-      );
-      c.style.opacity = "1";
-    });
+    if (glow) {
+      // Outer halo that pulses softer in search, intensifies on hold/ready.
+      glow.setAttribute("stroke", YELLOW);
+      glow.setAttribute("stroke-width", phase === "ready" ? "14" : phase === "hold" ? "10" : "6");
+      glow.style.opacity =
+        phase === "ready" ? "0.45" : phase === "hold" ? "0.28" : "0.15";
+    }
+
+    if (trace) {
+      // Bright traveling segment along the perimeter when ready — gives the
+      // "scanning sweep" feel of Genius Scan.
+      trace.setAttribute("stroke", "rgb(255,224,130)");
+      trace.setAttribute("stroke-width", "5");
+      trace.style.opacity = phase === "ready" ? "1" : "0";
+    }
+
+    // Hide corner dots entirely — Genius Scan-style frame is corner-free.
+    cornerRefs.current.forEach((c) => c && (c.style.opacity = "0"));
   }
+
 
   async function capture(normQuad: [Point, Point, Point, Point]) {
     if (capturedRef.current) return;
@@ -947,20 +976,55 @@ function ScanPage() {
           }}
           className="absolute inset-0 w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-black/25 pointer-events-none" />
-        {/* Detected document frame is rendered by the SVG polygon below.
-            No static guide frame — the frame only appears when 4 corners are detected. */}
+        <div className="absolute inset-0 bg-black/20 pointer-events-none" />
+        {/* Detected document frame — soft, Genius Scan-style yellow with
+            outer glow and an animated trace when ready. */}
         <svg
           ref={svgRef}
           className="absolute inset-0 z-20 w-full h-full pointer-events-none"
           preserveAspectRatio="none"
         >
+          {/* Outer soft glow halo */}
+          <polygon
+            ref={glowRef}
+            points=""
+            fill="none"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            style={{
+              opacity: 0,
+              filter: "blur(6px)",
+              transition: "opacity 220ms ease, stroke-width 220ms ease",
+            }}
+          />
+          {/* Main frame */}
           <polygon
             ref={polyRef}
             points=""
             strokeWidth={3}
-            style={{ transition: "opacity 150ms, stroke 200ms, fill 200ms" }}
             strokeLinejoin="round"
+            strokeLinecap="round"
+            style={{
+              opacity: 0,
+              transition:
+                "opacity 200ms ease, stroke 240ms ease, fill 240ms ease, stroke-width 220ms ease",
+            }}
+          />
+          {/* Animated traveling segment — only visible when ready */}
+          <polygon
+            ref={tracePolyRef}
+            points=""
+            fill="none"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            pathLength={100}
+            strokeDasharray="22 78"
+            style={{
+              opacity: 0,
+              transition: "opacity 240ms ease",
+              animation: "scan-trace 1.6s linear infinite",
+              filter: "drop-shadow(0 0 6px rgba(255,200,60,0.85))",
+            }}
           />
           {[0, 1, 2, 3].map((i) => (
             <circle
@@ -976,6 +1040,7 @@ function ScanPage() {
             />
           ))}
         </svg>
+
       </div>
 
       {/* Top bar */}
@@ -1066,7 +1131,7 @@ function ScanPage() {
                 cy="40"
                 r="36"
                 fill="none"
-                stroke="var(--success)"
+                stroke="rgb(255,193,7)"
                 strokeWidth="3"
                 strokeLinecap="round"
                 strokeDasharray={2 * Math.PI * 36}
