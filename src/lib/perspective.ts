@@ -1309,36 +1309,35 @@ function evaluateEdgeQuad(args: {
   const bboxArea = Math.max(1, (maxX - minX + 1) * (maxY - minY + 1));
   const polygonFill = bboxArea / Math.max(1, area);
 
-  // Very relaxed gates — accept en kraftigt vinklad A4 från en mobil med
-  // skuggor, ojämnt ljus och grova kanter. Confidence rangordnar överlevarna.
-  // Perspektivgrinden är medvetet generös: ett A4 fotograferat snett från
-  // sidan kan ge sidlängdskvoter på 2–4×.
+  // Tillåt kraftig perspektivvinkel, men kräv att fyrhörningen verkligen
+  // ligger på dokumentets kanter — annars riskerar vi att ramen sväljer
+  // bakgrund när telefonen vinklas åt sidan.
   if (ratioError > 1.1) return null;
   if (perspectiveError > 4.5) return null;
-  if (sideDeviation > 0.34) return null;
-  if (polygonFill < 0.4 || polygonFill > 2.8) return null;
+  if (sideDeviation > 0.22) return null; // strikt: polygonen måste följa konturen
+  if (polygonFill < 0.45 || polygonFill > 2.4) return null;
 
   const stats = polygonImageStats(ordered, lum, width, height);
   const edgeScore = quadEdgeSupport(ordered, edges, width, height);
   const a4Score = clamp01(1 - ratioError / 1.1);
-  const straightScore = clamp01(1 - sideDeviation / 0.34);
+  const straightScore = clamp01(1 - sideDeviation / 0.22);
   const perspectiveScore = clamp01(1 - perspectiveError / 4.5);
   const brightnessScore = clamp01((stats.mean - 70) / 140);
   const textScore = clamp01(stats.darkRatio / 0.055);
   const areaScore =
     areaRatio <= 0.7 ? clamp01((areaRatio - 0.02) / 0.18) : clamp01((0.98 - areaRatio) / 0.2);
   const confidence =
-    0.28 * edgeScore +
-    0.16 * straightScore +
-    0.12 * a4Score +
-    0.14 * brightnessScore +
-    0.08 * textScore +
-    0.12 * perspectiveScore +
-    0.1 * areaScore;
+    0.38 * edgeScore + // höjd vikt — kanttäckning är viktigast mot bakgrund
+    0.18 * straightScore +
+    0.10 * a4Score +
+    0.10 * brightnessScore +
+    0.06 * textScore +
+    0.10 * perspectiveScore +
+    0.08 * areaScore;
 
-  // Final gate is very loose — even weak edge support is OK as long as
-  // brightness/area/straightness combine to a reasonable confidence.
-  if (edgeScore < 0.05) return null;
+  // Hårdare kanttäckningsgrind: utan riktiga kanter under polygonens sidor
+  // är det en bakgrundsfyrhörning och inte ett dokument.
+  if (edgeScore < 0.18) return null;
 
   return {
     corners: ordered,
