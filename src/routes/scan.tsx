@@ -103,6 +103,13 @@ function ScanPage() {
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
   const detectCanvas = useRef<HTMLCanvasElement | null>(null);
+  // Throttle detection to ~22 Hz. The full pipeline (Canny + Sobel + snap)
+  // is too heavy to run at 60 fps on mid-range mobile — it starves the UI
+  // thread and the camera's continuous autofocus callback, which actually
+  // makes captures BLURRIER. ~45 ms cadence keeps the polygon feeling live
+  // while giving the GPU/ISP room to breathe.
+  const DETECT_INTERVAL_MS = 45;
+  const lastDetectAtRef = useRef(0);
 
   const lastRawQuad = useRef<[Point, Point, Point, Point] | null>(null);
   const smoothQuad = useRef<[Point, Point, Point, Point] | null>(null); // normalized 0..1
@@ -379,7 +386,11 @@ function ScanPage() {
 
   function loop() {
     const tick = () => {
-      detect();
+      const now = performance.now();
+      if (now - lastDetectAtRef.current >= DETECT_INTERVAL_MS) {
+        lastDetectAtRef.current = now;
+        detect();
+      }
       if (!capturedRef.current) {
         rafRef.current = requestAnimationFrame(tick);
       }
@@ -504,13 +515,23 @@ function ScanPage() {
 
     // Measure sharpness within the detected quad. If the doc is too blurry
     // we must not auto-capture — wait for continuous autofocus to settle.
-    let xs = smoothed.map((p) => p.x * dw);
-    let ys = smoothed.map((p) => p.y * dh);
+    // We shrink the bbox toward the centroid by 18% so the Laplacian sees
+    // mostly paper interior (text strokes), not the background bleeding
+    // in from the corners of an angled A4 — which used to make the score
+    // jumpy and inflate the "moveBack" hint.
+    const xs = smoothed.map((p) => p.x * dw);
+    const ys = smoothed.map((p) => p.y * dh);
+    const minSx = Math.min(...xs);
+    const maxSx = Math.max(...xs);
+    const minSy = Math.min(...ys);
+    const maxSy = Math.max(...ys);
+    const padX = (maxSx - minSx) * 0.09;
+    const padY = (maxSy - minSy) * 0.09;
     const sharpness = laplacianVariance(data, dw, dh, {
-      x0: Math.min(...xs),
-      y0: Math.min(...ys),
-      x1: Math.max(...xs),
-      y1: Math.max(...ys),
+      x0: minSx + padX,
+      y0: minSy + padY,
+      x1: maxSx - padX,
+      y1: maxSy - padY,
     });
     sharpnessRef.current = sharpness;
     const isSharp = sharpness >= SHARPNESS_LIVE_MIN;
