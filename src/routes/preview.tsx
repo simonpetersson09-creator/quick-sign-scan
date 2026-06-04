@@ -4,7 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
 import { useT } from "@/lib/i18n";
-import { ArrowRight, Plus, RotateCcw, Trash2, ChevronUp, ChevronDown, ScanLine } from "lucide-react";
+import { ArrowRight, Plus, RotateCcw, Trash2, ScanLine, ChevronLeft, ChevronRight } from "lucide-react";
 
 export const Route = createFileRoute("/preview")({
   head: () => ({ meta: [{ title: "Förhandsgranska" }] }),
@@ -52,14 +52,6 @@ function PreviewPage() {
     commitPages(next, nextActive);
   }
 
-  function movePage(i: number, dir: -1 | 1) {
-    const j = i + dir;
-    if (j < 0 || j >= pages.length) return;
-    const next = [...pages];
-    [next[i], next[j]] = [next[j], next[i]];
-    const nextActive = activeIndex === i ? j : activeIndex === j ? i : activeIndex;
-    commitPages(next, nextActive);
-  }
 
   function startOver() {
     scanStore.clear();
@@ -107,67 +99,63 @@ function PreviewPage() {
       </p>
 
       <div className="flex items-center justify-center">
-        <div
-          className="rounded-2xl overflow-hidden shadow-[var(--shadow-card)] border border-border bg-muted/30 p-3"
-          style={{ width: "min(78vw, 340px)", aspectRatio: "1 / 1.414" }}
-        >
-          <img
-            src={image}
-            alt={t("scannedAlt")}
-            className="w-full h-full object-contain bg-white shadow-sm"
-          />
+        <div className="relative flex items-center justify-center" style={{ width: "min(92vw, 400px)" }}>
+          {pages.length > 1 && (
+            <button
+              type="button"
+              onClick={() => {
+                const next = Math.max(0, activeIndex - 1);
+                setActiveIndex(next);
+                scanStore.set({ imageDataUrl: pages[next] });
+              }}
+              disabled={activeIndex === 0}
+              aria-label={t("prevPage")}
+              className="absolute left-0 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full bg-card/90 backdrop-blur border border-border shadow-[var(--shadow-soft)] text-foreground/80 hover:bg-secondary disabled:opacity-30 disabled:pointer-events-none transition"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+          )}
+          <div
+            className="relative rounded-2xl overflow-hidden shadow-[var(--shadow-card)] border border-border bg-muted/30 p-3"
+            style={{ width: "min(78vw, 340px)", aspectRatio: "1 / 1.414" }}
+          >
+            <img
+              src={image}
+              alt={t("scannedAlt")}
+              className="w-full h-full object-contain bg-white shadow-sm"
+            />
+            {pages.length > 1 && (
+              <span className="absolute top-2 right-2 inline-flex items-center rounded-full bg-black/65 px-2.5 py-1 text-[11px] font-semibold tabular-nums text-white shadow-sm">
+                {activeIndex + 1} / {pages.length}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => deletePage(activeIndex)}
+              aria-label={t("deletePage")}
+              className="absolute bottom-2 right-2 inline-flex h-9 w-9 items-center justify-center rounded-full bg-card/90 backdrop-blur border border-border shadow-[var(--shadow-soft)] text-destructive hover:bg-destructive/10 transition"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+          {pages.length > 1 && (
+            <button
+              type="button"
+              onClick={() => {
+                const next = Math.min(pages.length - 1, activeIndex + 1);
+                setActiveIndex(next);
+                scanStore.set({ imageDataUrl: pages[next] });
+              }}
+              disabled={activeIndex === pages.length - 1}
+              aria-label={t("nextPage")}
+              className="absolute right-0 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full bg-card/90 backdrop-blur border border-border shadow-[var(--shadow-soft)] text-foreground/80 hover:bg-secondary disabled:opacity-30 disabled:pointer-events-none transition"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          )}
         </div>
       </div>
 
-      {pages.length > 0 && (
-        <div className="mt-4 flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
-          {pages.map((p, i) => (
-            <div key={i} className="shrink-0 flex flex-col items-center gap-1">
-              <button
-                onClick={() => {
-                  setActiveIndex(i);
-                  scanStore.set({ imageDataUrl: p });
-                }}
-                className={`relative rounded-md overflow-hidden border-2 transition ${
-                  i === activeIndex ? "border-primary" : "border-border"
-                } bg-white`}
-                style={{ width: 64, aspectRatio: "1 / 1.414" }}
-                aria-label={`Sida ${i + 1}`}
-              >
-                <img src={p} alt="" className="w-full h-full object-contain" />
-                <span className="absolute top-0.5 left-0.5 bg-black/65 text-white text-[10px] px-1.5 py-0.5 rounded font-semibold tabular-nums">
-                  {i + 1}
-                </span>
-              </button>
-              <div className="flex items-center gap-0.5">
-                <button
-                  onClick={() => movePage(i, -1)}
-                  disabled={i === 0}
-                  className="h-6 w-6 rounded bg-secondary text-secondary-foreground disabled:opacity-30 flex items-center justify-center active:scale-90"
-                  aria-label={t("movePageUp")}
-                >
-                  <ChevronUp className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  onClick={() => movePage(i, 1)}
-                  disabled={i === pages.length - 1}
-                  className="h-6 w-6 rounded bg-secondary text-secondary-foreground disabled:opacity-30 flex items-center justify-center active:scale-90"
-                  aria-label={t("movePageDown")}
-                >
-                  <ChevronDown className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  onClick={() => deletePage(i)}
-                  className="h-6 w-6 rounded bg-destructive/10 text-destructive flex items-center justify-center active:scale-90"
-                  aria-label={t("deletePage")}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
 
       <div className="flex-1" />
 
