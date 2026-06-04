@@ -211,7 +211,7 @@ export function removeShadows(canvas: HTMLCanvasElement): HTMLCanvasElement {
 
   // Separable max filter — radius ~ 6% of the small image so it spans
   // multiple text lines and recovers paper brightness between glyphs.
-  const r = Math.max(3, Math.round(Math.max(sw, sh) * 0.06));
+  const r = Math.max(3, Math.round(Math.max(sw, sh) * 0.1));
   const bgX = new Float32Array(sw * sh);
   for (let y = 0; y < sh; y++) {
     const row = y * sw;
@@ -262,7 +262,7 @@ export function removeShadows(canvas: HTMLCanvasElement): HTMLCanvasElement {
   // of the small bg so we don't over-brighten genuinely white paper.
   const sample = new Float32Array(bgBlur);
   sample.sort();
-  const target = Math.max(160, sample[Math.floor(sample.length * 0.9)] || 220);
+  const target = Math.max(200, sample[Math.floor(sample.length * 0.95)] || 230);
 
   for (let y = 0; y < h; y++) {
     const fy = Math.min(sh - 1, y / scale);
@@ -328,7 +328,7 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
   // 3) Global white reference from the upper percentile of the background.
   const sample = new Float32Array(bg);
   sample.sort();
-  const whiteRef = Math.max(140, sample[Math.floor(n * 0.92)] || 200);
+  const whiteRef = Math.max(160, sample[Math.floor(n * 0.96)] || 210);
 
   // 4) Shading correction: per-pixel multiplier whiteRef / bg flattens
   //    shadows and uneven lighting across the page.
@@ -354,7 +354,7 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
   }
   cum = 0;
   let white = 255;
-  const whiteTarget = n * 0.6;
+  const whiteTarget = n * 0.72;
   for (let v = 0; v < 256; v++) {
     cum += hist[v];
     if (cum >= whiteTarget) {
@@ -372,7 +372,7 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
     let t = (v - black) / range;
     if (t < 0) t = 0;
     else if (t > 1) t = 1;
-    t = Math.pow(t, 1.45);
+    t = Math.pow(t, 1.65);
     t = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
     lut[v] = (t * 255) | 0;
   }
@@ -411,7 +411,7 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
   for (let i = 0, j = 0; i < d.length; i += 4, j++) {
     const L = (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) | 0;
     lum2[j] = L;
-    if (L >= 238) {
+    if (L >= 228) {
       d[i] = 255;
       d[i + 1] = 255;
       d[i + 2] = 255;
