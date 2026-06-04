@@ -211,7 +211,7 @@ export function removeShadows(canvas: HTMLCanvasElement): HTMLCanvasElement {
 
   // Separable max filter — radius ~ 6% of the small image so it spans
   // multiple text lines and recovers paper brightness between glyphs.
-  const r = Math.max(3, Math.round(Math.max(sw, sh) * 0.06));
+  const r = Math.max(3, Math.round(Math.max(sw, sh) * 0.1));
   const bgX = new Float32Array(sw * sh);
   for (let y = 0; y < sh; y++) {
     const row = y * sw;
