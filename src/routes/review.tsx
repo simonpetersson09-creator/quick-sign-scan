@@ -122,6 +122,27 @@ function ReviewPage() {
     setPan({ x: 0, y: 0 });
   }, [pageIdx]);
 
+  // Rebuild PDF when signature position changes (after drag release).
+  useEffect(() => {
+    if (!pages.length || !sigDataUrl || !sigPos) return;
+    let cancelled = false;
+    const handle = setTimeout(async () => {
+      const url = await buildPdf(pages, { dataUrl: sigDataUrl, x: sigPos.x, y: sigPos.y });
+      if (cancelled) return;
+      setPdfUrl(url);
+      scanStore.set({ pdfDataUrl: url, signaturePosition: sigPos });
+      try {
+        setSizeBytes(dataUrlToBlob(url).size);
+      } catch {
+        /* noop */
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [sigPos, sigDataUrl, pages]);
+
   function clampPan(nx: number, ny: number, z: number) {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return { x: nx, y: ny };
