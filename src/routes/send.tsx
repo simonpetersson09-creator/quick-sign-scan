@@ -134,6 +134,8 @@ function SendPage() {
       recipients.unshift({ email: recipient });
       saveSettings({
         ...settings,
+        defaultSubject: subject,
+        defaultMessage: message,
         recipients: recipients.slice(0, 15),
       });
 
