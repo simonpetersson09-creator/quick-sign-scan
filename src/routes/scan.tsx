@@ -134,6 +134,11 @@ function ScanPage() {
   const lockBreakFramesRef = useRef(0);
   const brightnessRef = useRef(255);
   const lowLightFramesRef = useRef(0);
+  const exposureLockedRef = useRef(false);
+  const trackCapsRef = useRef<Record<string, unknown>>({});
+
+  const [torchOn, setTorchOn] = useState(false);
+  const [torchAvailable, setTorchAvailable] = useState(false);
 
   const [status, setStatus] = useState<Status>("starting");
   const [progress, setProgress] = useState(0); // 0..1 — visual lock-in progress
