@@ -124,6 +124,9 @@ function ScanPage() {
         if (videoRef.current) videoRef.current.srcObject = null;
       }
       capturedRef.current = false;
+      sharpnessRef.current = 0;
+      blurFramesRef.current = 0;
+      captureRetryRef.current = 0;
       stableCount.current = 0;
       detectCount.current = 0;
       missCount.current = 0;
