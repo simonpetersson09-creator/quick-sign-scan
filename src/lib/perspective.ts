@@ -885,6 +885,51 @@ export function findDocumentCorners(
   return detectDocumentQuad(data, width, height)?.corners ?? null;
 }
 
+// Remove inner detections — any quad whose centroid AND most of its
+// corners lie inside a larger quad is treated as content (text block,
+// photo, table) on top of the actual paper. Only outer polygons survive.
+function filterOuterDetections(detections: DocumentDetection[]): DocumentDetection[] {
+  if (detections.length <= 1) return detections;
+  // Sort by area descending so larger quads are considered as parents first.
+  const sorted = [...detections].sort((a, b) => b.debug.areaRatio - a.debug.areaRatio);
+  const kept: DocumentDetection[] = [];
+  for (const det of sorted) {
+    const cx = (det.corners[0].x + det.corners[1].x + det.corners[2].x + det.corners[3].x) / 4;
+    const cy = (det.corners[0].y + det.corners[1].y + det.corners[2].y + det.corners[3].y) / 4;
+    let containedBy: DocumentDetection | null = null;
+    for (const outer of kept) {
+      if (det.debug.areaRatio >= outer.debug.areaRatio * 0.92) continue; // similar size — keep both
+      if (!pointInQuad({ x: cx, y: cy }, outer.corners)) continue;
+      let cornersInside = 0;
+      for (const c of det.corners) {
+        if (pointInQuad(c, outer.corners)) cornersInside++;
+      }
+      if (cornersInside >= 3) {
+        containedBy = outer;
+        break;
+      }
+    }
+    if (!containedBy) kept.push(det);
+  }
+  return kept;
+}
+
+function pointInQuad(p: Point, quad: [Point, Point, Point, Point]): boolean {
+  let inside = false;
+  for (let i = 0, j = 3; i < 4; j = i++) {
+    const xi = quad[i].x;
+    const yi = quad[i].y;
+    const xj = quad[j].x;
+    const yj = quad[j].y;
+    const intersects =
+      yi > p.y !== yj > p.y &&
+      p.x < ((xj - xi) * (p.y - yi)) / (yj - yi + 1e-9) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+
 function gaussianBlur(lum: Uint8ClampedArray, width: number, height: number): Uint8ClampedArray {
   const out = new Uint8ClampedArray(lum.length);
   for (let y = 1; y < height - 1; y++) {
