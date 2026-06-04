@@ -672,7 +672,6 @@ function ScanPage() {
           muted
           autoPlay
           // iOS Safari ignores playsInline unless it's also a literal attribute.
-          // eslint-disable-next-line react/no-unknown-property
           {...({ "webkit-playsinline": "true", "x-webkit-airplay": "deny" } as Record<
             string,
             string
