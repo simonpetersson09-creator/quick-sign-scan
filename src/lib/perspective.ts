@@ -1051,7 +1051,7 @@ function reduceHullToQuad(hull: Point[]): [Point, Point, Point, Point] | null {
   return pts.length === 4 ? [pts[0], pts[1], pts[2], pts[3]] : null;
 }
 
-function orderQuad(quad: [Point, Point, Point, Point]): [Point, Point, Point, Point] {
+export function orderQuad(quad: [Point, Point, Point, Point]): [Point, Point, Point, Point] {
   const cx = quad.reduce((s, p) => s + p.x, 0) / 4;
   const cy = quad.reduce((s, p) => s + p.y, 0) / 4;
   let ordered = [...quad].sort(
