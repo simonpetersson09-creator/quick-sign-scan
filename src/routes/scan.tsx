@@ -19,7 +19,7 @@ import {
 } from "@/lib/perspective";
 import type { DocumentAlignmentDiagnostics } from "@/lib/perspective";
 import { useT } from "@/lib/i18n";
-import { Camera, CameraOff, X, RefreshCw, ArrowLeft, ArrowRight } from "lucide-react";
+import { Camera, CameraOff, X, RefreshCw, ArrowLeft, ArrowRight, Zap, ZapOff } from "lucide-react";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 
 function triggerCaptureHaptic() {
