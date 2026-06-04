@@ -39,7 +39,7 @@ function SendPage() {
   const [to, setTo] = useState(settings.defaultRecipient);
   const [subject, setSubject] = useState(settings.defaultSubject);
   const [message, setMessage] = useState(settings.defaultMessage);
-  const [replyTo, setReplyTo] = useState("");
+  
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
