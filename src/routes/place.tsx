@@ -18,21 +18,36 @@ const ZOOM_STEP = 0.5;
 function PlacePage() {
   const t = useT();
   const navigate = useNavigate();
-  const [image, setImage] = useState<string | null>(null);
+  const [pages, setPages] = useState<string[]>([]);
+  const [pageIndex, setPageIndex] = useState(0);
   const [sigPos, setSigPos] = useState<{ x: number; y: number }>({ x: 0.5, y: 0.86 });
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const img = scanStore.get().imageDataUrl;
-    if (!img) {
+    const s = scanStore.get();
+    const list = s.pages && s.pages.length > 0 ? s.pages : s.imageDataUrl ? [s.imageDataUrl] : [];
+    if (list.length === 0) {
       navigate({ to: "/" });
       return;
     }
-    setImage(img);
-    scanStore.set({ signaturePosition: { x: 0.5, y: 0.86 } });
+    const idx = s.imageDataUrl ? Math.max(0, list.indexOf(s.imageDataUrl)) : 0;
+    setPages(list);
+    setPageIndex(idx);
+    scanStore.set({ imageDataUrl: list[idx], signaturePosition: { x: 0.5, y: 0.86 } });
   }, [navigate]);
+
+  const image = pages[pageIndex] ?? null;
+
+  function goToPage(next: number) {
+    if (next < 0 || next >= pages.length || next === pageIndex) return;
+    setPageIndex(next);
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+    setSigPos({ x: 0.5, y: 0.86 });
+    scanStore.set({ imageDataUrl: pages[next], signaturePosition: { x: 0.5, y: 0.86 } });
+  }
 
   // Pointer state — distinguish tap (place signature) from drag (pan when zoomed).
   const pointer = useRef<{
