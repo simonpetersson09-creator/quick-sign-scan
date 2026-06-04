@@ -411,7 +411,7 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
   for (let i = 0, j = 0; i < d.length; i += 4, j++) {
     const L = (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) | 0;
     lum2[j] = L;
-    if (L >= 238) {
+    if (L >= 228) {
       d[i] = 255;
       d[i + 1] = 255;
       d[i + 2] = 255;
