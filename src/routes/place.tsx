@@ -222,40 +222,41 @@ function PlacePage() {
                     : "cursor-grab ring-1 ring-primary/30 hover:ring-2 hover:ring-primary/50"
                 }`}
                 style={{
-                  width: `${140 / zoom}px`,
-                  gap: `${4 / zoom}px`,
-                  padding: `${6 / zoom}px ${4 / zoom}px`,
+                  width: `${110 / zoom}px`,
+                  gap: `${3 / zoom}px`,
+                  padding: `${5 / zoom}px ${3 / zoom}px`,
                 }}
               >
                 <span
-                  className="absolute left-1/2 -translate-x-1/2 font-semibold tracking-wide uppercase text-primary/80 whitespace-nowrap pointer-events-none"
+                  className="absolute left-1/2 -translate-x-1/2 font-semibold tracking-[0.08em] uppercase text-primary/80 whitespace-nowrap pointer-events-none"
                   style={{
-                    fontSize: `${9 / zoom}px`,
-                    bottom: `calc(100% - ${2 / zoom}px)`,
+                    fontSize: `${7.5 / zoom}px`,
+                    bottom: `calc(100% - ${1 / zoom}px)`,
                   }}
                 >
                   {t("signatureLabel")}
                 </span>
                 <PenLine
                   className="text-primary shrink-0 pointer-events-none"
-                  style={{ width: `${14 / zoom}px`, height: `${14 / zoom}px` }}
+                  style={{ width: `${11 / zoom}px`, height: `${11 / zoom}px` }}
                 />
                 <div
                   className="flex-1 bg-primary rounded-full pointer-events-none"
-                  style={{ height: `${Math.max(1, 1.5 / zoom)}px` }}
+                  style={{ height: `${Math.max(1, 1.2 / zoom)}px` }}
                 />
                 <div
-                  className="absolute -translate-y-1/2 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[var(--shadow-soft)] pointer-events-none"
+                  className="absolute -translate-y-1/2 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[var(--shadow-soft)]"
                   style={{
                     top: "50%",
-                    right: `${-10 / zoom}px`,
-                    width: `${18 / zoom}px`,
-                    height: `${18 / zoom}px`,
+                    right: `${-8 / zoom}px`,
+                    width: `${14 / zoom}px`,
+                    height: `${14 / zoom}px`,
                   }}
                 >
-                  <Move style={{ width: `${10 / zoom}px`, height: `${10 / zoom}px` }} />
+                  <Move style={{ width: `${8 / zoom}px`, height: `${8 / zoom}px` }} />
                 </div>
               </div>
+
 
 
             </div>
