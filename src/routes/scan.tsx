@@ -128,8 +128,13 @@ function ScanPage() {
   const [lastThumbnail, setLastThumbnail] = useState<string | null>(
     () => scanStore.get().imageDataUrl ?? null,
   );
-  const [flashOn, setFlashOn] = useState(false);
-  const flashTimerRef = useRef<number | null>(null);
+  const [savedOverlay, setSavedOverlay] = useState<{
+    dataUrl: string;
+    visible: boolean;
+  } | null>(null);
+  const savedTimer1Ref = useRef<number | null>(null);
+  const savedTimer2Ref = useRef<number | null>(null);
+  const savedTimer3Ref = useRef<number | null>(null);
   const [debugInfo, setDebugInfo] = useState<{
     vw: number;
     vh: number;
