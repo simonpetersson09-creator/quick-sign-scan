@@ -135,3 +135,44 @@ function SignPage() {
   );
 
 }
+
+// Crop a canvas to the bounding box of its non-transparent pixels with
+// a small padding, so the exported signature image only contains the
+// actual ink and isn't distorted or clipped when placed on the PDF.
+function trimCanvas(src: HTMLCanvasElement): string {
+  const w = src.width;
+  const h = src.height;
+  const ctx = src.getContext("2d")!;
+  let data: ImageData;
+  try {
+    data = ctx.getImageData(0, 0, w, h);
+  } catch {
+    return src.toDataURL("image/png");
+  }
+  let minX = w, minY = h, maxX = -1, maxY = -1;
+  const px = data.data;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const a = px[(y * w + x) * 4 + 3];
+      if (a > 8) {
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (maxX < 0) return src.toDataURL("image/png");
+  const pad = Math.round(Math.min(w, h) * 0.04);
+  minX = Math.max(0, minX - pad);
+  minY = Math.max(0, minY - pad);
+  maxX = Math.min(w - 1, maxX + pad);
+  maxY = Math.min(h - 1, maxY + pad);
+  const cw = maxX - minX + 1;
+  const ch = maxY - minY + 1;
+  const out = document.createElement("canvas");
+  out.width = cw;
+  out.height = ch;
+  out.getContext("2d")!.drawImage(src, minX, minY, cw, ch, 0, 0, cw, ch);
+  return out.toDataURL("image/png");
+}
