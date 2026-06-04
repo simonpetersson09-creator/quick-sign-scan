@@ -72,9 +72,9 @@ export const Route = createFileRoute("/scan")({
 // nedan ser till att kvaliteten ändå hålls hög.
 const STABLE_DELTA = 0.035; // normalized 0..1 — tål små handvibrationer
 const DETECT_FRAMES = 3; // mjukare intro innan ramen visas
-const HOLD_FRAMES = 9; // ~0.3s — "Håll stilla" phase
-const READY_FRAMES = 20; // ~0.65s — "Dokument hittat" lock-in
-const STABLE_FRAMES = 32; // ~1.05s total before auto-capture
+const HOLD_FRAMES = 7; // ~0.23s — "Håll stilla" phase
+const READY_FRAMES = 14; // ~0.45s — "Dokument hittat" lock-in
+const STABLE_FRAMES = 22; // ~0.72s total before auto-capture
 // Adaptive smoothing — mjukare och mindre ryckig rörelse på ramen.
 // Lägre alpha = långsammare följning = lugnare upplevelse.
 const ALPHA_PRE_LOCK = 0.18;
@@ -910,10 +910,9 @@ function ScanPage() {
     // Sortera alltid hörnen i exakt ordning TL, TR, BR, BL innan warp.
     const orderedNormQuad = orderQuad(normQuad);
 
-    // Expand the quad slightly outward from its centroid so we don't clip
-    // text right at the paper edge. Edge detection tends to land a few px
-    // inside the actual paper border; ~2.5% margin keeps content safe.
-    const EDGE_MARGIN = 0.025;
+    // Tiny safety pad outward from centroid so we don't clip text right at
+    // the paper edge — but small enough to avoid pulling background in.
+    const EDGE_MARGIN = 0.008;
     const cx = (orderedNormQuad[0].x + orderedNormQuad[1].x + orderedNormQuad[2].x + orderedNormQuad[3].x) / 4;
     const cy = (orderedNormQuad[0].y + orderedNormQuad[1].y + orderedNormQuad[2].y + orderedNormQuad[3].y) / 4;
     const expandedNormQuad = orderedNormQuad.map((p) => ({
