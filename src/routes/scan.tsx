@@ -47,9 +47,9 @@ export const Route = createFileRoute("/scan")({
 // for a sustained period before the camera captures, so we never fire too early.
 const STABLE_DELTA = 0.02; // normalized 0..1 — max smoothed corner movement to count as stable
 const DETECT_FRAMES = 2; // show the detected frame quickly once all 4 corners exist
-const HOLD_FRAMES = 8; // ~0.27s — "Håll stilla" phase
-const READY_FRAMES = 18; // ~0.6s — "Dokument hittat" lock-in
-const STABLE_FRAMES = 28; // ~0.95s total before auto-capture
+const HOLD_FRAMES = 15; // ~0.5s — "Håll stilla" phase
+const READY_FRAMES = 35; // ~1.2s — "Dokument hittat" lock-in
+const STABLE_FRAMES = 60; // ~2.0s total before auto-capture
 
 type StartCameraOptions = {
   restartStream?: boolean;
