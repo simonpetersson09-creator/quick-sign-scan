@@ -326,10 +326,8 @@ function ReviewPage() {
                   onPointerCancel={onSigUp}
                   role="button"
                   aria-label="Flytta signatur"
-                  className={`absolute touch-none select-none rounded-md transition ${
-                    isDraggingSig
-                      ? "cursor-grabbing ring-2 ring-primary/60"
-                      : "cursor-grab ring-1 ring-primary/30 hover:ring-2 hover:ring-primary/50"
+                  className={`absolute touch-none select-none transition ${
+                    isDraggingSig ? "cursor-grabbing" : "cursor-grab"
                   }`}
                   style={{
                     left: `${sigPos.x * 100}%`,
