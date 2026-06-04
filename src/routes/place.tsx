@@ -221,27 +221,25 @@ function PlacePage() {
                 }`}
                 style={{
                   width: `${110 / zoom}px`,
-                  gap: `${3 / zoom}px`,
                   padding: `${5 / zoom}px ${3 / zoom}px`,
                 }}
               >
-                <PenLine
-                  className="text-primary shrink-0 pointer-events-none self-center"
-                  style={{ width: `${11 / zoom}px`, height: `${11 / zoom}px` }}
-                />
+                <div className="flex-1 bg-primary/80 rounded-full pointer-events-none self-center" style={{ height: `${Math.max(0.5, 0.6 / zoom)}px` }} />
                 <div
-                  className="flex-1 bg-primary/80 rounded-full pointer-events-none self-center"
-                  style={{ height: `${Math.max(0.5, 0.6 / zoom)}px` }}
-                />
-                <span
-                  className="absolute left-1/2 -translate-x-1/2 font-semibold tracking-[0.08em] uppercase text-primary/70 whitespace-nowrap pointer-events-none"
-                  style={{
-                    fontSize: `${7 / zoom}px`,
-                    bottom: `calc(50% + ${2 / zoom}px)`,
-                  }}
+                  className="absolute left-1/2 -translate-x-1/2 flex items-center pointer-events-none"
+                  style={{ gap: `${1.5 / zoom}px`, bottom: `calc(50% + ${1.5 / zoom}px)` }}
                 >
-                  {t("signatureLabel")}
-                </span>
+                  <span
+                    className="font-semibold tracking-[0.08em] uppercase text-primary/70 whitespace-nowrap"
+                    style={{ fontSize: `${7 / zoom}px` }}
+                  >
+                    {t("signatureLabel")}
+                  </span>
+                  <PenLine
+                    className="text-primary shrink-0"
+                    style={{ width: `${7 / zoom}px`, height: `${7 / zoom}px` }}
+                  />
+                </div>
 
                 <div
                   className="absolute -translate-y-1/2 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[var(--shadow-soft)]"
