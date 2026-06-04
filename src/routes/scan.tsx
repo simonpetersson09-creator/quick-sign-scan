@@ -805,6 +805,7 @@ function ScanPage() {
     hold: t("statusHold"),
     focusing: t("statusFocusing"),
     moveBack: t("statusMoveBack"),
+    lowLight: t("statusLowLight"),
     ready: t("statusReady"),
     capturing: t("statusCapturing"),
     error: t("statusError"),
