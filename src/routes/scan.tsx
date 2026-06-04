@@ -471,9 +471,23 @@ function ScanPage() {
       y: p.y * vh,
     })) as [Point, Point, Point, Point];
 
-    // Output: portrait A4 aspect 1:√2
+    // Beräkna output-aspekt från dom faktiska hörnen istället för att tvinga
+    // A4. Detta säkerställer att text inte blir sträckt/komprimerad och att
+    // dokumentet alltid är rakt och proportionerligt. Vi mäter medellängden
+    // av motstående sidor (TL→TR vs BL→BR för bredd, TL→BL vs TR→BR för höjd).
+    const dist = (a: Point, b: Point) =>
+      Math.hypot(a.x - b.x, a.y - b.y);
+    const topW = dist(srcQuad[0], srcQuad[1]);
+    const bottomW = dist(srcQuad[3], srcQuad[2]);
+    const leftH = dist(srcQuad[0], srcQuad[3]);
+    const rightH = dist(srcQuad[1], srcQuad[2]);
+    const quadW = (topW + bottomW) / 2;
+    const quadH = (leftH + rightH) / 2;
+    const quadAspect = quadH / quadW; // >1 = portrait, <1 = landscape
+    // Begränsa till rimligt intervall så degenererade quads inte ger extrema mått
+    const aspect = Math.max(0.5, Math.min(2.0, quadAspect));
     const outW = 1000;
-    const outH = Math.round(outW * Math.SQRT2);
+    const outH = Math.round(outW * aspect);
 
     // Yield to UI so the "capturing" state renders
     await new Promise((r) => requestAnimationFrame(() => r(null)));
@@ -493,22 +507,23 @@ function ScanPage() {
         console.error("[scan] enhancePaper failed, using raw warp", e);
       }
 
-      // Skanna kantpixlar och ersätt mörka/svarta band (ofta från bakgrund
-      // eller out-of-bounds warp) med vitt så hela arket ser vitt ut hela
-      // vägen ut till kanten. Vi går inåt rad/kolumn för rad/kolumn så
-      // länge medelluminansen är klart mörkare än papperets vita yta.
+      // Aggressiv kantstädning — skanna upp till 18% från varje kant och
+      // ersätt rader/kolumner vars medelluminans är klart mörkare än
+      // papperets vita yta. Tröskeln är hög (220) för att även gråa skuggor
+      // och svaga mörkningar nära kanten ska försvinna och bli rent vita.
       try {
         const bctx = warped.getContext("2d");
         if (bctx) {
           const img = bctx.getImageData(0, 0, outW, outH);
           const data = img.data;
+          const DARK_THRESHOLD = 220; // 0-255, högre = mer aggressiv städning
           const isDarkRow = (y: number) => {
             let sum = 0;
             for (let x = 0; x < outW; x++) {
               const i = (y * outW + x) * 4;
               sum += data[i] + data[i + 1] + data[i + 2];
             }
-            return sum / (outW * 3) < 170; // < ~67% ljus
+            return sum / (outW * 3) < DARK_THRESHOLD;
           };
           const isDarkCol = (x: number) => {
             let sum = 0;
@@ -516,17 +531,18 @@ function ScanPage() {
               const i = (y * outW + x) * 4;
               sum += data[i] + data[i + 1] + data[i + 2];
             }
-            return sum / (outH * 3) < 170;
+            return sum / (outH * 3) < DARK_THRESHOLD;
           };
-          const maxBand = Math.round(outW * 0.06); // upp till 6% av sidan
+          const maxBandX = Math.round(outW * 0.18);
+          const maxBandY = Math.round(outH * 0.18);
           let top = 0;
-          while (top < maxBand && isDarkRow(top)) top++;
+          while (top < maxBandY && isDarkRow(top)) top++;
           let bottom = 0;
-          while (bottom < maxBand && isDarkRow(outH - 1 - bottom)) bottom++;
+          while (bottom < maxBandY && isDarkRow(outH - 1 - bottom)) bottom++;
           let left = 0;
-          while (left < maxBand && isDarkCol(left)) left++;
+          while (left < maxBandX && isDarkCol(left)) left++;
           let right = 0;
-          while (right < maxBand && isDarkCol(outW - 1 - right)) right++;
+          while (right < maxBandX && isDarkCol(outW - 1 - right)) right++;
           bctx.fillStyle = "#ffffff";
           if (top > 0) bctx.fillRect(0, 0, outW, top);
           if (bottom > 0) bctx.fillRect(0, outH - bottom, outW, bottom);
