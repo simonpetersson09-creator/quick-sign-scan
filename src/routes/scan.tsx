@@ -386,7 +386,11 @@ function ScanPage() {
 
   function loop() {
     const tick = () => {
-      detect();
+      const now = performance.now();
+      if (now - lastDetectAtRef.current >= DETECT_INTERVAL_MS) {
+        lastDetectAtRef.current = now;
+        detect();
+      }
       if (!capturedRef.current) {
         rafRef.current = requestAnimationFrame(tick);
       }
