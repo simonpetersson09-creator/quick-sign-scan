@@ -262,7 +262,7 @@ export function removeShadows(canvas: HTMLCanvasElement): HTMLCanvasElement {
   // of the small bg so we don't over-brighten genuinely white paper.
   const sample = new Float32Array(bgBlur);
   sample.sort();
-  const target = Math.max(160, sample[Math.floor(sample.length * 0.9)] || 220);
+  const target = Math.max(200, sample[Math.floor(sample.length * 0.95)] || 230);
 
   for (let y = 0; y < h; y++) {
     const fy = Math.min(sh - 1, y / scale);
