@@ -662,6 +662,15 @@ function ScanPage() {
       setStatus("uncertain");
       return;
     }
+    // Tight-edge gate: the polygon must actually be snapped onto real
+    // document edges. Stops auto-capture from firing when the frame is
+    // still floating a few cm off the paper (e.g. on a uniform floor).
+    if (meta.debug.edgeTightness < MIN_EDGE_TIGHTNESS_FOR_CAPTURE) {
+      stableCount.current = 0;
+      lockedRef.current = false;
+      setStatus("align");
+      return;
+    }
     // Final A4 ratio gate — reject quads whose proportions diverge too far
     // from sqrt(2). Manual capture from `manualCapture` bypasses this since
     // user intent is explicit.
