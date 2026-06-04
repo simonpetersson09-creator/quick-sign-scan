@@ -4,7 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
 import { useT } from "@/lib/i18n";
-import { PenLine, Send, Minus, Plus, Maximize2 } from "lucide-react";
+import { PenLine, Send, Minus, Plus, Maximize2, ChevronLeft, ChevronRight } from "lucide-react";
 
 export const Route = createFileRoute("/place")({
   head: () => ({ meta: [{ title: "Placera signatur" }] }),
@@ -18,21 +18,36 @@ const ZOOM_STEP = 0.5;
 function PlacePage() {
   const t = useT();
   const navigate = useNavigate();
-  const [image, setImage] = useState<string | null>(null);
+  const [pages, setPages] = useState<string[]>([]);
+  const [pageIndex, setPageIndex] = useState(0);
   const [sigPos, setSigPos] = useState<{ x: number; y: number }>({ x: 0.5, y: 0.86 });
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const img = scanStore.get().imageDataUrl;
-    if (!img) {
+    const s = scanStore.get();
+    const list = s.pages && s.pages.length > 0 ? s.pages : s.imageDataUrl ? [s.imageDataUrl] : [];
+    if (list.length === 0) {
       navigate({ to: "/" });
       return;
     }
-    setImage(img);
-    scanStore.set({ signaturePosition: { x: 0.5, y: 0.86 } });
+    const idx = s.imageDataUrl ? Math.max(0, list.indexOf(s.imageDataUrl)) : 0;
+    setPages(list);
+    setPageIndex(idx);
+    scanStore.set({ imageDataUrl: list[idx], signaturePosition: { x: 0.5, y: 0.86 } });
   }, [navigate]);
+
+  const image = pages[pageIndex] ?? null;
+
+  function goToPage(next: number) {
+    if (next < 0 || next >= pages.length || next === pageIndex) return;
+    setPageIndex(next);
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+    setSigPos({ x: 0.5, y: 0.86 });
+    scanStore.set({ imageDataUrl: pages[next], signaturePosition: { x: 0.5, y: 0.86 } });
+  }
 
   // Pointer state — distinguish tap (place signature) from drag (pan when zoomed).
   const pointer = useRef<{
@@ -124,6 +139,18 @@ function PlacePage() {
     <AppShell title={t("placeTitle")} back="/preview">
       <p className="text-sm text-muted-foreground mt-1 mb-3">{t("placeHint")}</p>
       <div className="flex-1 flex flex-col items-center justify-center gap-3 min-h-0">
+        <div className="relative flex items-center justify-center" style={{ width: "min(92vw, 440px)" }}>
+          {pages.length > 1 && (
+            <button
+              type="button"
+              onClick={() => goToPage(pageIndex - 1)}
+              disabled={pageIndex === 0}
+              aria-label={t("prevPage")}
+              className="absolute left-0 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full bg-card/90 backdrop-blur border border-border shadow-[var(--shadow-soft)] text-foreground/80 hover:bg-secondary disabled:opacity-30 disabled:pointer-events-none transition"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+          )}
         <div
           ref={containerRef}
           onPointerDown={onDown}
@@ -172,6 +199,26 @@ function PlacePage() {
             </div>
           </div>
         </div>
+          {pages.length > 1 && (
+            <button
+              type="button"
+              onClick={() => goToPage(pageIndex + 1)}
+              disabled={pageIndex === pages.length - 1}
+              aria-label={t("nextPage")}
+              className="absolute right-0 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full bg-card/90 backdrop-blur border border-border shadow-[var(--shadow-soft)] text-foreground/80 hover:bg-secondary disabled:opacity-30 disabled:pointer-events-none transition"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          )}
+        </div>
+
+        {pages.length > 1 && (
+          <div className="text-xs text-muted-foreground tabular-nums">
+            {t("pageIndicator").replace("{current}", String(pageIndex + 1)).replace("{total}", String(pages.length))}
+          </div>
+        )}
+
+
 
 
 
