@@ -666,8 +666,11 @@ function ScanPage() {
     // kamerans/canvasens proportion. Själva innehållet mappas fortfarande från
     // de fyra verkliga hörnen i srcQuad.
     const aspect = geometry.height >= geometry.width ? Math.SQRT2 : 1 / Math.SQRT2;
-    const outW = 1000;
+    // 300 DPI A4 (210 mm × 297 mm) ≈ 2480 × 3508 px. Print-quality output
+    // for contracts, signatures and small text.
+    const outW = 2480;
     const outH = Math.round(outW * aspect);
+
 
     logScanStage("camera-frame", { width: vw, height: vh, readyState: video.readyState });
     logScanStage("detected-corners", {
@@ -729,8 +732,9 @@ function ScanPage() {
       sourceCanvas.height = vh;
       sourceCanvas.getContext("2d")!.drawImage(video, 0, 0, vw, vh);
 
-      const dataUrl = warped.toDataURL("image/jpeg", 0.92);
-      const sourceDataUrl = sourceCanvas.toDataURL("image/jpeg", 0.86);
+      const dataUrl = warped.toDataURL("image/jpeg", 0.95);
+      const sourceDataUrl = sourceCanvas.toDataURL("image/jpeg", 0.9);
+
       logScanCanvas("final-image-to-pdf", warped, debugEnabled);
       logScanStage("pdf-input", {
         sameDataUrlUsedForPreviewAndPdf: true,

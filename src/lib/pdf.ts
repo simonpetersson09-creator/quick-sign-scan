@@ -32,7 +32,9 @@ export async function buildPdf(
       imageFormat: imgFormat,
       dataUrlBytes: imageDataUrl.length,
     });
-    pdf.addImage(imageDataUrl, imgFormat, 0, 0, pageW, pageH, undefined, "FAST");
+    // SLOW = best quality compression in jsPDF (uses higher-quality DCT).
+    pdf.addImage(imageDataUrl, imgFormat, 0, 0, pageW, pageH, undefined, "SLOW");
+
   });
 
   if (signature && signature.dataUrl) {
