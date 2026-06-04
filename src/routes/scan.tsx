@@ -136,6 +136,11 @@ function ScanPage() {
   const lowLightFramesRef = useRef(0);
   const exposureLockedRef = useRef(false);
   const trackCapsRef = useRef<Record<string, unknown>>({});
+  // Auto-capture is "armed" only after this timestamp — used to enforce a short
+  // re-aim pause after a saved page so the camera doesn't immediately snap
+  // the same document again.
+  const armedAtRef = useRef(0);
+  const REARM_DELAY_MS = 1200;
 
   const [torchOn, setTorchOn] = useState(false);
   const [torchAvailable, setTorchAvailable] = useState(false);
@@ -634,8 +639,14 @@ function ScanPage() {
       setStatus("ready");
     } else {
       drawOverlay(smoothed, "ready");
-      setStatus("capturing");
-      capture(smoothed);
+      if (performance.now() < armedAtRef.current) {
+        // Re-aim cooldown after a saved page — show "ready" but don't snap yet.
+        setStatus("ready");
+        stableCount.current = Math.min(stableCount.current, STABLE_FRAMES - 1);
+      } else {
+        setStatus("capturing");
+        capture(smoothed);
+      }
     }
   }
 
@@ -1003,6 +1014,11 @@ function ScanPage() {
     savedTimer2Ref.current = window.setTimeout(() => {
       if (cancelledRef.current) return;
       capturedRef.current = false;
+      stableCount.current = 0;
+      detectCount.current = 0;
+      lockedRef.current = false;
+      setProgress(0);
+      armedAtRef.current = performance.now() + REARM_DELAY_MS;
       setStatus("searching");
       loop();
     }, 2400);
