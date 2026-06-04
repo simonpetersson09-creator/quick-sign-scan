@@ -1,9 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useRef } from "react";
-import { ScanLine, PenLine, Mail, CheckCircle2, Settings as SettingsIcon, ArrowDown, Globe, FileUp } from "lucide-react";
+import { useRef, useState } from "react";
+import { ScanLine, PenLine, Mail, CheckCircle2, Settings as SettingsIcon, ArrowDown, Globe, FileUp, Loader2 } from "lucide-react";
 import { useLang } from "@/lib/i18n";
 import { scanStore } from "@/lib/scanStore";
 import { pdfFileToImages } from "@/lib/pdfToImages";
+
+const MAX_PDF_PAGES = 20;
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -19,6 +21,8 @@ function Home() {
   const { lang, toggle, t } = useLang();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
 
   const steps = [
     { icon: ScanLine, label: t("step_scan") },
@@ -85,10 +89,32 @@ function Home() {
           onChange={async (e) => {
             const file = e.target.files?.[0];
             if (!file) return;
+            setFileError(null);
             try {
               if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) {
-                const pages = await pdfFileToImages(file);
-                if (pages.length === 0) return;
+                setBusy(t("processingPdf", { current: "0", total: "?" }));
+                let pages: string[];
+                try {
+                  pages = await pdfFileToImages(file, {
+                    onProgress: (current, total) => {
+                      if (total > MAX_PDF_PAGES) return;
+                      setBusy(t("processingPdf", { current: String(current), total: String(total) }));
+                    },
+                  });
+                } catch {
+                  setBusy(null);
+                  setFileError(t("pdfReadError"));
+                  return;
+                }
+                if (pages.length === 0) {
+                  setBusy(null);
+                  return;
+                }
+                if (pages.length > MAX_PDF_PAGES) {
+                  setBusy(null);
+                  setFileError(t("pdfTooManyPages", { max: String(MAX_PDF_PAGES) }));
+                  return;
+                }
                 scanStore.clear();
                 scanStore.set({ pages, imageDataUrl: pages[0] });
                 navigate({ to: "/preview" });
@@ -110,13 +136,21 @@ function Home() {
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="block group w-full max-w-[240px]"
+          disabled={!!busy}
+          className="block group w-full max-w-[240px] disabled:opacity-60"
         >
           <div className="rounded-xl bg-primary text-primary-foreground h-11 px-6 shadow-[var(--shadow-card)] transition active:scale-[0.98] flex items-center justify-center gap-2.5">
-            <FileUp className="h-[18px] w-[18px] shrink-0 opacity-90" strokeWidth={1.75} />
-            <span className="text-[15px] font-semibold tracking-tight whitespace-nowrap">{t("attachFile")}</span>
+            {busy ? (
+              <Loader2 className="h-[18px] w-[18px] shrink-0 opacity-90 animate-spin" strokeWidth={1.75} />
+            ) : (
+              <FileUp className="h-[18px] w-[18px] shrink-0 opacity-90" strokeWidth={1.75} />
+            )}
+            <span className="text-[15px] font-semibold tracking-tight whitespace-nowrap">{busy ?? t("attachFile")}</span>
           </div>
         </button>
+        {fileError && (
+          <p className="text-xs text-destructive text-center px-4">{fileError}</p>
+        )}
 
         <div className="flex items-center justify-center gap-2 w-full">
           {/* Settings — vänster */}

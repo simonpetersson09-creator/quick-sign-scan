@@ -2,7 +2,11 @@
 // Dynamically imported so pdfjs-dist (which references browser-only globals
 // like DOMMatrix) never runs during SSR.
 
-export async function pdfFileToImages(file: File, scale = 2): Promise<string[]> {
+export async function pdfFileToImages(
+  file: File,
+  opts: { scale?: number; quality?: number; onProgress?: (current: number, total: number) => void } = {},
+): Promise<string[]> {
+  const { scale = 2, quality = 0.85, onProgress } = opts;
   if (typeof window === "undefined") {
     throw new Error("pdfFileToImages can only run in the browser");
   }
@@ -22,8 +26,12 @@ export async function pdfFileToImages(file: File, scale = 2): Promise<string[]> 
     canvas.height = viewport.height;
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Canvas 2D context unavailable");
+    // White background — JPEG has no alpha, PDF transparency would render black.
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     await page.render({ canvasContext: ctx, viewport, canvas }).promise;
-    pages.push(canvas.toDataURL("image/png"));
+    pages.push(canvas.toDataURL("image/jpeg", quality));
+    onProgress?.(i, pdf.numPages);
   }
   return pages;
 }
