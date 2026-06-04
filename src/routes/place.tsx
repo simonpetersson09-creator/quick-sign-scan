@@ -180,21 +180,30 @@ function PlacePage() {
                 style={{ left: `${sigPos.x * 100}%`, top: `${sigPos.y * 100}%` }}
               >
               <div
-                className="rounded-md border-2 border-dashed border-primary/80 bg-primary/10 flex items-center justify-center"
+                className="flex flex-col items-stretch justify-center"
                 style={{
-                  // Keep signature box visually constant regardless of zoom.
-                  width: `${128 / zoom}px`,
+                  width: `${140 / zoom}px`,
                   height: `${40 / zoom}px`,
                 }}
               >
-                <PenLine className="text-primary" style={{ width: 16 / zoom, height: 16 / zoom }} />
                 <span
-                  className="ml-1 font-medium text-primary"
-                  style={{ fontSize: `${11 / zoom}px` }}
+                  className="font-semibold tracking-wide uppercase text-primary/80 text-center"
+                  style={{ fontSize: `${9 / zoom}px`, marginBottom: `${4 / zoom}px` }}
                 >
                   {t("signatureLabel")}
                 </span>
+                <div className="flex items-center" style={{ gap: `${4 / zoom}px` }}>
+                  <PenLine
+                    className="text-primary shrink-0"
+                    style={{ width: `${14 / zoom}px`, height: `${14 / zoom}px` }}
+                  />
+                  <div
+                    className="flex-1 bg-primary"
+                    style={{ height: `${Math.max(1, 1.5 / zoom)}px` }}
+                  />
+                </div>
               </div>
+
             </div>
             </div>
           </div>
