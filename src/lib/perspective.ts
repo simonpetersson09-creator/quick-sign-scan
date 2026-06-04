@@ -264,9 +264,47 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
     d[i + 2] = b;
   }
 
+  // 8) Despeckle / clean-up pass — high-contrast scanner output otherwise
+  //    leaves faint sensor noise on the white paper and stray dark pixels
+  //    that print as visible specks. Two cheap operations fix this:
+  //    a) snap near-white pixels (lum >= 238) to pure 255 white, killing
+  //       virtually all background noise without touching real ink.
+  //    b) remove isolated dark pixels: any dark pixel (lum < 90) whose
+  //       4-neighbours are all bright (lum > 210) is treated as noise and
+  //       flipped to white. Real text strokes always have dark neighbours,
+  //       so they're preserved.
+  const lum2 = new Uint8ClampedArray(n);
+  for (let i = 0, j = 0; i < d.length; i += 4, j++) {
+    const L = (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) | 0;
+    lum2[j] = L;
+    if (L >= 238) {
+      d[i] = 255;
+      d[i + 1] = 255;
+      d[i + 2] = 255;
+    }
+  }
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const j = y * w + x;
+      if (lum2[j] >= 90) continue;
+      if (
+        lum2[j - 1] > 210 &&
+        lum2[j + 1] > 210 &&
+        lum2[j - w] > 210 &&
+        lum2[j + w] > 210
+      ) {
+        const i = j * 4;
+        d[i] = 255;
+        d[i + 1] = 255;
+        d[i + 2] = 255;
+      }
+    }
+  }
+
   ctx.putImageData(img, 0, 0);
   return canvas;
 }
+
 
 export function cleanPaperEdges(canvas: HTMLCanvasElement): HTMLCanvasElement {
   const w = canvas.width;
