@@ -1254,6 +1254,28 @@ function ScanPage() {
           </div>
           <div>conf: {detectionMeta.current?.confidence?.toFixed(2) ?? "—"}</div>
           <div>
+            tight:{" "}
+            {detectionMeta.current?.debug.edgeTightness?.toFixed(2) ?? "—"} /{" "}
+            offset:{" "}
+            {detectionMeta.current?.debug.meanEdgeOffset !== undefined
+              ? detectionMeta.current.debug.meanEdgeOffset.toFixed(1) + "px"
+              : "—"}
+          </div>
+          <div>
+            edge: {detectionMeta.current?.debug.edgeScore?.toFixed(2) ?? "—"} /{" "}
+            a4: {detectionMeta.current?.debug.a4Score?.toFixed(2) ?? "—"} /{" "}
+            area: {detectionMeta.current?.debug.areaRatio?.toFixed(2) ?? "—"}
+          </div>
+          <div>
+            gate:{" "}
+            {detectionMeta.current
+              ? detectionMeta.current.confidence >= MIN_DOCUMENT_CONFIDENCE &&
+                detectionMeta.current.debug.edgeTightness >= MIN_EDGE_TIGHTNESS_FOR_CAPTURE
+                ? "READY ✓"
+                : "no — needs tighter edges"
+              : "—"}
+          </div>
+          <div>
             lastCapture:{" "}
             {debugInfo.lastCapture ? new Date(debugInfo.lastCapture).toLocaleTimeString() : "—"}
           </div>
