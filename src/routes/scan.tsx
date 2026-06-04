@@ -1008,6 +1008,11 @@ function ScanPage() {
     savedTimer2Ref.current = window.setTimeout(() => {
       if (cancelledRef.current) return;
       capturedRef.current = false;
+      stableCount.current = 0;
+      detectCount.current = 0;
+      lockedRef.current = false;
+      setProgress(0);
+      armedAtRef.current = performance.now() + REARM_DELAY_MS;
       setStatus("searching");
       loop();
     }, 2400);
