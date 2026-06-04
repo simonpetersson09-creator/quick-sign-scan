@@ -872,9 +872,13 @@ function ScanPage() {
           )}
         </div>
         {pageCount > 0 ? (
-          <div className="px-3 py-1.5 rounded-full bg-success/90 text-success-foreground text-[12px] font-semibold tabular-nums">
-            {pageCount}
-          </div>
+          <button
+            onClick={finishScanning}
+            className="px-4 py-2 rounded-full bg-white text-black text-[13px] font-semibold tracking-tight shadow-md active:scale-95 transition flex items-center gap-1.5"
+          >
+            {t("doneButton")}
+            <ArrowRight className="h-4 w-4" />
+          </button>
         ) : (
           <div className="w-10" />
         )}
