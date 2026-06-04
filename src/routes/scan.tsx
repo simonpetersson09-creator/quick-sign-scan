@@ -31,6 +31,7 @@ type Status =
   | "lowLight"
   | "ready"
   | "capturing"
+  | "saved"
   | "error";
 
 type ErrorType =
