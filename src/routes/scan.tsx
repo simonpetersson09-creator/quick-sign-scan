@@ -407,6 +407,26 @@ function ScanPage() {
     if (delta < STABLE_DELTA) stableCount.current++;
     else stableCount.current = Math.max(0, stableCount.current - 1);
 
+    // Measure sharpness within the detected quad. If the doc is too blurry
+    // we must not auto-capture — wait for continuous autofocus to settle.
+    let xs = smoothed.map((p) => p.x * dw);
+    let ys = smoothed.map((p) => p.y * dh);
+    const sharpness = laplacianVariance(data, dw, dh, {
+      x0: Math.min(...xs),
+      y0: Math.min(...ys),
+      x1: Math.max(...xs),
+      y1: Math.max(...ys),
+    });
+    sharpnessRef.current = sharpness;
+    const isSharp = sharpness >= SHARPNESS_LIVE_MIN;
+    if (!isSharp) {
+      blurFramesRef.current++;
+      // Hold back stability progress while the camera is still refocusing.
+      stableCount.current = Math.min(stableCount.current, READY_FRAMES - 1);
+    } else {
+      blurFramesRef.current = 0;
+    }
+
     // Progress 0..1 — fills up as the document stays stable, hits 1.0 right before capture.
     const pct = Math.max(0, Math.min(1, stableCount.current / STABLE_FRAMES));
     setProgress(pct);
@@ -423,6 +443,11 @@ function ScanPage() {
     if (stableCount.current < HOLD_FRAMES) {
       drawOverlay(smoothed, true);
       setStatus("align");
+    } else if (!isSharp) {
+      drawOverlay(smoothed, true);
+      // After ~2.5s of unsharp frames, prompt the user to back off — usually
+      // the document is closer than the minimum focus distance.
+      setStatus(blurFramesRef.current > BLUR_HINT_FRAMES ? "moveBack" : "focusing");
     } else if (stableCount.current < READY_FRAMES) {
       drawOverlay(smoothed, true);
       setStatus("hold");
