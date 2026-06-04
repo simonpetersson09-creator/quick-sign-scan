@@ -177,8 +177,10 @@ function ScanPage() {
         const gumPromise = navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: "environment" },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
+            width: { ideal: 3840 },
+            height: { ideal: 2160 },
+            // @ts-expect-error — non-standard but honored on iOS/Android
+            focusMode: "continuous",
           },
           audio: false,
         });
