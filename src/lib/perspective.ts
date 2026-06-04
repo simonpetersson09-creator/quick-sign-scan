@@ -227,6 +227,272 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
   return canvas;
 }
 
+export function cleanPaperEdges(canvas: HTMLCanvasElement): HTMLCanvasElement {
+  const w = canvas.width;
+  const h = canvas.height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx || !w || !h) return canvas;
+
+  const img = ctx.getImageData(0, 0, w, h);
+  const data = img.data;
+  const edgeLimitX = Math.round(w * 0.16);
+  const edgeLimitY = Math.round(h * 0.16);
+  const darkThreshold = 226;
+
+  const isDarkRow = (y: number) => {
+    let sum = 0;
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      sum += data[i] + data[i + 1] + data[i + 2];
+    }
+    return sum / (w * 3) < darkThreshold;
+  };
+  const isDarkCol = (x: number) => {
+    let sum = 0;
+    for (let y = 0; y < h; y++) {
+      const i = (y * w + x) * 4;
+      sum += data[i] + data[i + 1] + data[i + 2];
+    }
+    return sum / (h * 3) < darkThreshold;
+  };
+
+  let top = 0;
+  while (top < edgeLimitY && isDarkRow(top)) top++;
+  let bottom = 0;
+  while (bottom < edgeLimitY && isDarkRow(h - 1 - bottom)) bottom++;
+  let left = 0;
+  while (left < edgeLimitX && isDarkCol(left)) left++;
+  let right = 0;
+  while (right < edgeLimitX && isDarkCol(w - 1 - right)) right++;
+
+  ctx.fillStyle = "#ffffff";
+  if (top > 0) ctx.fillRect(0, 0, w, top);
+  if (bottom > 0) ctx.fillRect(0, h - bottom, w, bottom);
+  if (left > 0) ctx.fillRect(0, 0, left, h);
+  if (right > 0) ctx.fillRect(w - right, 0, right, h);
+  return canvas;
+}
+
+export function autoOrientAndDeskewDocument(canvas: HTMLCanvasElement): HTMLCanvasElement {
+  const sample = scaleCanvas(canvas, 420);
+  const rotations = [0, 90, 180, 270] as const;
+  let bestRotation = canvas.height >= canvas.width ? 0 : 90;
+  let bestScore = -Infinity;
+  let foundText = false;
+
+  for (const rotation of rotations) {
+    const rotatedSample = rotateCanvas(sample, rotation);
+    const analysis = estimateTextSkew(rotatedSample, 7, 0.5);
+    const portraitBias = rotatedSample.height >= rotatedSample.width ? 1.06 : 0.9;
+    const score = analysis.hasText
+      ? analysis.score * analysis.uprightScore * portraitBias
+      : portraitBias;
+    if (analysis.hasText) foundText = true;
+    if (score > bestScore) {
+      bestScore = score;
+      bestRotation = rotation;
+    }
+  }
+
+  let oriented = rotateCanvas(canvas, bestRotation);
+  const skew = estimateTextSkew(oriented, 7, 0.35);
+  if ((foundText || skew.hasText) && Math.abs(skew.angle) > 0.25) {
+    oriented = rotateCanvas(oriented, skew.angle);
+  }
+
+  const a4 = renderToA4Portrait(oriented);
+  cleanPaperEdges(a4);
+  return a4;
+}
+
+function renderToA4Portrait(source: HTMLCanvasElement): HTMLCanvasElement {
+  const outW = 1000;
+  const outH = Math.round(outW * Math.SQRT2);
+  const out = document.createElement("canvas");
+  out.width = outW;
+  out.height = outH;
+  const ctx = out.getContext("2d")!;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, outW, outH);
+  const scale = Math.min(outW / source.width, outH / source.height);
+  const drawW = source.width * scale;
+  const drawH = source.height * scale;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(source, (outW - drawW) / 2, (outH - drawH) / 2, drawW, drawH);
+  return out;
+}
+
+function rotateCanvas(source: HTMLCanvasElement, degrees: number): HTMLCanvasElement {
+  const normalized = ((degrees % 360) + 360) % 360;
+  if (Math.abs(normalized) < 0.001) return cloneCanvas(source);
+  const rad = (degrees * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const outW = Math.ceil(Math.abs(source.width * cos) + Math.abs(source.height * sin));
+  const outH = Math.ceil(Math.abs(source.width * sin) + Math.abs(source.height * cos));
+  const out = document.createElement("canvas");
+  out.width = outW;
+  out.height = outH;
+  const ctx = out.getContext("2d")!;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, outW, outH);
+  ctx.translate(outW / 2, outH / 2);
+  ctx.rotate(rad);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(source, -source.width / 2, -source.height / 2);
+  return out;
+}
+
+function cloneCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
+  const out = document.createElement("canvas");
+  out.width = source.width;
+  out.height = source.height;
+  out.getContext("2d")!.drawImage(source, 0, 0);
+  return out;
+}
+
+function scaleCanvas(source: HTMLCanvasElement, maxSide: number): HTMLCanvasElement {
+  const scale = Math.min(1, maxSide / Math.max(source.width, source.height));
+  const out = document.createElement("canvas");
+  out.width = Math.max(1, Math.round(source.width * scale));
+  out.height = Math.max(1, Math.round(source.height * scale));
+  const ctx = out.getContext("2d")!;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, out.width, out.height);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(source, 0, 0, out.width, out.height);
+  return out;
+}
+
+function estimateTextSkew(
+  canvas: HTMLCanvasElement,
+  maxAngle: number,
+  step: number,
+): { angle: number; score: number; hasText: boolean; uprightScore: number } {
+  const points = collectTextPoints(canvas);
+  if (points.length < 90) return { angle: 0, score: 0, hasText: false, uprightScore: 1 };
+
+  let bestAngle = 0;
+  let bestScore = -Infinity;
+  for (let angle = -maxAngle; angle <= maxAngle + 1e-6; angle += step) {
+    const score = horizontalProjectionScore(points, canvas.width, canvas.height, angle);
+    if (score > bestScore) {
+      bestScore = score;
+      bestAngle = angle;
+    }
+  }
+  for (let angle = bestAngle - step; angle <= bestAngle + step + 1e-6; angle += step / 4) {
+    const score = horizontalProjectionScore(points, canvas.width, canvas.height, angle);
+    if (score > bestScore) {
+      bestScore = score;
+      bestAngle = angle;
+    }
+  }
+
+  return {
+    angle: bestAngle,
+    score: bestScore,
+    hasText: true,
+    uprightScore: estimateUprightScore(points, canvas.width, canvas.height),
+  };
+}
+
+function collectTextPoints(canvas: HTMLCanvasElement): Point[] {
+  const w = canvas.width;
+  const h = canvas.height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return [];
+  const img = ctx.getImageData(0, 0, w, h);
+  const data = img.data;
+  const hist = new Uint32Array(256);
+  const lum = new Uint8ClampedArray(w * h);
+  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+    const value = (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) | 0;
+    lum[p] = value;
+    hist[value]++;
+  }
+
+  const cutoff = Math.max(55, Math.min(190, otsuThreshold(hist, w * h) - 4));
+  const marginX = Math.round(w * 0.045);
+  const marginY = Math.round(h * 0.045);
+  const all: Point[] = [];
+  for (let y = marginY; y < h - marginY; y++) {
+    for (let x = marginX; x < w - marginX; x++) {
+      if (lum[y * w + x] < cutoff) all.push({ x, y });
+    }
+  }
+  if (all.length > w * h * 0.22) return [];
+  if (all.length <= 14000) return all;
+  const stride = Math.ceil(all.length / 14000);
+  return all.filter((_, i) => i % stride === 0);
+}
+
+function horizontalProjectionScore(
+  points: Point[],
+  w: number,
+  h: number,
+  angleDeg: number,
+): number {
+  const rad = (angleDeg * Math.PI) / 180;
+  const sin = Math.sin(rad);
+  const cos = Math.cos(rad);
+  const bins = new Float32Array(Math.ceil(Math.hypot(w, h)) + 6);
+  const cx = w / 2;
+  const cy = h / 2;
+  const offset = bins.length / 2;
+  for (const p of points) {
+    const y = sin * (p.x - cx) + cos * (p.y - cy) + offset;
+    const yi = Math.max(0, Math.min(bins.length - 1, Math.round(y)));
+    bins[yi]++;
+  }
+  let score = 0;
+  for (let i = 1; i < bins.length - 1; i++) {
+    const smoothed = bins[i - 1] * 0.25 + bins[i] * 0.5 + bins[i + 1] * 0.25;
+    score += smoothed * smoothed;
+  }
+  return score / Math.max(1, points.length);
+}
+
+function estimateUprightScore(points: Point[], w: number, h: number): number {
+  const rows = new Uint16Array(h);
+  let topHalf = 0;
+  let bottomHalf = 0;
+  let leftHalf = 0;
+  let rightHalf = 0;
+  let sumX = 0;
+  for (const p of points) {
+    rows[Math.max(0, Math.min(h - 1, Math.round(p.y)))]++;
+    if (p.y < h / 2) topHalf++;
+    else bottomHalf++;
+    if (p.x < w / 2) leftHalf++;
+    else rightHalf++;
+    sumX += p.x;
+  }
+  const rowCutoff = Math.max(3, points.length * 0.0025);
+  let firstTop = h;
+  let firstBottom = h;
+  for (let y = 0; y < h; y++) {
+    if (rows[y] >= rowCutoff) {
+      firstTop = y;
+      break;
+    }
+  }
+  for (let y = h - 1; y >= 0; y--) {
+    if (rows[y] >= rowCutoff) {
+      firstBottom = h - 1 - y;
+      break;
+    }
+  }
+  const marginHint = clamp01((firstBottom - firstTop) / Math.max(1, h * 0.18));
+  const topHint = clamp01((topHalf - bottomHalf) / Math.max(1, points.length) + 0.15);
+  const leftHint = clamp01((leftHalf - rightHalf) / Math.max(1, points.length) + 0.2);
+  const avgXHint = clamp01((0.62 - sumX / Math.max(1, points.length) / w) / 0.24);
+  return 0.9 + 0.2 * (0.42 * marginHint + 0.24 * topHint + 0.22 * leftHint + 0.12 * avgXHint);
+}
+
 function boxBlur(src: Float32Array, w: number, h: number, r: number): Float32Array {
   const tmp = new Float32Array(src.length);
   const out = new Float32Array(src.length);
@@ -1051,7 +1317,7 @@ function reduceHullToQuad(hull: Point[]): [Point, Point, Point, Point] | null {
   return pts.length === 4 ? [pts[0], pts[1], pts[2], pts[3]] : null;
 }
 
-function orderQuad(quad: [Point, Point, Point, Point]): [Point, Point, Point, Point] {
+export function orderQuad(quad: [Point, Point, Point, Point]): [Point, Point, Point, Point] {
   const cx = quad.reduce((s, p) => s + p.x, 0) / 4;
   const cy = quad.reduce((s, p) => s + p.y, 0) / 4;
   let ordered = [...quad].sort(
