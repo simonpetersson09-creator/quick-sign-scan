@@ -139,6 +139,18 @@ function PlacePage() {
     <AppShell title={t("placeTitle")} back="/preview">
       <p className="text-sm text-muted-foreground mt-1 mb-3">{t("placeHint")}</p>
       <div className="flex-1 flex flex-col items-center justify-center gap-3 min-h-0">
+        <div className="relative flex items-center justify-center" style={{ width: "min(92vw, 440px)" }}>
+          {pages.length > 1 && (
+            <button
+              type="button"
+              onClick={() => goToPage(pageIndex - 1)}
+              disabled={pageIndex === 0}
+              aria-label={t("prevPage")}
+              className="absolute left-0 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full bg-card/90 backdrop-blur border border-border shadow-[var(--shadow-soft)] text-foreground/80 hover:bg-secondary disabled:opacity-30 disabled:pointer-events-none transition"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+          )}
         <div
           ref={containerRef}
           onPointerDown={onDown}
