@@ -4,7 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
 import { useT } from "@/lib/i18n";
-import { ArrowRight, Plus, RotateCcw, Trash2, ChevronUp, ChevronDown } from "lucide-react";
+import { ArrowRight, Plus, RotateCcw, Trash2, ChevronUp, ChevronDown, ScanLine } from "lucide-react";
 
 export const Route = createFileRoute("/preview")({
   head: () => ({ meta: [{ title: "Förhandsgranska" }] }),
@@ -20,7 +20,8 @@ function PreviewPage() {
   useEffect(() => {
     const session = scanStore.get();
     if (!session.pages.length) {
-      navigate({ to: "/" });
+      setPages([]);
+      setActiveIndex(0);
       return;
     }
     setPages(session.pages);
@@ -73,7 +74,30 @@ function PreviewPage() {
     navigate({ to: "/place" });
   }
 
-  if (!pages.length) return null;
+  if (!pages.length) {
+    return (
+      <AppShell title={t("previewTitle")} back="/">
+        <div className="flex flex-1 flex-col items-center justify-center text-center pb-16">
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-secondary text-secondary-foreground">
+            <ScanLine className="h-6 w-6" />
+          </div>
+          <h2 className="text-[18px] font-semibold tracking-tight text-foreground">
+            {t("emptyPreviewTitle")}
+          </h2>
+          <p className="mt-2 max-w-[260px] text-sm leading-6 text-muted-foreground">
+            {t("emptyPreviewDesc")}
+          </p>
+        </div>
+        <div className="pb-5">
+          <PrimaryButton onClick={addPage}>
+            <span className="inline-flex items-center justify-center gap-2">
+              <ScanLine className="h-5 w-5" /> {t("scanDocument")}
+            </span>
+          </PrimaryButton>
+        </div>
+      </AppShell>
+    );
+  }
   const image = pages[activeIndex];
 
   return (
