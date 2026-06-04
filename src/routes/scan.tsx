@@ -561,11 +561,21 @@ function ScanPage() {
   ) {
     const svg = svgRef.current;
     const poly = polyRef.current;
+    const glow = glowRef.current;
+    const trace = tracePolyRef.current;
     if (!svg || !poly) return;
 
     if (!quad) {
       poly.setAttribute("points", "");
       poly.style.opacity = "0";
+      if (glow) {
+        glow.setAttribute("points", "");
+        glow.style.opacity = "0";
+      }
+      if (trace) {
+        trace.setAttribute("points", "");
+        trace.style.opacity = "0";
+      }
       cornerRefs.current.forEach((c) => c && (c.style.opacity = "0"));
       return;
     }
@@ -590,35 +600,52 @@ function ScanPage() {
     const pts = quad.map((p) => `${offX + p.x * dispW},${offY + p.y * dispH}`).join(" ");
     poly.setAttribute("points", pts);
     poly.style.opacity = "1";
+    if (glow) {
+      glow.setAttribute("points", pts);
+    }
+    if (trace) {
+      trace.setAttribute("points", pts);
+    }
 
-    // Color phases: white (searching) → yellow (held, focusing) → green (ready)
-    const stroke =
-      phase === "ready"
-        ? "var(--success)"
-        : phase === "hold"
-          ? "rgb(250,204,21)" // amber-400 — clear yellow signal
-          : "rgba(255,255,255,0.95)";
+    // Soft Genius Scan-style palette — always warm yellow, only intensity
+    // and glow change across phases. Searching = subtle hint, hold = clear
+    // yellow frame, ready = thicker glowing yellow with animated trace.
+    const YELLOW = "rgb(255,193,7)"; // amber — warm, soft
+    const YELLOW_SOFT = "rgb(255,214,90)";
+
+    const stroke = phase === "search" ? YELLOW_SOFT : YELLOW;
     const fill =
       phase === "ready"
-        ? "color-mix(in oklab, var(--success) 18%, transparent)"
+        ? "color-mix(in oklab, rgb(255,193,7) 14%, transparent)"
         : phase === "hold"
-          ? "color-mix(in oklab, rgb(250,204,21) 14%, transparent)"
-          : "rgba(255,255,255,0.06)";
+          ? "color-mix(in oklab, rgb(255,193,7) 9%, transparent)"
+          : "color-mix(in oklab, rgb(255,214,90) 5%, transparent)";
+
     poly.setAttribute("stroke", stroke);
     poly.setAttribute("fill", fill);
+    poly.setAttribute("stroke-width", phase === "ready" ? "4.5" : phase === "hold" ? "3.5" : "2.5");
+    poly.style.opacity = phase === "search" ? "0.85" : "1";
 
-    quad.forEach((p, i) => {
-      const c = cornerRefs.current[i];
-      if (!c) return;
-      c.setAttribute("cx", String(offX + p.x * dispW));
-      c.setAttribute("cy", String(offY + p.y * dispH));
-      c.setAttribute(
-        "fill",
-        phase === "ready" ? "var(--success)" : phase === "hold" ? "rgb(250,204,21)" : "white",
-      );
-      c.style.opacity = "1";
-    });
+    if (glow) {
+      // Outer halo that pulses softer in search, intensifies on hold/ready.
+      glow.setAttribute("stroke", YELLOW);
+      glow.setAttribute("stroke-width", phase === "ready" ? "14" : phase === "hold" ? "10" : "6");
+      glow.style.opacity =
+        phase === "ready" ? "0.45" : phase === "hold" ? "0.28" : "0.15";
+    }
+
+    if (trace) {
+      // Bright traveling segment along the perimeter when ready — gives the
+      // "scanning sweep" feel of Genius Scan.
+      trace.setAttribute("stroke", "rgb(255,224,130)");
+      trace.setAttribute("stroke-width", "5");
+      trace.style.opacity = phase === "ready" ? "1" : "0";
+    }
+
+    // Hide corner dots entirely — Genius Scan-style frame is corner-free.
+    cornerRefs.current.forEach((c) => c && (c.style.opacity = "0"));
   }
+
 
   async function capture(normQuad: [Point, Point, Point, Point]) {
     if (capturedRef.current) return;
