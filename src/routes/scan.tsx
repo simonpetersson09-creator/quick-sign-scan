@@ -8,6 +8,7 @@ import {
   detectDocumentQuad,
   laplacianVariance,
   MIN_DOCUMENT_CONFIDENCE,
+  MIN_EDGE_TIGHTNESS_FOR_CAPTURE,
   measureQuadGeometry,
   orderQuad,
   Point,
@@ -661,6 +662,15 @@ function ScanPage() {
       setStatus("uncertain");
       return;
     }
+    // Tight-edge gate: the polygon must actually be snapped onto real
+    // document edges. Stops auto-capture from firing when the frame is
+    // still floating a few cm off the paper (e.g. on a uniform floor).
+    if (meta.debug.edgeTightness < MIN_EDGE_TIGHTNESS_FOR_CAPTURE) {
+      stableCount.current = 0;
+      lockedRef.current = false;
+      setStatus("align");
+      return;
+    }
     // Final A4 ratio gate — reject quads whose proportions diverge too far
     // from sqrt(2). Manual capture from `manualCapture` bypasses this since
     // user intent is explicit.
@@ -1243,6 +1253,28 @@ function ScanPage() {
             detect: {detectCount.current} / stable: {stableCount.current}
           </div>
           <div>conf: {detectionMeta.current?.confidence?.toFixed(2) ?? "—"}</div>
+          <div>
+            tight:{" "}
+            {detectionMeta.current?.debug.edgeTightness?.toFixed(2) ?? "—"} /{" "}
+            offset:{" "}
+            {detectionMeta.current?.debug.meanEdgeOffset !== undefined
+              ? detectionMeta.current.debug.meanEdgeOffset.toFixed(1) + "px"
+              : "—"}
+          </div>
+          <div>
+            edge: {detectionMeta.current?.debug.edgeScore?.toFixed(2) ?? "—"} /{" "}
+            a4: {detectionMeta.current?.debug.a4Score?.toFixed(2) ?? "—"} /{" "}
+            area: {detectionMeta.current?.debug.areaRatio?.toFixed(2) ?? "—"}
+          </div>
+          <div>
+            gate:{" "}
+            {detectionMeta.current
+              ? detectionMeta.current.confidence >= MIN_DOCUMENT_CONFIDENCE &&
+                detectionMeta.current.debug.edgeTightness >= MIN_EDGE_TIGHTNESS_FOR_CAPTURE
+                ? "READY ✓"
+                : "no — needs tighter edges"
+              : "—"}
+          </div>
           <div>
             lastCapture:{" "}
             {debugInfo.lastCapture ? new Date(debugInfo.lastCapture).toLocaleTimeString() : "—"}
