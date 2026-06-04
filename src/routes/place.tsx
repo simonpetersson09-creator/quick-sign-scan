@@ -199,6 +199,26 @@ function PlacePage() {
             </div>
           </div>
         </div>
+          {pages.length > 1 && (
+            <button
+              type="button"
+              onClick={() => goToPage(pageIndex + 1)}
+              disabled={pageIndex === pages.length - 1}
+              aria-label={t("nextPage")}
+              className="absolute right-0 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full bg-card/90 backdrop-blur border border-border shadow-[var(--shadow-soft)] text-foreground/80 hover:bg-secondary disabled:opacity-30 disabled:pointer-events-none transition"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          )}
+        </div>
+
+        {pages.length > 1 && (
+          <div className="text-xs text-muted-foreground tabular-nums">
+            {t("pageIndicator").replace("{current}", String(pageIndex + 1)).replace("{total}", String(pages.length))}
+          </div>
+        )}
+
+
 
 
 
