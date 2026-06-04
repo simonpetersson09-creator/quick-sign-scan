@@ -459,15 +459,15 @@ function ScanPage() {
       setDebugInfo((d) => ({ ...d, vw, vh, ready: true, lastCapture: Date.now() }));
     }
 
-    // Inset corners ~3.2% toward centroid as a safety margin so background,
-    // bordskanter eller skuggor utanför pappret aldrig läcker in i resultatet.
-    // Större inset = mer kantmarginal bortskuren, men säkrare enhetlig vit yta.
+    // Outset corners ~1.5% bort från centroid så att hela dokumentet kommer med
+    // — tidigare insat skar bort kanterna. Liten outset säkerställer att vi
+    // fångar hela arket utan att tappa text nära kanten.
     const cx = (normQuad[0].x + normQuad[1].x + normQuad[2].x + normQuad[3].x) / 4;
     const cy = (normQuad[0].y + normQuad[1].y + normQuad[2].y + normQuad[3].y) / 4;
-    const INSET = 0.032;
+    const INSET = -0.015;
     const inset = normQuad.map((p) => ({
-      x: p.x + (cx - p.x) * INSET,
-      y: p.y + (cy - p.y) * INSET,
+      x: Math.max(0, Math.min(1, p.x + (cx - p.x) * INSET)),
+      y: Math.max(0, Math.min(1, p.y + (cy - p.y) * INSET)),
     })) as [Point, Point, Point, Point];
 
 
