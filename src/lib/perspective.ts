@@ -328,7 +328,7 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
   // 3) Global white reference from the upper percentile of the background.
   const sample = new Float32Array(bg);
   sample.sort();
-  const whiteRef = Math.max(140, sample[Math.floor(n * 0.92)] || 200);
+  const whiteRef = Math.max(160, sample[Math.floor(n * 0.96)] || 210);
 
   // 4) Shading correction: per-pixel multiplier whiteRef / bg flattens
   //    shadows and uneven lighting across the page.
