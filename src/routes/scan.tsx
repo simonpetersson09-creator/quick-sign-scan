@@ -142,6 +142,13 @@ function ScanPage() {
   // the same document again.
   const armedAtRef = useRef(0);
   const REARM_DELAY_MS = 1200;
+  // Gyro / motion stability — exponential moving average of |acceleration|
+  // (gravity removed). Stays near 0 when the phone is held still; spikes on
+  // jitter. Used as an extra gate before auto-capture so we never snap a
+  // shaky frame even if the detected quad looks stable.
+  const motionMagRef = useRef(0);
+  const motionAvailableRef = useRef(false);
+  const MOTION_STILL_THRESHOLD = 0.45; // m/s² — empirical, tolerates breathing
 
   const [torchOn, setTorchOn] = useState(false);
   const [torchAvailable, setTorchAvailable] = useState(false);
