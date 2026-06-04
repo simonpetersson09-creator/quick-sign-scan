@@ -15,6 +15,7 @@ import {
   emaQuad,
   enhancePaper,
   maxCornerDelta,
+  removeShadows,
   warpQuadToRect,
 } from "@/lib/perspective";
 import type { DocumentAlignmentDiagnostics } from "@/lib/perspective";
