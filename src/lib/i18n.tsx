@@ -20,6 +20,7 @@ const sv: Dict = {
   step_send: "Skicka",
   step_done: "Färdig",
   scanDocument: "Skanna dokument",
+  attachFile: "Bifoga fil",
   changeLanguage: "Byt språk",
 
   // scan
@@ -200,6 +201,7 @@ const en: Dict = {
   step_send: "Send",
   step_done: "Done",
   scanDocument: "Scan document",
+  attachFile: "Attach file",
   changeLanguage: "Change language",
 
   // scan
