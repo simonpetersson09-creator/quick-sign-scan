@@ -320,10 +320,13 @@ export function autoOrientAndDeskewDocument(
 ): HTMLCanvasElement {
   const sample = scaleCanvas(canvas, 420);
   const rotations = [0, 90, 180, 270] as const;
-  let bestRotation: (typeof rotations)[number] = canvas.height >= canvas.width ? 0 : 90;
-  let bestScore = -Infinity;
+  // Default: trust the source orientation. The perspective warp already aligns
+  // the document with the natural up-direction of how the user framed it, so
+  // 0° is the right answer unless we have strong evidence otherwise.
+  let bestRotation: (typeof rotations)[number] = 0;
   let foundText = false;
   const orientationCandidates: DocumentAlignmentDiagnostics["orientationCandidates"] = [];
+  const scoresByRotation = new Map<number, number>();
 
   for (const rotation of rotations) {
     const rotatedSample = rotateCanvas(sample, rotation);
@@ -342,10 +345,26 @@ export function autoOrientAndDeskewDocument(
       hasText: analysis.hasText,
       score,
     });
+    scoresByRotation.set(rotation, score);
     if (analysis.hasText) foundText = true;
-    if (score > bestScore) {
-      bestScore = score;
-      bestRotation = rotation;
+  }
+
+  // Only deviate from 0° if SOME rotation produced real text evidence AND its
+  // score is meaningfully higher than 0°'s score. This prevents accidental
+  // 180° flips when text detection is unreliable.
+  if (foundText) {
+    const baseScore = scoresByRotation.get(0) ?? 0;
+    const margin = 1.18; // require ~18% better than 0° to override
+    let challengerScore = baseScore;
+    for (const rotation of rotations) {
+      if (rotation === 0) continue;
+      const s = scoresByRotation.get(rotation) ?? 0;
+      const cand = orientationCandidates.find((c) => c.rotation === rotation);
+      if (!cand?.hasText) continue;
+      if (s > challengerScore && s > baseScore * margin) {
+        challengerScore = s;
+        bestRotation = rotation;
+      }
     }
   }
 
