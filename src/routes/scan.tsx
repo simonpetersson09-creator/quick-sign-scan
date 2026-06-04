@@ -100,7 +100,11 @@ function ScanPage() {
   const [errorType, setErrorType] = useState<ErrorType | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [pageCount, setPageCount] = useState(() => scanStore.get().pages.length);
-  const [justCaptured, setJustCaptured] = useState<string | null>(null);
+  const [lastThumbnail, setLastThumbnail] = useState<string | null>(
+    () => scanStore.get().imageDataUrl ?? null,
+  );
+  const [flashOn, setFlashOn] = useState(false);
+  const flashTimerRef = useRef<number | null>(null);
   const [debugInfo, setDebugInfo] = useState<{
     vw: number;
     vh: number;
@@ -714,37 +718,55 @@ function ScanPage() {
     finishPageCapture(dataUrl, nextPages.length);
   }
 
-  // After a successful capture, freeze detection and show the in-camera review
-  // overlay. The stream stays alive so the user can immediately scan another
-  // page without re-asking for camera permissions.
+  // After a successful capture: brief visual flash + thumbnail update, then
+  // automatically resume detection so the user can scan the next page without
+  // leaving the camera. The camera stream stays alive the entire time.
   function finishPageCapture(dataUrl: string, count: number) {
     setPageCount(count);
-    setJustCaptured(dataUrl);
-    // Pause RAF/detection until the user chooses next action.
-    capturedRef.current = true;
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-  }
+    setLastThumbnail(dataUrl);
+    // Visual confirmation flash
+    setFlashOn(true);
+    if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = window.setTimeout(() => setFlashOn(false), 220);
 
-  function scanAnotherPage() {
-    // Start a fresh camera session from this direct button click. This keeps
-    // mobile browser camera permissions in a user gesture and avoids stale
-    // video/detection state from the previous page.
-    setJustCaptured(null);
-    startCamera({ restartStream: true, skipPermissionPreflight: true });
+    // Reset detection state so auto-capture starts fresh for the next page.
+    stableCount.current = 0;
+    detectCount.current = 0;
+    missCount.current = 0;
+    smoothQuad.current = null;
+    lastRawQuad.current = null;
+    detectionMeta.current = null;
+    blurFramesRef.current = 0;
+    captureRetryRef.current = 0;
+    sharpnessRef.current = 0;
+    setProgress(0);
+    drawOverlay(null, false);
+
+    // Short cool-down so the user perceives the capture, then resume the
+    // detection loop on the same live stream.
+    window.setTimeout(() => {
+      if (cancelledRef.current) return;
+      capturedRef.current = false;
+      setStatus("searching");
+      loop();
+    }, 650);
   }
 
   function finishScanning() {
+    if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current);
     streamRef.current?.getTracks().forEach((tr) => tr.stop());
     navigate({ to: "/preview" });
   }
 
   function startOverScan() {
     scanStore.clear();
-    setJustCaptured(null);
+    setLastThumbnail(null);
     setPageCount(0);
     setStatus("searching");
     startCamera({ restartStream: true });
   }
+  // Suppress unused warning — kept for potential future re-entry point.
+  void startOverScan;
 
   function cancelScan() {
     streamRef.current?.getTracks().forEach((tr) => tr.stop());
@@ -852,9 +874,13 @@ function ScanPage() {
           )}
         </div>
         {pageCount > 0 ? (
-          <div className="px-3 py-1.5 rounded-full bg-success/90 text-success-foreground text-[12px] font-semibold tabular-nums">
-            {pageCount}
-          </div>
+          <button
+            onClick={finishScanning}
+            className="px-4 py-2 rounded-full bg-white text-black text-[13px] font-semibold tracking-tight shadow-md active:scale-95 transition flex items-center gap-1.5"
+          >
+            {t("doneButton")}
+            <ArrowRight className="h-4 w-4" />
+          </button>
         ) : (
           <div className="w-10" />
         )}
@@ -862,53 +888,104 @@ function ScanPage() {
 
       <div className="flex-1" />
 
-      {/* Bottom hint / manual capture */}
+      {/* Bottom hint / manual capture / page thumbnail */}
       <div className="relative pb-safe px-5 pt-4 flex flex-col items-center gap-3">
         {error && status !== "error" && (
           <p className="text-center text-sm text-red-200 max-w-xs">{error}</p>
         )}
-        <div className="relative h-20 w-20 flex items-center justify-center">
-          {/* Progress ring — fills as the document locks in, hits 100% then auto-captures */}
-          <svg
-            className="absolute inset-0 h-full w-full -rotate-90 pointer-events-none"
-            viewBox="0 0 80 80"
-            aria-hidden="true"
-          >
-            <circle
-              cx="40"
-              cy="40"
-              r="36"
-              fill="none"
-              stroke="rgba(255,255,255,0.18)"
-              strokeWidth="3"
-            />
-            <circle
-              cx="40"
-              cy="40"
-              r="36"
-              fill="none"
-              stroke="var(--success)"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeDasharray={2 * Math.PI * 36}
-              strokeDashoffset={2 * Math.PI * 36 * (1 - progress)}
-              style={{ transition: "stroke-dashoffset 120ms linear, opacity 200ms" }}
-              opacity={progress > 0 ? 1 : 0}
-            />
-          </svg>
-          <button
-            onClick={manualCapture}
-            disabled={
-              !cameraReady || status === "starting" || status === "error" || status === "capturing"
-            }
-            className="h-16 w-16 rounded-full bg-white text-black flex items-center justify-center shadow-lg active:scale-95 disabled:opacity-40"
-            aria-label={t("manualCapture")}
-          >
-            <Camera className="h-7 w-7" />
-          </button>
+        <div className="w-full flex items-end justify-between gap-3">
+          {/* Left: thumbnail of last scanned page + counter */}
+          <div className="w-20 flex flex-col items-center gap-1">
+            {lastThumbnail ? (
+              <button
+                onClick={finishScanning}
+                className="relative rounded-md overflow-hidden border-2 border-white/70 bg-white shadow-lg active:scale-95 transition"
+                style={{ width: 56, aspectRatio: "1 / 1.414" }}
+                aria-label={t("doneButton")}
+              >
+                <img
+                  src={lastThumbnail}
+                  alt=""
+                  className="block w-full h-full object-cover"
+                />
+                <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-success text-success-foreground text-[11px] font-bold flex items-center justify-center tabular-nums shadow">
+                  {pageCount}
+                </span>
+              </button>
+            ) : (
+              <div style={{ width: 56 }} />
+            )}
+            {pageCount > 0 && (
+              <span className="text-[10px] text-white/70 tabular-nums">
+                {pageCount} {pageCount === 1 ? t("pageSingular") : t("pagePlural")}
+              </span>
+            )}
+          </div>
+
+          {/* Center: capture button */}
+          <div className="relative h-20 w-20 flex items-center justify-center shrink-0">
+            <svg
+              className="absolute inset-0 h-full w-full -rotate-90 pointer-events-none"
+              viewBox="0 0 80 80"
+              aria-hidden="true"
+            >
+              <circle
+                cx="40"
+                cy="40"
+                r="36"
+                fill="none"
+                stroke="rgba(255,255,255,0.18)"
+                strokeWidth="3"
+              />
+              <circle
+                cx="40"
+                cy="40"
+                r="36"
+                fill="none"
+                stroke="var(--success)"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeDasharray={2 * Math.PI * 36}
+                strokeDashoffset={2 * Math.PI * 36 * (1 - progress)}
+                style={{ transition: "stroke-dashoffset 120ms linear, opacity 200ms" }}
+                opacity={progress > 0 ? 1 : 0}
+              />
+            </svg>
+            <button
+              onClick={manualCapture}
+              disabled={
+                !cameraReady || status === "starting" || status === "error" || status === "capturing"
+              }
+              className="h-16 w-16 rounded-full bg-white text-black flex items-center justify-center shadow-lg active:scale-95 disabled:opacity-40"
+              aria-label={t("manualCapture")}
+            >
+              <Camera className="h-7 w-7" />
+            </button>
+          </div>
+
+          {/* Right: Klar button (only when pages exist) */}
+          <div className="w-20 flex justify-center">
+            {pageCount > 0 ? (
+              <button
+                onClick={finishScanning}
+                className="rounded-full bg-success text-success-foreground px-4 py-2.5 text-[14px] font-semibold tracking-tight shadow-lg active:scale-95 transition flex items-center gap-1"
+              >
+                {t("doneButton")}
+              </button>
+            ) : (
+              <div className="w-12" />
+            )}
+          </div>
         </div>
-        <p className="text-xs text-white/75 text-center max-w-[260px]">{t("scanHint")}</p>
+        <p className="text-xs text-white/75 text-center max-w-[260px]">
+          {pageCount > 0 ? t("scanHintMulti") : t("scanHint")}
+        </p>
       </div>
+
+      {/* Capture flash — brief visual confirmation after each page */}
+      {flashOn && (
+        <div className="pointer-events-none absolute inset-0 z-30 bg-white/40 animate-in fade-in duration-100" />
+      )}
 
       {/* Debug overlay — enable with ?debug=1 in the URL */}
       {debugEnabled && (
@@ -933,106 +1010,6 @@ function ScanPage() {
         </div>
       )}
 
-      {/* Post-capture review overlay — shown after each page is captured.
-          User can scan another page (stream stays alive) or finish. */}
-      {justCaptured && status !== "error" && (
-        <div className="absolute inset-0 z-40 flex flex-col items-center justify-end bg-black/75 backdrop-blur-sm px-5 pb-safe pt-10">
-          <div className="w-full max-w-sm flex flex-col items-center gap-4">
-            <div className="text-center">
-              <p className="text-[13px] uppercase tracking-wide text-white/60 font-semibold">
-                {t("pageCaptured")}
-              </p>
-              <p className="text-2xl font-semibold tracking-tight mt-1">
-                {pageCount} {pageCount === 1 ? t("pageSingular") : t("pagePlural")}
-              </p>
-            </div>
-            <div
-              className="rounded-sm overflow-hidden border border-white/15 bg-white shadow-xl flex items-center justify-center"
-              style={{ width: "min(60vw, 240px)" }}
-            >
-              <img
-                src={justCaptured}
-                alt={t("scannedAlt")}
-                className="block w-full h-auto bg-white"
-              />
-            </div>
-            {debugEnabled && scanStore.get().sourceDataUrl && scanStore.get().detection && (
-              <div className="w-full flex flex-col items-center gap-1">
-                <p className="text-[11px] uppercase tracking-wide text-white/60 font-semibold">
-                  Debug: källram + hörn
-                </p>
-                <div
-                  className="relative rounded-sm overflow-hidden border border-yellow-400/60 bg-black"
-                  style={{ width: "min(70vw, 280px)" }}
-                >
-                  <img
-                    src={scanStore.get().sourceDataUrl!}
-                    alt="source frame"
-                    className="block w-full h-auto"
-                  />
-                  <svg
-                    className="absolute inset-0 w-full h-full"
-                    viewBox="0 0 1 1"
-                    preserveAspectRatio="none"
-                  >
-                    <polygon
-                      points={scanStore
-                        .get()
-                        .detection!.corners.map((p) => `${p.x},${p.y}`)
-                        .join(" ")}
-                      fill="rgba(250,204,21,0.18)"
-                      stroke="rgb(250,204,21)"
-                      strokeWidth={0.006}
-                      vectorEffect="non-scaling-stroke"
-                    />
-                    {scanStore.get().detection!.corners.map((p, i) => (
-                      <g key={i}>
-                        <circle cx={p.x} cy={p.y} r={0.012} fill="rgb(250,204,21)" />
-                        <text
-                          x={p.x}
-                          y={p.y}
-                          fontSize={0.035}
-                          fill="black"
-                          textAnchor="middle"
-                          dominantBaseline="middle"
-                          fontWeight="bold"
-                        >
-                          {["TL", "TR", "BR", "BL"][i]}
-                        </text>
-                      </g>
-                    ))}
-                  </svg>
-                </div>
-                <p className="text-[10px] text-white/50 font-mono">
-                  conf: {scanStore.get().detection!.confidence.toFixed(2)} · a4:{" "}
-                  {scanStore.get().detection!.a4Ratio.toFixed(2)}
-                </p>
-              </div>
-            )}
-            <div className="w-full flex flex-col gap-3 pt-2 pb-4">
-              <button
-                onClick={scanAnotherPage}
-                className="w-full rounded-xl bg-white/15 border border-white/25 text-white py-3.5 px-4 font-medium text-[15px] tracking-tight flex items-center justify-center gap-2 active:scale-[0.98] transition"
-              >
-                <Camera className="h-5 w-5" />
-                {t("scanAnotherPage")}
-              </button>
-              <button
-                onClick={finishScanning}
-                className="w-full rounded-xl bg-white text-black py-3.5 px-4 font-semibold text-[15px] tracking-tight flex items-center justify-center gap-2 active:scale-[0.98] transition"
-              >
-                {t("finishScanning")} <ArrowRight className="h-5 w-5" />
-              </button>
-              <button
-                onClick={startOverScan}
-                className="w-full rounded-xl bg-transparent border border-white/15 text-white/70 py-3 px-4 font-medium text-[14px] tracking-tight active:scale-[0.98] transition"
-              >
-                {t("startOver")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Permission / error overlay */}
       {status === "error" && (

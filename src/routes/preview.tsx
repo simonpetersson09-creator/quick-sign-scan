@@ -4,7 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
 import { useT } from "@/lib/i18n";
-import { RefreshCw, ArrowRight, Plus, RotateCcw } from "lucide-react";
+import { ArrowRight, Plus, RotateCcw, Trash2, ChevronUp, ChevronDown } from "lucide-react";
 
 export const Route = createFileRoute("/preview")({
   head: () => ({ meta: [{ title: "Förhandsgranska" }] }),
@@ -14,31 +14,50 @@ export const Route = createFileRoute("/preview")({
 function PreviewPage() {
   const navigate = useNavigate();
   const t = useT();
-  const [image, setImage] = useState<string | null>(null);
   const [pages, setPages] = useState<string[]>([]);
+  const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
-    const img = scanStore.get().imageDataUrl;
-    if (!img) {
+    const session = scanStore.get();
+    if (!session.pages.length) {
       navigate({ to: "/" });
       return;
     }
-    const session = scanStore.get();
-    setImage(img);
     setPages(session.pages);
+    const idx = session.imageDataUrl
+      ? Math.max(0, session.pages.indexOf(session.imageDataUrl))
+      : session.pages.length - 1;
+    setActiveIndex(idx);
   }, [navigate]);
 
-  function retake() {
+  function commitPages(next: string[], nextActive: number) {
+    const safeActive = Math.max(0, Math.min(next.length - 1, nextActive));
+    setPages(next);
+    setActiveIndex(safeActive);
     scanStore.set({
-      imageDataUrl: null,
-      sourceDataUrl: null,
-      pages: [],
-      detection: null,
-      signatureDataUrl: null,
-      signaturePosition: null,
-      pdfDataUrl: null,
+      pages: next,
+      imageDataUrl: next[safeActive] ?? null,
     });
-    navigate({ to: "/scan" });
+  }
+
+  function deletePage(i: number) {
+    const next = pages.filter((_, idx) => idx !== i);
+    if (next.length === 0) {
+      scanStore.clear();
+      navigate({ to: "/" });
+      return;
+    }
+    const nextActive = i <= activeIndex ? Math.max(0, activeIndex - 1) : activeIndex;
+    commitPages(next, nextActive);
+  }
+
+  function movePage(i: number, dir: -1 | 1) {
+    const j = i + dir;
+    if (j < 0 || j >= pages.length) return;
+    const next = [...pages];
+    [next[i], next[j]] = [next[j], next[i]];
+    const nextActive = activeIndex === i ? j : activeIndex === j ? i : activeIndex;
+    commitPages(next, nextActive);
   }
 
   function startOver() {
@@ -54,12 +73,13 @@ function PreviewPage() {
     navigate({ to: "/place" });
   }
 
-  if (!image) return null;
+  if (!pages.length) return null;
+  const image = pages[activeIndex];
 
   return (
     <AppShell title={t("previewTitle")} back="/">
       <p className="text-sm text-muted-foreground mt-1 mb-3">
-        {t("previewHint")}
+        {pages.length} {pages.length === 1 ? t("pageSingular") : t("pagePlural")} · {t("previewHint")}
       </p>
 
       <div className="flex items-center justify-center">
@@ -75,17 +95,51 @@ function PreviewPage() {
         </div>
       </div>
 
-      {pages.length > 1 && (
-        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+      {pages.length > 0 && (
+        <div className="mt-4 flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
           {pages.map((p, i) => (
-            <div
-              key={i}
-              className={`shrink-0 rounded-md overflow-hidden border-2 ${
-                p === image ? "border-primary" : "border-border"
-              } bg-white`}
-              style={{ width: 56, aspectRatio: "1 / 1.414" }}
-            >
-              <img src={p} alt="" className="w-full h-full object-contain" />
+            <div key={i} className="shrink-0 flex flex-col items-center gap-1">
+              <button
+                onClick={() => {
+                  setActiveIndex(i);
+                  scanStore.set({ imageDataUrl: p });
+                }}
+                className={`relative rounded-md overflow-hidden border-2 transition ${
+                  i === activeIndex ? "border-primary" : "border-border"
+                } bg-white`}
+                style={{ width: 64, aspectRatio: "1 / 1.414" }}
+                aria-label={`Sida ${i + 1}`}
+              >
+                <img src={p} alt="" className="w-full h-full object-contain" />
+                <span className="absolute top-0.5 left-0.5 bg-black/65 text-white text-[10px] px-1.5 py-0.5 rounded font-semibold tabular-nums">
+                  {i + 1}
+                </span>
+              </button>
+              <div className="flex items-center gap-0.5">
+                <button
+                  onClick={() => movePage(i, -1)}
+                  disabled={i === 0}
+                  className="h-6 w-6 rounded bg-secondary text-secondary-foreground disabled:opacity-30 flex items-center justify-center active:scale-90"
+                  aria-label={t("movePageUp")}
+                >
+                  <ChevronUp className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() => movePage(i, 1)}
+                  disabled={i === pages.length - 1}
+                  className="h-6 w-6 rounded bg-secondary text-secondary-foreground disabled:opacity-30 flex items-center justify-center active:scale-90"
+                  aria-label={t("movePageDown")}
+                >
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() => deletePage(i)}
+                  className="h-6 w-6 rounded bg-destructive/10 text-destructive flex items-center justify-center active:scale-90"
+                  aria-label={t("deletePage")}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -99,18 +153,11 @@ function PreviewPage() {
             {t("useDocument")} <ArrowRight className="h-5 w-5" />
           </span>
         </PrimaryButton>
-        <div className="grid grid-cols-2 gap-3">
-          <PrimaryButton variant="secondary" onClick={addPage}>
-            <span className="inline-flex items-center justify-center gap-2">
-              <Plus className="h-5 w-5" /> {t("addPage")}
-            </span>
-          </PrimaryButton>
-          <PrimaryButton variant="secondary" onClick={retake}>
-            <span className="inline-flex items-center justify-center gap-2">
-              <RefreshCw className="h-5 w-5" /> {t("retake")}
-            </span>
-          </PrimaryButton>
-        </div>
+        <PrimaryButton variant="secondary" onClick={addPage}>
+          <span className="inline-flex items-center justify-center gap-2">
+            <Plus className="h-5 w-5" /> {t("addPage")}
+          </span>
+        </PrimaryButton>
         <PrimaryButton variant="ghost" onClick={startOver}>
           <span className="inline-flex items-center justify-center gap-2">
             <RotateCcw className="h-5 w-5" /> {t("startOver")}
