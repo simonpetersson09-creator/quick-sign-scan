@@ -11,9 +11,9 @@ export const Route = createFileRoute("/place")({
   component: PlacePage,
 });
 
-const MIN_ZOOM = 0.6;
+const MIN_ZOOM = 1;
 const MAX_ZOOM = 4;
-const ZOOM_STEP = 0.5;
+const ZOOM_STEP = 1;
 
 function PlacePage() {
   const t = useT();
