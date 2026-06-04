@@ -976,20 +976,55 @@ function ScanPage() {
           }}
           className="absolute inset-0 w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-black/25 pointer-events-none" />
-        {/* Detected document frame is rendered by the SVG polygon below.
-            No static guide frame — the frame only appears when 4 corners are detected. */}
+        <div className="absolute inset-0 bg-black/20 pointer-events-none" />
+        {/* Detected document frame — soft, Genius Scan-style yellow with
+            outer glow and an animated trace when ready. */}
         <svg
           ref={svgRef}
           className="absolute inset-0 z-20 w-full h-full pointer-events-none"
           preserveAspectRatio="none"
         >
+          {/* Outer soft glow halo */}
+          <polygon
+            ref={glowRef}
+            points=""
+            fill="none"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            style={{
+              opacity: 0,
+              filter: "blur(6px)",
+              transition: "opacity 220ms ease, stroke-width 220ms ease",
+            }}
+          />
+          {/* Main frame */}
           <polygon
             ref={polyRef}
             points=""
             strokeWidth={3}
-            style={{ transition: "opacity 150ms, stroke 200ms, fill 200ms" }}
             strokeLinejoin="round"
+            strokeLinecap="round"
+            style={{
+              opacity: 0,
+              transition:
+                "opacity 200ms ease, stroke 240ms ease, fill 240ms ease, stroke-width 220ms ease",
+            }}
+          />
+          {/* Animated traveling segment — only visible when ready */}
+          <polygon
+            ref={tracePolyRef}
+            points=""
+            fill="none"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            pathLength={100}
+            strokeDasharray="22 78"
+            style={{
+              opacity: 0,
+              transition: "opacity 240ms ease",
+              animation: "scan-trace 1.6s linear infinite",
+              filter: "drop-shadow(0 0 6px rgba(255,200,60,0.85))",
+            }}
           />
           {[0, 1, 2, 3].map((i) => (
             <circle
@@ -1005,6 +1040,7 @@ function ScanPage() {
             />
           ))}
         </svg>
+
       </div>
 
       {/* Top bar */}
