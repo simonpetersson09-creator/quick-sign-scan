@@ -217,7 +217,7 @@ function PreviewPage() {
             </button>
           )}
           <div
-            className="relative rounded-2xl overflow-hidden shadow-[var(--shadow-card)] border border-border bg-muted/30 p-3"
+            className="relative rounded-2xl overflow-hidden border border-border bg-muted/30 p-3"
             style={{ width: "min(78vw, 340px)", aspectRatio: "1 / 1.414" }}
           >
             <img

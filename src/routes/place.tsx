@@ -187,7 +187,7 @@ function PlacePage() {
           onPointerMove={onMove}
           onPointerUp={onUp}
           onPointerCancel={onUp}
-          className="relative rounded-2xl overflow-hidden shadow-[var(--shadow-card)] border border-border bg-muted/30 touch-none select-none"
+          className="relative rounded-2xl overflow-hidden border border-border bg-muted/30 touch-none select-none"
           style={{ width: "min(82vw, 360px)", aspectRatio: "1 / 1.414" }}
         >
           <div
