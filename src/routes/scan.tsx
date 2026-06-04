@@ -59,6 +59,12 @@ const DETECT_FRAMES = 2; // show the detected frame quickly once all 4 corners e
 const HOLD_FRAMES = 15; // ~0.5s — "Håll stilla" phase
 const READY_FRAMES = 35; // ~1.2s — "Dokument hittat" lock-in
 const STABLE_FRAMES = 60; // ~2.0s total before auto-capture
+// Sharpness gates — Laplacian variance computed on a 200px detect frame
+// (in-camera) and the warped doc (post-capture). Tuned conservatively so a
+// blurry doc never gets saved.
+const SHARPNESS_LIVE_MIN = 35;
+const SHARPNESS_CAPTURE_MIN = 80;
+const BLUR_HINT_FRAMES = 75; // ~2.5s of blur before suggesting "move back"
 
 type StartCameraOptions = {
   restartStream?: boolean;
