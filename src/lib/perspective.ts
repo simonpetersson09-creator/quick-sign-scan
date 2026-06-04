@@ -572,6 +572,105 @@ function horizontalProjectionScore(
   return score / Math.max(1, points.length);
 }
 
+function estimateVerticalPaperEdgeSkew(canvas: HTMLCanvasElement): {
+  angle: number;
+  confidence: number;
+  leftAngle: number | null;
+  rightAngle: number | null;
+} {
+  const sample = scaleCanvas(canvas, 520);
+  const w = sample.width;
+  const h = sample.height;
+  const ctx = sample.getContext("2d", { willReadFrequently: true });
+  if (!ctx || w < 80 || h < 80) {
+    return { angle: 0, confidence: 0, leftAngle: null, rightAngle: null };
+  }
+  const img = ctx.getImageData(0, 0, w, h);
+  const data = img.data;
+  const lum = new Uint8ClampedArray(w * h);
+  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+    lum[p] = (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) | 0;
+  }
+
+  const left = collectVerticalEdgePoints(lum, w, h, "left");
+  const right = collectVerticalEdgePoints(lum, w, h, "right");
+  const leftFit = fitVerticalLine(left);
+  const rightFit = fitVerticalLine(right);
+  const angles = [leftFit, rightFit]
+    .filter((fit): fit is { angle: number; confidence: number } => !!fit && fit.confidence > 0)
+    .map((fit) => fit.angle);
+  if (!angles.length) {
+    return {
+      angle: 0,
+      confidence: 0,
+      leftAngle: leftFit?.angle ?? null,
+      rightAngle: rightFit?.angle ?? null,
+    };
+  }
+
+  const confidence = Math.max(leftFit?.confidence ?? 0, rightFit?.confidence ?? 0);
+  return {
+    angle: averageAngles(angles),
+    confidence,
+    leftAngle: leftFit?.angle ?? null,
+    rightAngle: rightFit?.angle ?? null,
+  };
+}
+
+function collectVerticalEdgePoints(
+  lum: Uint8ClampedArray,
+  w: number,
+  h: number,
+  side: "left" | "right",
+): Point[] {
+  const points: Point[] = [];
+  const y0 = Math.round(h * 0.04);
+  const y1 = Math.round(h * 0.96);
+  const xStart = side === "left" ? 1 : Math.round(w * 0.62);
+  const xEnd = side === "left" ? Math.round(w * 0.38) : w - 2;
+  const minGradient = 12;
+  for (let y = y0; y < y1; y += 2) {
+    let bestX = -1;
+    let bestG = 0;
+    for (let x = xStart; x <= xEnd; x++) {
+      const g = Math.abs(lum[y * w + x + 1] - lum[y * w + x - 1]);
+      if (g > bestG) {
+        bestG = g;
+        bestX = x;
+      }
+    }
+    if (bestX >= 0 && bestG >= minGradient) points.push({ x: bestX, y });
+  }
+  return points;
+}
+
+function fitVerticalLine(points: Point[]): { angle: number; confidence: number } | null {
+  if (points.length < 24) return null;
+  let sx = 0;
+  let sy = 0;
+  let sxy = 0;
+  let syy = 0;
+  for (const p of points) {
+    sx += p.x;
+    sy += p.y;
+    sxy += p.x * p.y;
+    syy += p.y * p.y;
+  }
+  const n = points.length;
+  const denom = n * syy - sy * sy;
+  if (Math.abs(denom) < 1e-6) return null;
+  const slope = (n * sxy - sx * sy) / denom; // x = slope*y + intercept
+  const intercept = (sx - slope * sy) / n;
+  let err = 0;
+  for (const p of points) {
+    const predictedX = slope * p.y + intercept;
+    err += Math.abs(p.x - predictedX);
+  }
+  const meanErr = err / n;
+  const confidence = clamp01((n / 160) * (1 - meanErr / 18));
+  return { angle: (Math.atan(slope) * 180) / Math.PI, confidence };
+}
+
 function estimateUprightScore(points: Point[], w: number, h: number): number {
   const rows = new Uint16Array(h);
   let topHalf = 0;
