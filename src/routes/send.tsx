@@ -227,18 +227,6 @@ function SendPage() {
           )}
         </Field>
 
-        <Field label={t("fieldReplyTo")}>
-          <input
-            type="email"
-            inputMode="email"
-            autoComplete="email"
-            value={replyTo}
-            onChange={(e) => setReplyTo(e.target.value)}
-            placeholder={t("placeholderReply")}
-            className="input"
-          />
-        </Field>
-
         <Field label={t("fieldSubject")}>
           <input
             value={subject}
