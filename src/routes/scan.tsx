@@ -1029,6 +1029,28 @@ function ScanPage() {
   );
 }
 
+function formatQuad(quad: [Point, Point, Point, Point]) {
+  return quad.map((p, i) => ({
+    label: ["TL", "TR", "BR", "BL"][i],
+    x: Number(p.x.toFixed(4)),
+    y: Number(p.y.toFixed(4)),
+  }));
+}
+
+function logScanStage(stage: string, payload: unknown) {
+  // eslint-disable-next-line no-console
+  console.log(`[scan:${stage}]`, payload);
+}
+
+function logScanCanvas(stage: string, canvas: HTMLCanvasElement, includeImage: boolean) {
+  const payload: { width: number; height: number; dataUrl?: string } = {
+    width: canvas.width,
+    height: canvas.height,
+  };
+  if (includeImage) payload.dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+  logScanStage(stage, payload);
+}
+
 function PlatformInstructions() {
   const t = useT();
   const ua = navigator.userAgent;
