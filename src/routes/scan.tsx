@@ -1010,8 +1010,6 @@ function ScanPage() {
         </div>
       )}
 
-      {/* startOverScan is reachable from the main UI elsewhere; keep ref alive */}
-      {false && <button onClick={startOverScan} />}
 
       {/* Permission / error overlay */}
       {status === "error" && (
