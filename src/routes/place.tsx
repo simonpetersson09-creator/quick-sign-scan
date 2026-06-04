@@ -237,7 +237,7 @@ function PlacePage() {
                   className="absolute left-1/2 -translate-x-1/2 font-semibold tracking-[0.08em] uppercase text-primary/70 whitespace-nowrap pointer-events-none"
                   style={{
                     fontSize: `${7 / zoom}px`,
-                    top: `calc(50% + ${2 / zoom}px)`,
+                    bottom: `calc(50% + ${2 / zoom}px)`,
                   }}
                 >
                   {t("signatureLabel")}
