@@ -633,7 +633,6 @@ function ScanPage() {
       stableCount.current = 0;
       lockedRef.current = false;
       setStatus("align");
-      capturedRef.current = false;
       return;
     }
     const video = videoRef.current;
