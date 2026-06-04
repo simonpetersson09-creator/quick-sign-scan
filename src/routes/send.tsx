@@ -110,13 +110,6 @@ function SendPage() {
     }
     const recipient = parsed.data;
 
-    // Reply-To is optional. Only forward it if it parses as a valid email.
-    const replyParsed = optionalEmailSchema.safeParse(replyTo);
-    const replyToValue =
-      replyParsed.success && replyParsed.data && replyParsed.data.length > 0
-        ? replyParsed.data
-        : undefined;
-
     setEmailError(null);
     setSending(true);
     setInfo(null);
