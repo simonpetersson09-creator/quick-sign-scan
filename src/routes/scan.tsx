@@ -927,7 +927,9 @@ function ScanPage() {
 
 
   function finishScanning() {
-    if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current);
+    if (savedTimer1Ref.current) window.clearTimeout(savedTimer1Ref.current);
+    if (savedTimer2Ref.current) window.clearTimeout(savedTimer2Ref.current);
+    if (savedTimer3Ref.current) window.clearTimeout(savedTimer3Ref.current);
     streamRef.current?.getTracks().forEach((tr) => tr.stop());
     navigate({ to: "/preview" });
   }
