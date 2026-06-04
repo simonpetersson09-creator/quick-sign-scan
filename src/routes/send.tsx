@@ -35,10 +35,26 @@ function SendPage() {
   const navigate = useNavigate();
   const t = useT();
   const sendEmailFn = useServerFn(sendScanEmail);
-  const settings = useMemo(() => loadSettings(), []);
-  const [to, setTo] = useState(settings.defaultRecipient);
-  const [subject, setSubject] = useState(settings.defaultSubject || t("defaultSubjectInitial"));
-  const [message, setMessage] = useState(settings.defaultMessage || t("defaultMessageInitial"));
+  // Read settings on mount only — avoids SSR/hydration mismatch since
+  // loadSettings() touches localStorage.
+  const [settings, setSettings] = useState(() => ({
+    defaultRecipient: "",
+    defaultSubject: "",
+    defaultMessage: "",
+    recipients: [] as { email: string; label?: string }[],
+  }));
+  const [to, setTo] = useState("");
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    const s = loadSettings();
+    setSettings(s);
+    setTo(s.defaultRecipient);
+    setSubject(s.defaultSubject || t("defaultSubjectInitial"));
+    setMessage(s.defaultMessage || t("defaultMessageInitial"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
