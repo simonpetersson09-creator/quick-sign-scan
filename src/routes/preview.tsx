@@ -68,7 +68,7 @@ function PreviewPage() {
 
   if (!pages.length) {
     return (
-      <AppShell title={t("previewTitle")} back="/">
+      <AppShell title={t("previewTitle")} back="/scan">
         <div className="flex flex-1 flex-col items-center justify-center text-center pb-16">
           <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-secondary text-secondary-foreground">
             <ScanLine className="h-6 w-6" />
@@ -93,7 +93,7 @@ function PreviewPage() {
   const image = pages[activeIndex];
 
   return (
-    <AppShell title={t("previewTitle")} back="/">
+    <AppShell title={t("previewTitle")} back="/scan">
       <p className="text-sm text-muted-foreground mt-1 mb-3">
         {pages.length} {pages.length === 1 ? t("pageSingular") : t("pagePlural")} · {t("previewHint")}
       </p>

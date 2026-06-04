@@ -976,7 +976,7 @@ function ScanPage() {
 
   function cancelScan() {
     streamRef.current?.getTracks().forEach((tr) => tr.stop());
-    navigate({ to: scanStore.get().pages.length > 0 ? "/preview" : "/" });
+    navigate({ to: "/" });
   }
 
   const statusText: Record<Status, string> = {
