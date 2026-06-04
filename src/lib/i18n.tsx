@@ -277,6 +277,9 @@ const en: Dict = {
   placeTitle: "Place signature",
   placeHint: "Tap where the signature should be placed. Zoom in for precise placement.",
   signatureLabel: "Signature",
+  prevPage: "Previous page",
+  nextPage: "Next page",
+  pageIndicator: "Page {current} of {total}",
   signDocument: "Sign document",
   sendWithoutSignature: "Send without signature",
 
