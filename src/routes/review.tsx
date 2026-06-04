@@ -298,18 +298,32 @@ function ReviewPage() {
                 />
               )}
               {isLastPage && sigDataUrl && sigPos && (
-                <img
-                  src={sigDataUrl}
-                  alt=""
-                  className="absolute pointer-events-none"
+                <div
+                  onPointerDown={onSigDown}
+                  onPointerMove={onSigMove}
+                  onPointerUp={onSigUp}
+                  onPointerCancel={onSigUp}
+                  role="button"
+                  aria-label="Flytta signatur"
+                  className={`absolute touch-none select-none rounded-md transition ${
+                    isDraggingSig
+                      ? "cursor-grabbing ring-2 ring-primary/60"
+                      : "cursor-grab ring-1 ring-primary/30 hover:ring-2 hover:ring-primary/50"
+                  }`}
                   style={{
                     left: `${sigPos.x * 100}%`,
                     top: `${sigPos.y * 100}%`,
                     width: "28%",
                     transform: "translate(-50%, -50%)",
                   }}
-                  draggable={false}
-                />
+                >
+                  <img
+                    src={sigDataUrl}
+                    alt=""
+                    className="block w-full h-auto pointer-events-none"
+                    draggable={false}
+                  />
+                </div>
               )}
             </div>
           </div>
