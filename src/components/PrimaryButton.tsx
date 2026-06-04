@@ -8,7 +8,7 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
 export const PrimaryButton = forwardRef<HTMLButtonElement, Props>(
   ({ variant = "primary", className, ...props }, ref) => {
     const base =
-      "w-full h-14 rounded-2xl text-[17px] font-semibold tracking-tight transition active:scale-[0.985] disabled:opacity-50 disabled:pointer-events-none";
+      "w-full h-14 rounded-2xl text-[17px] font-semibold tracking-tight transition active:scale-[0.985] disabled:opacity-50 disabled:pointer-events-none inline-flex items-center justify-center text-center leading-none";
     const styles =
       variant === "primary"
         ? "bg-primary text-primary-foreground shadow-[var(--shadow-soft)] hover:opacity-95"
