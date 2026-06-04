@@ -75,7 +75,7 @@ function Home() {
       </p>
 
       {/* CTA */}
-      <div className="flex flex-col items-center gap-3 pt-2 pb-4">
+      <div className="flex flex-col items-center gap-2 pt-2 pb-4">
         <input
           ref={fileInputRef}
           type="file"
@@ -102,7 +102,7 @@ function Home() {
           onClick={() => fileInputRef.current?.click()}
           className="block group w-full max-w-[240px]"
         >
-          <div className="rounded-xl bg-primary text-primary-foreground h-12 px-6 shadow-[var(--shadow-card)] transition active:scale-[0.98] flex items-center justify-center gap-2.5">
+          <div className="rounded-xl bg-primary text-primary-foreground h-11 px-6 shadow-[var(--shadow-card)] transition active:scale-[0.98] flex items-center justify-center gap-2.5">
             <FileUp className="h-[18px] w-[18px] shrink-0 opacity-90" strokeWidth={1.75} />
             <span className="text-[15px] font-semibold tracking-tight whitespace-nowrap">{t("attachFile")}</span>
           </div>
@@ -111,14 +111,14 @@ function Home() {
         <div className="flex items-center justify-center gap-2 w-full">
           {/* Settings — vänster */}
           <Link to="/settings" className="block group">
-            <div className="rounded-xl bg-card text-muted-foreground h-12 w-12 flex items-center justify-center shadow-[var(--shadow-soft)] border border-border transition active:scale-[0.98]">
+            <div className="rounded-xl bg-card text-muted-foreground h-11 w-12 flex items-center justify-center shadow-[var(--shadow-soft)] border border-border transition active:scale-[0.98]">
               <SettingsIcon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
             </div>
           </Link>
 
           {/* Skanna — i mitten */}
           <Link to="/scan" className="block group w-full max-w-[240px]">
-            <div className="rounded-xl bg-primary text-primary-foreground h-12 px-6 shadow-[var(--shadow-card)] transition active:scale-[0.98] flex items-center justify-center gap-2.5">
+            <div className="rounded-xl bg-primary text-primary-foreground h-11 px-6 shadow-[var(--shadow-card)] transition active:scale-[0.98] flex items-center justify-center gap-2.5">
               <ScanLine className="h-[18px] w-[18px] shrink-0 opacity-90" strokeWidth={1.75} />
               <span className="text-[15px] font-semibold tracking-tight whitespace-nowrap">{t("scanDocument")}</span>
             </div>
@@ -129,7 +129,7 @@ function Home() {
             type="button"
             onClick={toggle}
             aria-label={t("changeLanguage")}
-            className="flex flex-col items-center justify-center rounded-xl bg-card text-muted-foreground h-12 w-12 shadow-[var(--shadow-soft)] border border-border transition active:scale-[0.98]"
+            className="flex flex-col items-center justify-center rounded-xl bg-card text-muted-foreground h-11 w-12 shadow-[var(--shadow-soft)] border border-border transition active:scale-[0.98]"
           >
             <Globe className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
             <span className="text-[7px] font-semibold tracking-wide mt-0.5">
