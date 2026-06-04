@@ -103,6 +103,13 @@ function ScanPage() {
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
   const detectCanvas = useRef<HTMLCanvasElement | null>(null);
+  // Throttle detection to ~22 Hz. The full pipeline (Canny + Sobel + snap)
+  // is too heavy to run at 60 fps on mid-range mobile — it starves the UI
+  // thread and the camera's continuous autofocus callback, which actually
+  // makes captures BLURRIER. ~45 ms cadence keeps the polygon feeling live
+  // while giving the GPU/ISP room to breathe.
+  const DETECT_INTERVAL_MS = 45;
+  const lastDetectAtRef = useRef(0);
 
   const lastRawQuad = useRef<[Point, Point, Point, Point] | null>(null);
   const smoothQuad = useRef<[Point, Point, Point, Point] | null>(null); // normalized 0..1
