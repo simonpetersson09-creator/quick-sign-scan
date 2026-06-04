@@ -86,7 +86,7 @@ function SignPage() {
   }
 
   function done() {
-    const dataUrl = canvasRef.current!.toDataURL("image/png");
+    const dataUrl = trimCanvas(canvasRef.current!);
     scanStore.set({ signatureDataUrl: dataUrl });
     navigate({ to: "/review" });
   }
