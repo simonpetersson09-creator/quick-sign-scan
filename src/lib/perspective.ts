@@ -5,6 +5,47 @@ export interface Point {
   y: number;
 }
 
+export interface DocumentAlignmentDiagnostics {
+  input: { width: number; height: number };
+  orientationCandidates: Array<{
+    rotation: 0 | 90 | 180 | 270;
+    width: number;
+    height: number;
+    textAngle: number;
+    textScore: number;
+    uprightScore: number;
+    hasText: boolean;
+    score: number;
+  }>;
+  selectedOrientationRotation: 0 | 90 | 180 | 270;
+  documentAngleBeforeDeskew: number;
+  textSkewAngle: number;
+  textSkewScore: number;
+  textHasText: boolean;
+  verticalEdgeSkewAngle: number;
+  verticalEdgeConfidence: number;
+  leftEdgeAngle: number | null;
+  rightEdgeAngle: number | null;
+  appliedDeskewAngle: number;
+  appliedDeskewSource: "vertical-edges" | "text" | "none";
+  output: { width: number; height: number };
+}
+
+export interface QuadGeometryDiagnostics {
+  topAngle: number;
+  bottomAngle: number;
+  leftAngleFromVertical: number;
+  rightAngleFromVertical: number;
+  documentAngle: number;
+  topWidth: number;
+  bottomWidth: number;
+  leftHeight: number;
+  rightHeight: number;
+  width: number;
+  height: number;
+  aspect: number;
+}
+
 // Coefficients for a projective transform of the unit square -> arbitrary quad.
 // Quad corners in order: TL, TR, BR, BL (clockwise from top-left).
 //   x = (a*u + b*v + c) / (g*u + h*v + 1)
