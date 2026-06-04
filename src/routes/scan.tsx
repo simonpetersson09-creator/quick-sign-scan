@@ -61,10 +61,10 @@ export const Route = createFileRoute("/scan")({
 // detekteringsramen) ska inte bryta stabiliteten — skärpe- och ljusgrindarna
 // nedan ser till att kvaliteten ändå hålls hög.
 const STABLE_DELTA = 0.035; // normalized 0..1 — tål små handvibrationer
-const DETECT_FRAMES = 4; // mjukare intro innan ramen visas
-const HOLD_FRAMES = 16; // ~0.55s — "Håll stilla" phase
-const READY_FRAMES = 34; // ~1.15s — "Dokument hittat" lock-in
-const STABLE_FRAMES = 56; // ~1.9s total before auto-capture
+const DETECT_FRAMES = 3; // mjukare intro innan ramen visas
+const HOLD_FRAMES = 9; // ~0.3s — "Håll stilla" phase
+const READY_FRAMES = 20; // ~0.65s — "Dokument hittat" lock-in
+const STABLE_FRAMES = 32; // ~1.05s total before auto-capture
 // Adaptive smoothing — mjukare och mindre ryckig rörelse på ramen.
 // Lägre alpha = långsammare följning = lugnare upplevelse.
 const ALPHA_PRE_LOCK = 0.18;
