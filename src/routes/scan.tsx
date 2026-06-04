@@ -87,8 +87,11 @@ const LOCK_BREAK_DELTA = 0.2; // sustained delta this large breaks the lock and 
 const SHARPNESS_LIVE_MIN = 35;
 const SHARPNESS_CAPTURE_MIN = 60;
 const BLUR_HINT_FRAMES = 75; // ~2.5s of blur before suggesting "move back"
-// Lighting gate — mean luminance below this is "too dark to scan reliably"
-const BRIGHTNESS_MIN = 55;
+// Lighting gate — mean luminance below this is "too dark to scan reliably".
+// Lowered from 55 to 38: detection itself is now tolerant of dim scenes
+// (adaptive contrast stretch inside detectDocumentQuad), so we only flag
+// genuinely very-low-light frames where the user really needs more light.
+const BRIGHTNESS_MIN = 38;
 // A4 ratio gate at capture — ett A4 som fotograferas snett kan få en
 // projicerad proportion långt från sqrt(2). Vi accepterar generös perspektiv-
 // skevhet här eftersom warp-steget rätar upp dokumentet ändå; den verkliga
