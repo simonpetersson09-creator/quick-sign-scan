@@ -368,10 +368,8 @@ export function autoOrientAndDeskewDocument(
     oriented = rotateCanvas(oriented, appliedDeskewAngle);
   }
 
-  // Viktigt: vi padda INTE upp till en fast A4-ruta här. Sidan behåller sin
-  // egna proportion från quaden, så preview = PDF och inga konstgjorda
-  // marginaler smyger in (vilket annars syns som asymmetriska kanter).
   cleanPaperEdges(oriented);
+  const finalCanvas = renderToA4Portrait(oriented);
   onDiagnostics?.({
     input: { width: canvas.width, height: canvas.height },
     orientationCandidates,
@@ -386,9 +384,9 @@ export function autoOrientAndDeskewDocument(
     rightEdgeAngle: edgeSkew.rightAngle,
     appliedDeskewAngle,
     appliedDeskewSource,
-    output: { width: oriented.width, height: oriented.height },
+    output: { width: finalCanvas.width, height: finalCanvas.height },
   });
-  return oriented;
+  return finalCanvas;
 }
 
 export function measureQuadGeometry(quad: [Point, Point, Point, Point]): QuadGeometryDiagnostics {
