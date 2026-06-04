@@ -150,7 +150,45 @@ function ReviewPage() {
     panY: number;
   } | null>(null);
 
+  // Signature drag handling
+  const sigDrag = useRef<{ id: number | null }>({ id: null });
+  const [isDraggingSig, setIsDraggingSig] = useState(false);
+
+  function clientToNorm(clientX: number, clientY: number) {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return null;
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+    const localX = (clientX - rect.left - cx - pan.x) / zoom + cx;
+    const localY = (clientY - rect.top - cy - pan.y) / zoom + cy;
+    return {
+      x: Math.max(0.03, Math.min(0.97, localX / rect.width)),
+      y: Math.max(0.03, Math.min(0.97, localY / rect.height)),
+    };
+  }
+
+  function onSigDown(e: React.PointerEvent<HTMLDivElement>) {
+    e.stopPropagation();
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    sigDrag.current.id = e.pointerId;
+    setIsDraggingSig(true);
+  }
+  function onSigMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (sigDrag.current.id !== e.pointerId) return;
+    e.stopPropagation();
+    const p = clientToNorm(e.clientX, e.clientY);
+    if (p) setSigPos(p);
+  }
+  function onSigUp(e: React.PointerEvent<HTMLDivElement>) {
+    if (sigDrag.current.id !== e.pointerId) return;
+    e.stopPropagation();
+    sigDrag.current.id = null;
+    setIsDraggingSig(false);
+    if (sigPos) scanStore.set({ signaturePosition: sigPos });
+  }
+
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (sigDrag.current.id !== null) return;
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.current.size === 2) {
