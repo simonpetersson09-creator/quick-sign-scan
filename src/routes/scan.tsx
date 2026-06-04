@@ -148,6 +148,10 @@ function ScanPage() {
       sharpnessRef.current = 0;
       blurFramesRef.current = 0;
       captureRetryRef.current = 0;
+      lockedRef.current = false;
+      lockBreakFramesRef.current = 0;
+      brightnessRef.current = 255;
+      lowLightFramesRef.current = 0;
       stableCount.current = 0;
       detectCount.current = 0;
       missCount.current = 0;
