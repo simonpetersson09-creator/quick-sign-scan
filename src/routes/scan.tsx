@@ -708,6 +708,8 @@ function ScanPage() {
     uncertain: t("statusUncertain"),
     align: t("statusAlign"),
     hold: t("statusHold"),
+    focusing: t("statusFocusing"),
+    moveBack: t("statusMoveBack"),
     ready: t("statusReady"),
     capturing: t("statusCapturing"),
     error: t("statusError"),
