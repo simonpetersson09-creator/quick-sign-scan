@@ -97,183 +97,190 @@ function ScanPage() {
     typeof window !== "undefined" && /[?&]debug=1\b/.test(window.location.search);
   const cancelledRef = useRef(false);
 
-  const startCamera = useCallback(async (options: StartCameraOptions = {}) => {
-    if (rafRef.current) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-    }
-    if (options.restartStream || streamRef.current) {
-      streamRef.current?.getTracks().forEach((tr) => tr.stop());
-      streamRef.current = null;
-      if (videoRef.current) videoRef.current.srcObject = null;
-    }
-    capturedRef.current = false;
-    stableCount.current = 0;
-    detectCount.current = 0;
-    missCount.current = 0;
-    smoothQuad.current = null;
-    lastRawQuad.current = null;
-    detectionMeta.current = null;
-    setProgress(0);
-    setCameraReady(false);
-    drawOverlay(null, false);
-    setStatus("starting");
-    setError(null);
-    setErrorType(null);
-
-    // Secure context check — getUserMedia only works on HTTPS/localhost.
-    if (typeof window !== "undefined" && !window.isSecureContext) {
-      setErrorType("insecure_context");
-      setError(t("errUnknown"));
-      setStatus("error");
-      return;
-    }
-
-    // getUserMedia is not available at all (older browsers, restricted contexts).
-    if (!navigator.mediaDevices?.getUserMedia) {
-      // In an iframe without allow="camera" Chrome strips mediaDevices entirely.
-      setErrorType(isInIframe() ? "iframe_blocked" : "unknown");
-      setError(t("errUnknown"));
-      setStatus("error");
-      return;
-    }
-
-    // Try to read the current permission state. On browsers where this is
-    // unsupported or limited (notably Safari/iOS), we fall through and just
-    // call getUserMedia — which either resolves immediately (granted) or
-    // shows the native prompt (first time).
-    let knownState: PermissionState | null = null;
-    if (!options.skipPermissionPreflight) {
-      try {
-        const status = await navigator.permissions?.query?.({ name: "camera" as PermissionName });
-        if (status?.state === "granted" || status?.state === "denied" || status?.state === "prompt") {
-          knownState = status.state;
-        }
-      } catch {
-        // ignore
+  const startCamera = useCallback(
+    async (options: StartCameraOptions = {}) => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
       }
-    }
+      if (options.restartStream || streamRef.current) {
+        streamRef.current?.getTracks().forEach((tr) => tr.stop());
+        streamRef.current = null;
+        if (videoRef.current) videoRef.current.srcObject = null;
+      }
+      capturedRef.current = false;
+      stableCount.current = 0;
+      detectCount.current = 0;
+      missCount.current = 0;
+      smoothQuad.current = null;
+      lastRawQuad.current = null;
+      detectionMeta.current = null;
+      setProgress(0);
+      setCameraReady(false);
+      drawOverlay(null, false);
+      setStatus("starting");
+      setError(null);
+      setErrorType(null);
 
-    if (cancelledRef.current) return;
-
-    if (knownState === "denied") {
-      setErrorType("permission_denied");
-      setError(t("errPermissionDenied"));
-      setStatus("error");
-      return;
-    }
-
-    try {
-      // Race getUserMedia against a 15s timeout — on iOS Safari the promise
-      // can hang indefinitely if the user dismisses the permission prompt
-      // without choosing. Without a timeout the UI is stuck on "starting".
-      const gumPromise = navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-        },
-        audio: false,
-      });
-      const stream = await Promise.race([
-        gumPromise,
-        new Promise<MediaStream>((_, reject) =>
-          setTimeout(
-            () => reject(Object.assign(new Error("timeout"), { name: "TimeoutError" })),
-            15000,
-          ),
-        ),
-      ]);
-      // If the user navigated away while getUserMedia was pending, immediately
-      // shut down the stream so the camera light never lingers.
-      if (cancelledRef.current) {
-        stream.getTracks().forEach((tr) => tr.stop());
+      // Secure context check — getUserMedia only works on HTTPS/localhost.
+      if (typeof window !== "undefined" && !window.isSecureContext) {
+        setErrorType("insecure_context");
+        setError(t("errUnknown"));
+        setStatus("error");
         return;
       }
-      streamRef.current = stream;
-      const videoEl = videoRef.current;
-      if (videoEl) {
-        videoEl.srcObject = stream;
-        // Wait for the video to actually have frame data before allowing
-        // detection / capture. Without this, the first ticks of the RAF
-        // loop hit a 0x0 video and we draw a blank canvas.
-        const waitReady = new Promise<void>((resolve) => {
-          if (videoEl.readyState >= 2 && videoEl.videoWidth > 0) {
-            resolve();
+
+      // getUserMedia is not available at all (older browsers, restricted contexts).
+      if (!navigator.mediaDevices?.getUserMedia) {
+        // In an iframe without allow="camera" Chrome strips mediaDevices entirely.
+        setErrorType(isInIframe() ? "iframe_blocked" : "unknown");
+        setError(t("errUnknown"));
+        setStatus("error");
+        return;
+      }
+
+      // Try to read the current permission state. On browsers where this is
+      // unsupported or limited (notably Safari/iOS), we fall through and just
+      // call getUserMedia — which either resolves immediately (granted) or
+      // shows the native prompt (first time).
+      let knownState: PermissionState | null = null;
+      if (!options.skipPermissionPreflight) {
+        try {
+          const status = await navigator.permissions?.query?.({ name: "camera" as PermissionName });
+          if (
+            status?.state === "granted" ||
+            status?.state === "denied" ||
+            status?.state === "prompt"
+          ) {
+            knownState = status.state;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      if (cancelledRef.current) return;
+
+      if (knownState === "denied") {
+        setErrorType("permission_denied");
+        setError(t("errPermissionDenied"));
+        setStatus("error");
+        return;
+      }
+
+      try {
+        // Race getUserMedia against a 15s timeout — on iOS Safari the promise
+        // can hang indefinitely if the user dismisses the permission prompt
+        // without choosing. Without a timeout the UI is stuck on "starting".
+        const gumPromise = navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
+          audio: false,
+        });
+        const stream = await Promise.race([
+          gumPromise,
+          new Promise<MediaStream>((_, reject) =>
+            setTimeout(
+              () => reject(Object.assign(new Error("timeout"), { name: "TimeoutError" })),
+              15000,
+            ),
+          ),
+        ]);
+        // If the user navigated away while getUserMedia was pending, immediately
+        // shut down the stream so the camera light never lingers.
+        if (cancelledRef.current) {
+          stream.getTracks().forEach((tr) => tr.stop());
+          return;
+        }
+        streamRef.current = stream;
+        const videoEl = videoRef.current;
+        if (videoEl) {
+          videoEl.srcObject = stream;
+          // Wait for the video to actually have frame data before allowing
+          // detection / capture. Without this, the first ticks of the RAF
+          // loop hit a 0x0 video and we draw a blank canvas.
+          const waitReady = new Promise<void>((resolve) => {
+            if (videoEl.readyState >= 2 && videoEl.videoWidth > 0) {
+              resolve();
+              return;
+            }
+            const onReady = () => {
+              if (videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
+                videoEl.removeEventListener("loadedmetadata", onReady);
+                videoEl.removeEventListener("canplay", onReady);
+                resolve();
+              }
+            };
+            videoEl.addEventListener("loadedmetadata", onReady);
+            videoEl.addEventListener("canplay", onReady);
+          });
+          try {
+            await videoEl.play();
+          } catch {
+            // iOS Safari can reject play() if the gesture context was lost.
+          }
+          // Race readiness against a short timeout — if metadata never arrives
+          // we still let detect() bail safely on its own readyState check.
+          await Promise.race([waitReady, new Promise<void>((r) => setTimeout(r, 4000))]);
+          if (cancelledRef.current) {
+            stream.getTracks().forEach((tr) => tr.stop());
+            streamRef.current = null;
             return;
           }
-          const onReady = () => {
-            if (videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
-              videoEl.removeEventListener("loadedmetadata", onReady);
-              videoEl.removeEventListener("canplay", onReady);
-              resolve();
-            }
-          };
-          videoEl.addEventListener("loadedmetadata", onReady);
-          videoEl.addEventListener("canplay", onReady);
-        });
-        try {
-          await videoEl.play();
-        } catch {
-          // iOS Safari can reject play() if the gesture context was lost.
+          setCameraReady(videoEl.videoWidth > 0 && videoEl.videoHeight > 0);
         }
-        // Race readiness against a short timeout — if metadata never arrives
-        // we still let detect() bail safely on its own readyState check.
-        await Promise.race([waitReady, new Promise<void>((r) => setTimeout(r, 4000))]);
         if (cancelledRef.current) {
           stream.getTracks().forEach((tr) => tr.stop());
           streamRef.current = null;
           return;
         }
-        setCameraReady(videoEl.videoWidth > 0 && videoEl.videoHeight > 0);
-      }
-      if (cancelledRef.current) {
-        stream.getTracks().forEach((tr) => tr.stop());
-        streamRef.current = null;
-        return;
-      }
-      setStatus("searching");
-      loop();
-    } catch (e) {
-      if (cancelledRef.current) return;
-      console.error(`[scan] camera error: ${(e as Error)?.name ?? "unknown"}`);
-      const err = e as Error;
-      if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
-        setErrorType("not_found");
-        setError(t("errNotFound"));
-      } else if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-        // In a sandboxed iframe without allow="camera", Chrome rejects with
-        // NotAllowedError immediately and never shows a prompt. Detect that
-        // case so we can surface a useful "open in new tab" path instead of
-        // accusing the user of having denied permission they never saw.
-        if (isInIframe()) {
-          setErrorType("iframe_blocked");
-          setError(t("errUnknown"));
-        } else {
-          let confirmed: PermissionState | null = null;
-          try {
-            const status = await navigator.permissions?.query?.({
-              name: "camera" as PermissionName,
-            });
-            if (status?.state) confirmed = status.state as PermissionState;
-          } catch {
-            // ignore
-          }
-          if (confirmed === "prompt") {
-            setErrorType("unknown");
+        setStatus("searching");
+        loop();
+      } catch (e) {
+        if (cancelledRef.current) return;
+        console.error(`[scan] camera error: ${(e as Error)?.name ?? "unknown"}`);
+        const err = e as Error;
+        if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
+          setErrorType("not_found");
+          setError(t("errNotFound"));
+        } else if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+          // In a sandboxed iframe without allow="camera", Chrome rejects with
+          // NotAllowedError immediately and never shows a prompt. Detect that
+          // case so we can surface a useful "open in new tab" path instead of
+          // accusing the user of having denied permission they never saw.
+          if (isInIframe()) {
+            setErrorType("iframe_blocked");
             setError(t("errUnknown"));
           } else {
-            setErrorType("permission_denied");
-            setError(t("errPermissionDenied"));
+            let confirmed: PermissionState | null = null;
+            try {
+              const status = await navigator.permissions?.query?.({
+                name: "camera" as PermissionName,
+              });
+              if (status?.state) confirmed = status.state as PermissionState;
+            } catch {
+              // ignore
+            }
+            if (confirmed === "prompt") {
+              setErrorType("unknown");
+              setError(t("errUnknown"));
+            } else {
+              setErrorType("permission_denied");
+              setError(t("errPermissionDenied"));
+            }
           }
+        } else {
+          setErrorType("unknown");
+          setError(t("errUnknown"));
         }
-      } else {
-        setErrorType("unknown");
-        setError(t("errUnknown"));
+        setStatus("error");
       }
-      setStatus("error");
-    }
-  }, [t]);
+    },
+    [t],
+  );
 
   useEffect(() => {
     cancelledRef.current = false;
@@ -475,8 +482,7 @@ function ScanPage() {
     // A4. Detta säkerställer att text inte blir sträckt/komprimerad och att
     // dokumentet alltid är rakt och proportionerligt. Vi mäter medellängden
     // av motstående sidor (TL→TR vs BL→BR för bredd, TL→BL vs TR→BR för höjd).
-    const dist = (a: Point, b: Point) =>
-      Math.hypot(a.x - b.x, a.y - b.y);
+    const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
     const topW = dist(srcQuad[0], srcQuad[1]);
     const bottomW = dist(srcQuad[3], srcQuad[2]);
     const leftH = dist(srcQuad[0], srcQuad[3]);
@@ -509,7 +515,6 @@ function ScanPage() {
         console.error("[scan] enhance/orient failed, using raw warp", e);
       }
 
-
       const sourceCanvas = document.createElement("canvas");
       sourceCanvas.width = vw;
       sourceCanvas.height = vh;
@@ -524,7 +529,7 @@ function ScanPage() {
         sourceDataUrl,
         pages: nextPages,
         detection: {
-            corners: orderedNormQuad,
+          corners: orderedNormQuad,
           a4Ratio: meta.a4Ratio,
           confidence: meta.confidence,
           debug: meta.debug,
@@ -755,7 +760,6 @@ function ScanPage() {
 
       <div className="flex-1" />
 
-
       {/* Bottom hint / manual capture */}
       <div className="relative pb-safe px-5 pt-4 flex flex-col items-center gap-3">
         {error && status !== "error" && (
@@ -875,8 +879,6 @@ function ScanPage() {
         </div>
       )}
 
-
-
       {/* Permission / error overlay */}
       {status === "error" && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm px-6">
@@ -926,7 +928,9 @@ function ScanPage() {
               )}
               {errorType === "permission_denied" && (
                 <button
-                  onClick={() => startCamera({ restartStream: true, skipPermissionPreflight: true })}
+                  onClick={() =>
+                    startCamera({ restartStream: true, skipPermissionPreflight: true })
+                  }
                   className="w-full rounded-xl bg-white text-black py-3.5 px-4 font-semibold text-[15px] tracking-tight flex items-center justify-center gap-2 active:scale-[0.98] transition"
                 >
                   <RefreshCw className="h-4 w-4" strokeWidth={2} />
@@ -935,7 +939,9 @@ function ScanPage() {
               )}
               {errorType !== "permission_denied" && errorType !== "iframe_blocked" && (
                 <button
-                  onClick={() => startCamera({ restartStream: true, skipPermissionPreflight: true })}
+                  onClick={() =>
+                    startCamera({ restartStream: true, skipPermissionPreflight: true })
+                  }
                   className="w-full rounded-xl bg-white text-black py-3.5 px-4 font-semibold text-[15px] tracking-tight flex items-center justify-center gap-2 active:scale-[0.98] transition"
                 >
                   <RefreshCw className="h-4 w-4" strokeWidth={2} />

@@ -284,7 +284,9 @@ export function autoOrientAndDeskewDocument(canvas: HTMLCanvasElement): HTMLCanv
     const rotatedSample = rotateCanvas(sample, rotation);
     const analysis = estimateTextSkew(rotatedSample, 7, 0.5);
     const portraitBias = rotatedSample.height >= rotatedSample.width ? 1.06 : 0.9;
-    const score = analysis.hasText ? analysis.score * analysis.uprightScore * portraitBias : portraitBias;
+    const score = analysis.hasText
+      ? analysis.score * analysis.uprightScore * portraitBias
+      : portraitBias;
     if (analysis.hasText) foundText = true;
     if (score > bestScore) {
       bestScore = score;
@@ -428,7 +430,12 @@ function collectTextPoints(canvas: HTMLCanvasElement): Point[] {
   return all.filter((_, i) => i % stride === 0);
 }
 
-function horizontalProjectionScore(points: Point[], w: number, h: number, angleDeg: number): number {
+function horizontalProjectionScore(
+  points: Point[],
+  w: number,
+  h: number,
+  angleDeg: number,
+): number {
   const rad = (angleDeg * Math.PI) / 180;
   const sin = Math.sin(rad);
   const cos = Math.cos(rad);
