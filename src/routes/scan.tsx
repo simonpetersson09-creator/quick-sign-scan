@@ -61,9 +61,9 @@ export const Route = createFileRoute("/scan")({
 // nedan ser till att kvaliteten ändå hålls hög.
 const STABLE_DELTA = 0.03; // normalized 0..1 — tål små handvibrationer
 const DETECT_FRAMES = 2; // show the detected frame quickly once all 4 corners exist
-const HOLD_FRAMES = 12; // ~0.4s — "Håll stilla" phase
-const READY_FRAMES = 28; // ~0.95s — "Dokument hittat" lock-in
-const STABLE_FRAMES = 48; // ~1.6s total before auto-capture
+const HOLD_FRAMES = 9; // ~0.3s — "Håll stilla" phase
+const READY_FRAMES = 20; // ~0.7s — "Dokument hittat" lock-in
+const STABLE_FRAMES = 34; // ~1.1s total before auto-capture
 // Adaptive smoothing — gentle pre-lock, very stable post-lock.
 // Once the quad is "locked", the overlay barely moves frame-to-frame (acts
 // like a KLT tracker visually) and outliers are rejected outright.
