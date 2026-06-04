@@ -435,6 +435,78 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
     }
   }
 
+  // 9) Background-blob suppression — large soft grey areas (shadows, faint
+  //    smudges, lens artifacts) that survive the tone curve because they're
+  //    not dark enough to be flagged as ink. Strategy: downsample, compute
+  //    a local-min map; any region whose local min is still bright means
+  //    there's no real ink nearby — safe to bleach to white.
+  {
+    const SCALE = 4;
+    const sw = Math.max(1, Math.floor(w / SCALE));
+    const sh = Math.max(1, Math.floor(h / SCALE));
+    const small = new Uint8ClampedArray(sw * sh);
+    for (let sy = 0; sy < sh; sy++) {
+      for (let sx = 0; sx < sw; sx++) {
+        let minL = 255;
+        const x0 = sx * SCALE;
+        const y0 = sy * SCALE;
+        const x1 = Math.min(w, x0 + SCALE);
+        const y1 = Math.min(h, y0 + SCALE);
+        for (let yy = y0; yy < y1; yy++) {
+          for (let xx = x0; xx < x1; xx++) {
+            const v = lum2[yy * w + xx];
+            if (v < minL) minL = v;
+          }
+        }
+        small[sy * sw + sx] = minL;
+      }
+    }
+    // Separable min-filter — radius ~15 small px ≈ 60 full-res px window.
+    const R = 15;
+    const minX = new Uint8ClampedArray(sw * sh);
+    for (let y = 0; y < sh; y++) {
+      const row = y * sw;
+      for (let x = 0; x < sw; x++) {
+        let m = 255;
+        const a = Math.max(0, x - R);
+        const b = Math.min(sw - 1, x + R);
+        for (let xx = a; xx <= b; xx++) {
+          const v = small[row + xx];
+          if (v < m) m = v;
+        }
+        minX[row + x] = m;
+      }
+    }
+    const minXY = new Uint8ClampedArray(sw * sh);
+    for (let x = 0; x < sw; x++) {
+      for (let y = 0; y < sh; y++) {
+        let m = 255;
+        const a = Math.max(0, y - R);
+        const b = Math.min(sh - 1, y + R);
+        for (let yy = a; yy <= b; yy++) {
+          const v = minX[yy * sw + x];
+          if (v < m) m = v;
+        }
+        minXY[y * sw + x] = m;
+      }
+    }
+    // Apply: pixels in regions with no nearby ink (local min > 130) and
+    // current luminance > 175 get bleached to pure white.
+    for (let y = 0; y < h; y++) {
+      const sy = Math.min(sh - 1, (y / SCALE) | 0);
+      for (let x = 0; x < w; x++) {
+        const sx = Math.min(sw - 1, (x / SCALE) | 0);
+        if (minXY[sy * sw + sx] <= 130) continue;
+        const j = y * w + x;
+        if (lum2[j] < 175) continue;
+        const i = j * 4;
+        d[i] = 255;
+        d[i + 1] = 255;
+        d[i + 2] = 255;
+      }
+    }
+  }
+
   ctx.putImageData(img, 0, 0);
   return canvas;
 }
