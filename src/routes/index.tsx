@@ -75,49 +75,80 @@ function Home() {
       </p>
 
       {/* CTA */}
-      <div className="flex items-center justify-center gap-2 pt-2 pb-4">
-        {/* Settings — vänster */}
-        <Link to="/settings" className="block group">
-          <div className="rounded-xl bg-card text-muted-foreground h-12 w-12 flex items-center justify-center shadow-[var(--shadow-soft)] border border-border transition active:scale-[0.98]">
-            <SettingsIcon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
-          </div>
-        </Link>
-
-        {/* Skanna — lite bredare, i mitten */}
-        <Link to="/scan" className="block group">
-          <div className="rounded-xl bg-primary text-primary-foreground h-12 px-6 shadow-[var(--shadow-card)] transition active:scale-[0.98] flex items-center justify-center gap-2.5">
-            <ScanLine className="h-[18px] w-[18px] shrink-0 opacity-90" strokeWidth={1.75} />
-            <span className="relative text-[15px] font-semibold tracking-tight whitespace-nowrap inline-flex items-center justify-center">
-              <span aria-hidden className="invisible">Skanna dokument</span>
-              <span className="absolute inset-0 flex items-center justify-center">{t("scanDocument")}</span>
-            </span>
-          </div>
-        </Link>
-
-        {/* Språkväxlare */}
+      <div className="flex flex-col items-center gap-3 pt-2 pb-4">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,.pdf"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = () => {
+              const dataUrl = reader.result as string;
+              scanStore.clear();
+              scanStore.set({
+                pages: [dataUrl],
+                imageDataUrl: dataUrl,
+              });
+              navigate({ to: "/preview" });
+            };
+            reader.readAsDataURL(file);
+          }}
+        />
         <button
           type="button"
-          onClick={toggle}
-          aria-label={t("changeLanguage")}
-          className="flex flex-col items-center justify-center rounded-xl bg-card text-muted-foreground h-12 w-12 shadow-[var(--shadow-soft)] border border-border transition active:scale-[0.98]"
+          onClick={() => fileInputRef.current?.click()}
+          className="block group w-full max-w-[240px]"
         >
-          <Globe className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
-          <span className="text-[7px] font-semibold tracking-wide mt-0.5">
-            {lang === "sv" ? (
-              <>
-                <span className="text-foreground">SV</span>
-                <span> | </span>
-                <span className="opacity-50">EN</span>
-              </>
-            ) : (
-              <>
-                <span className="opacity-50">SV</span>
-                <span> | </span>
-                <span className="text-foreground">EN</span>
-              </>
-            )}
-          </span>
+          <div className="rounded-xl bg-primary text-primary-foreground h-12 px-6 shadow-[var(--shadow-card)] transition active:scale-[0.98] flex items-center justify-center gap-2.5">
+            <FileUp className="h-[18px] w-[18px] shrink-0 opacity-90" strokeWidth={1.75} />
+            <span className="text-[15px] font-semibold tracking-tight whitespace-nowrap">{t("attachFile")}</span>
+          </div>
         </button>
+
+        <div className="flex items-center justify-center gap-2 w-full">
+          {/* Settings — vänster */}
+          <Link to="/settings" className="block group">
+            <div className="rounded-xl bg-card text-muted-foreground h-12 w-12 flex items-center justify-center shadow-[var(--shadow-soft)] border border-border transition active:scale-[0.98]">
+              <SettingsIcon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
+            </div>
+          </Link>
+
+          {/* Skanna — i mitten */}
+          <Link to="/scan" className="block group">
+            <div className="rounded-xl bg-card text-foreground h-12 px-6 shadow-[var(--shadow-soft)] border border-border transition active:scale-[0.98] flex items-center justify-center gap-2.5">
+              <ScanLine className="h-[18px] w-[18px] shrink-0 text-primary" strokeWidth={1.75} />
+              <span className="text-[15px] font-semibold tracking-tight whitespace-nowrap">{t("scanDocument")}</span>
+            </div>
+          </Link>
+
+          {/* Språkväxlare */}
+          <button
+            type="button"
+            onClick={toggle}
+            aria-label={t("changeLanguage")}
+            className="flex flex-col items-center justify-center rounded-xl bg-card text-muted-foreground h-12 w-12 shadow-[var(--shadow-soft)] border border-border transition active:scale-[0.98]"
+          >
+            <Globe className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
+            <span className="text-[7px] font-semibold tracking-wide mt-0.5">
+              {lang === "sv" ? (
+                <>
+                  <span className="text-foreground">SV</span>
+                  <span> | </span>
+                  <span className="opacity-50">EN</span>
+                </>
+              ) : (
+                <>
+                  <span className="opacity-50">SV</span>
+                  <span> | </span>
+                  <span className="text-foreground">EN</span>
+                </>
+              )}
+            </span>
+          </button>
+        </div>
       </div>
     </div>
   );
