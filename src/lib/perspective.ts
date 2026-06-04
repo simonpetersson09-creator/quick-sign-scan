@@ -806,7 +806,7 @@ export interface DocumentDetection {
 
 const A4_RATIO = Math.SQRT2;
 export const MIN_DOCUMENT_CONFIDENCE = 0.12;
-export const MIN_EDGE_TIGHTNESS_FOR_CAPTURE = 0.7;
+export const MIN_EDGE_TIGHTNESS_FOR_CAPTURE = 0.55;
 
 
 // Detect the document from its contour: isolate candidate paper, extract the
