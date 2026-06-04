@@ -1082,9 +1082,12 @@ function cannyEdges(
 }
 
 function closeEdgeGaps(edges: Uint8Array, width: number, height: number): Uint8Array {
-  let mask = dilateMask(edges, width, height);
-  mask = dilateMask(mask, width, height);
-  return erodeMask(mask, width, height);
+  // Balanced morphological closing (dilate then erode by the same amount).
+  // The previous dilate-dilate-erode was a net +1px dilation which pushed
+  // the detected contour OUTSIDE the real paper edge by a couple of pixels
+  // per side — visible as a frame that floats a few mm/cm off the document.
+  const dilated = dilateMask(edges, width, height);
+  return erodeMask(dilated, width, height);
 }
 
 function buildBrightPaperMask(
@@ -1095,10 +1098,13 @@ function buildBrightPaperMask(
 ): Uint8Array {
   const mask = new Uint8Array(lum.length);
   for (let i = 0; i < lum.length; i++) mask[i] = lum[i] >= threshold ? 1 : 0;
+  // Balanced closing: dilate N, erode N. The previous extra dilate at the
+  // end grew the mask by 1px on every side, which propagated through to the
+  // boundary contour and put the polygon outside the actual paper.
   let closed: Uint8Array<ArrayBufferLike> = mask;
   for (let i = 0; i < 3; i++) closed = dilateMask(closed, width, height);
   for (let i = 0; i < 3; i++) closed = erodeMask(closed, width, height);
-  return dilateMask(erodeMask(closed, width, height), width, height);
+  return closed;
 }
 
 function maskBoundary(mask: Uint8Array, width: number, height: number): Uint8Array {
