@@ -29,6 +29,8 @@ const sv: Dict = {
   statusUncertain: "Kunde inte identifiera dokumentets kanter.",
   statusAlign: "Rikta in dokumentet",
   statusHold: "Håll stilla…",
+  statusFocusing: "Fokuserar…",
+  statusMoveBack: "Flytta telefonen något längre från dokumentet.",
   statusReady: "Dokument hittat",
   statusCapturing: "Skannar och rätar upp…",
   statusError: "Fel",
