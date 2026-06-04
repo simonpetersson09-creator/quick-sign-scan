@@ -448,73 +448,60 @@ export function cleanPaperEdges(canvas: HTMLCanvasElement): HTMLCanvasElement {
 
   const img = ctx.getImageData(0, 0, w, h);
   const data = img.data;
-  // Max inward depth we'll whiten per row/col (12% — enough to swallow
-  // shadow bands and stray background from over-expanded quads, but not
-  // so deep we eat into the document body).
-  const maxDepthX = Math.round(w * 0.12);
-  const maxDepthY = Math.round(h * 0.12);
-  // Pixel is "paper-white-ish" if all channels are above this.
-  const PAPER_MIN = 232;
-  // Consecutive paper-white pixels needed to stop whitening.
-  const STOP_RUN = 8;
+  // Max inward depth — generous enough to swallow soft shadow gradients
+  // and stray background, but bounded so we never eat document body.
+  const maxDepthX = Math.round(w * 0.18);
+  const maxDepthY = Math.round(h * 0.18);
+  // Sliding-window stop: we stop whitening only when the average luminance
+  // of the last WINDOW pixels stays above PAPER_AVG. Single bright noise
+  // pixels in a shadow band can't trigger an early stop.
+  const PAPER_AVG = 244;
+  const WINDOW = 24;
 
-  const isPaper = (i: number) =>
-    data[i] >= PAPER_MIN && data[i + 1] >= PAPER_MIN && data[i + 2] >= PAPER_MIN;
+  const lumAt = (i: number) =>
+    0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
   const whitenPx = (i: number) => {
     data[i] = 255;
     data[i + 1] = 255;
     data[i + 2] = 255;
   };
 
-  // Sweep from each edge inward, per scanline, whitening non-paper pixels
-  // until we've seen STOP_RUN consecutive paper pixels.
+  const sweep = (
+    start: number,
+    step: number,
+    maxDepth: number,
+    indexFn: (depth: number) => number,
+  ) => {
+    const buf: number[] = [];
+    let sum = 0;
+    let stopped = false;
+    for (let d = 0; d < maxDepth; d++) {
+      const i = indexFn(d);
+      const l = lumAt(i);
+      if (!stopped) {
+        buf.push(l);
+        sum += l;
+        if (buf.length > WINDOW) sum -= buf.shift()!;
+        if (buf.length === WINDOW && sum / WINDOW >= PAPER_AVG) {
+          stopped = true;
+          break;
+        }
+        whitenPx(i);
+      }
+    }
+    void start;
+    void step;
+  };
+
+  // Per row, sweep from left and from right.
   for (let y = 0; y < h; y++) {
-    let run = 0;
-    for (let x = 0; x < maxDepthX; x++) {
-      const i = (y * w + x) * 4;
-      if (isPaper(i)) {
-        run++;
-        if (run >= STOP_RUN) break;
-      } else {
-        run = 0;
-        whitenPx(i);
-      }
-    }
-    run = 0;
-    for (let x = 0; x < maxDepthX; x++) {
-      const i = (y * w + (w - 1 - x)) * 4;
-      if (isPaper(i)) {
-        run++;
-        if (run >= STOP_RUN) break;
-      } else {
-        run = 0;
-        whitenPx(i);
-      }
-    }
+    sweep(0, 1, maxDepthX, (d) => (y * w + d) * 4);
+    sweep(0, 1, maxDepthX, (d) => (y * w + (w - 1 - d)) * 4);
   }
+  // Per column, sweep from top and from bottom.
   for (let x = 0; x < w; x++) {
-    let run = 0;
-    for (let y = 0; y < maxDepthY; y++) {
-      const i = (y * w + x) * 4;
-      if (isPaper(i)) {
-        run++;
-        if (run >= STOP_RUN) break;
-      } else {
-        run = 0;
-        whitenPx(i);
-      }
-    }
-    run = 0;
-    for (let y = 0; y < maxDepthY; y++) {
-      const i = ((h - 1 - y) * w + x) * 4;
-      if (isPaper(i)) {
-        run++;
-        if (run >= STOP_RUN) break;
-      } else {
-        run = 0;
-        whitenPx(i);
-      }
-    }
+    sweep(0, 1, maxDepthY, (d) => (d * w + x) * 4);
+    sweep(0, 1, maxDepthY, (d) => ((h - 1 - d) * w + x) * 4);
   }
 
   ctx.putImageData(img, 0, 0);
