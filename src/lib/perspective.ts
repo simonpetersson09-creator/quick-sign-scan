@@ -168,6 +168,140 @@ export function warpQuadToRect(
   return out;
 }
 
+// Shadow removal via divisive flat-fielding using a max-filter background
+// estimate. A max filter on luminance ignores ink (dark) and recovers the
+// true paper brightness underneath shadows. Dividing the original by this
+// background flattens shadows and uneven lighting before tone-curve work.
+// Runs on a downsampled copy for speed; result is upsampled back.
+export function removeShadows(canvas: HTMLCanvasElement): HTMLCanvasElement {
+  const w = canvas.width;
+  const h = canvas.height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+
+  // Downsample factor — target ~240px long edge for the background estimate.
+  // Large enough to localize shadows, small enough to keep this fast.
+  const longEdge = Math.max(w, h);
+  const scale = Math.max(1, Math.round(longEdge / 240));
+  const sw = Math.max(1, Math.floor(w / scale));
+  const sh = Math.max(1, Math.floor(h / scale));
+
+  // Build small luminance plane via simple block-average.
+  const small = new Float32Array(sw * sh);
+  for (let sy = 0; sy < sh; sy++) {
+    for (let sx = 0; sx < sw; sx++) {
+      const x0 = sx * scale;
+      const y0 = sy * scale;
+      const x1 = Math.min(w, x0 + scale);
+      const y1 = Math.min(h, y0 + scale);
+      let sum = 0;
+      let cnt = 0;
+      for (let y = y0; y < y1; y++) {
+        const row = y * w;
+        for (let x = x0; x < x1; x++) {
+          const i = (row + x) * 4;
+          sum += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+          cnt++;
+        }
+      }
+      small[sy * sw + sx] = cnt ? sum / cnt : 0;
+    }
+  }
+
+  // Separable max filter — radius ~ 6% of the small image so it spans
+  // multiple text lines and recovers paper brightness between glyphs.
+  const r = Math.max(3, Math.round(Math.max(sw, sh) * 0.06));
+  const bgX = new Float32Array(sw * sh);
+  for (let y = 0; y < sh; y++) {
+    const row = y * sw;
+    for (let x = 0; x < sw; x++) {
+      let m = 0;
+      const x0 = Math.max(0, x - r);
+      const x1 = Math.min(sw - 1, x + r);
+      for (let xx = x0; xx <= x1; xx++) {
+        const v = small[row + xx];
+        if (v > m) m = v;
+      }
+      bgX[row + x] = m;
+    }
+  }
+  const bg = new Float32Array(sw * sh);
+  for (let x = 0; x < sw; x++) {
+    for (let y = 0; y < sh; y++) {
+      let m = 0;
+      const y0 = Math.max(0, y - r);
+      const y1 = Math.min(sh - 1, y + r);
+      for (let yy = y0; yy <= y1; yy++) {
+        const v = bgX[yy * sw + x];
+        if (v > m) m = v;
+      }
+      bg[y * sw + x] = m;
+    }
+  }
+
+  // Light blur on the background (3-tap box) to avoid blocky artifacts when
+  // we upsample.
+  const bgBlur = new Float32Array(sw * sh);
+  for (let y = 0; y < sh; y++) {
+    for (let x = 0; x < sw; x++) {
+      let sum = 0;
+      let cnt = 0;
+      for (let yy = Math.max(0, y - 1); yy <= Math.min(sh - 1, y + 1); yy++) {
+        for (let xx = Math.max(0, x - 1); xx <= Math.min(sw - 1, x + 1); xx++) {
+          sum += bg[yy * sw + xx];
+          cnt++;
+        }
+      }
+      bgBlur[y * sw + x] = sum / cnt;
+    }
+  }
+
+  // Apply: per full-res pixel, find background via bilinear sample, then
+  // multiply each channel by (target / bg). Target = global high percentile
+  // of the small bg so we don't over-brighten genuinely white paper.
+  const sample = new Float32Array(bgBlur);
+  sample.sort();
+  const target = Math.max(160, sample[Math.floor(sample.length * 0.9)] || 220);
+
+  for (let y = 0; y < h; y++) {
+    const fy = Math.min(sh - 1, y / scale);
+    const sy0 = Math.floor(fy);
+    const sy1 = Math.min(sh - 1, sy0 + 1);
+    const wy = fy - sy0;
+    for (let x = 0; x < w; x++) {
+      const fx = Math.min(sw - 1, x / scale);
+      const sx0 = Math.floor(fx);
+      const sx1 = Math.min(sw - 1, sx0 + 1);
+      const wx = fx - sx0;
+      const b00 = bgBlur[sy0 * sw + sx0];
+      const b10 = bgBlur[sy0 * sw + sx1];
+      const b01 = bgBlur[sy1 * sw + sx0];
+      const b11 = bgBlur[sy1 * sw + sx1];
+      const bgVal =
+        b00 * (1 - wx) * (1 - wy) +
+        b10 * wx * (1 - wy) +
+        b01 * (1 - wx) * wy +
+        b11 * wx * wy;
+      // Clamp so very dark regions (e.g. background outside paper) don't blow up.
+      const k = target / Math.max(60, bgVal);
+      const i = (y * w + x) * 4;
+      let r0 = d[i] * k;
+      let g0 = d[i + 1] * k;
+      let b0 = d[i + 2] * k;
+      if (r0 > 255) r0 = 255;
+      if (g0 > 255) g0 = 255;
+      if (b0 > 255) b0 = 255;
+      d[i] = r0;
+      d[i + 1] = g0;
+      d[i + 2] = b0;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  return canvas;
+}
+
 // Paper enhancement: shading-correct (remove shadows / uneven lighting),
 // then stretch whites and crisp up ink so the result looks like a clean
 // office-scanner output (white paper, dark text, no background tones).
