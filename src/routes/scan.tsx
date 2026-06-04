@@ -5,7 +5,6 @@ import {
   autoOrientAndDeskewDocument,
   cleanPaperEdges,
   detectDocumentQuad,
-  DocumentAlignmentDiagnostics,
   MIN_DOCUMENT_CONFIDENCE,
   measureQuadGeometry,
   orderQuad,
@@ -15,6 +14,7 @@ import {
   maxCornerDelta,
   warpQuadToRect,
 } from "@/lib/perspective";
+import type { DocumentAlignmentDiagnostics } from "@/lib/perspective";
 import { useT } from "@/lib/i18n";
 import { Camera, CameraOff, X, RefreshCw, ArrowLeft, ArrowRight } from "lucide-react";
 
