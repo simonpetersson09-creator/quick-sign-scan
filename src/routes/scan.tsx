@@ -844,13 +844,13 @@ function ScanPage() {
               </p>
             </div>
             <div
-              className="rounded-sm overflow-hidden border border-white/15 bg-white shadow-xl"
-              style={{ width: "min(60vw, 240px)", aspectRatio: "1 / 1.414" }}
+              className="rounded-sm overflow-hidden border border-white/15 bg-white shadow-xl flex items-center justify-center"
+              style={{ width: "min(60vw, 240px)" }}
             >
               <img
                 src={justCaptured}
                 alt={t("scannedAlt")}
-                className="w-full h-full object-contain bg-white"
+                className="block w-full h-auto bg-white"
               />
             </div>
             {debugEnabled && scanStore.get().sourceDataUrl && scanStore.get().detection && (
