@@ -1433,6 +1433,50 @@ function pointInQuad(p: Point, quad: [Point, Point, Point, Point]): boolean {
 }
 
 
+// Percentile-based contrast stretch. Finds the 2nd and 98th percentiles of
+// the luminance histogram and linearly remaps that range to [0..255]. This
+// is the cheapest form of adaptive normalization and dramatically improves
+// edge/mask detection on dimly lit scenes where the whole histogram is
+// squeezed into the middle of the range (white paper at ~140 instead of
+// ~230). If contrast is already healthy we skip the remap so well-lit
+// frames behave exactly as before.
+function stretchContrast(
+  lum: Uint8ClampedArray,
+  hist: Uint32Array,
+  total: number,
+): { lum: Uint8ClampedArray; hist: Uint32Array } {
+  const lowCut = Math.floor(total * 0.02);
+  const highCut = Math.floor(total * 0.02);
+  let acc = 0;
+  let lo = 0;
+  for (let i = 0; i < 256; i++) {
+    acc += hist[i];
+    if (acc > lowCut) { lo = i; break; }
+  }
+  acc = 0;
+  let hi = 255;
+  for (let i = 255; i >= 0; i--) {
+    acc += hist[i];
+    if (acc > highCut) { hi = i; break; }
+  }
+  const span = hi - lo;
+  // Skip remap when contrast is already good — avoids touching well-lit frames.
+  if (span >= 170) return { lum, hist };
+  if (span < 20) return { lum, hist }; // degenerate / nearly flat image — leave untouched
+  const out = new Uint8ClampedArray(lum.length);
+  const outHist = new Uint32Array(256);
+  const scale = 255 / span;
+  for (let i = 0; i < lum.length; i++) {
+    let v = (lum[i] - lo) * scale;
+    if (v < 0) v = 0;
+    else if (v > 255) v = 255;
+    const vi = v | 0;
+    out[i] = vi;
+    outHist[vi]++;
+  }
+  return { lum: out, hist: outHist };
+}
+
 function gaussianBlur(lum: Uint8ClampedArray, width: number, height: number): Uint8ClampedArray {
   const out = new Uint8ClampedArray(lum.length);
   for (let y = 1; y < height - 1; y++) {
