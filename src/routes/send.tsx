@@ -25,13 +25,6 @@ function makeEmailSchema(t: (k: string) => string) {
     .email({ message: t("invalidEmail") });
 }
 
-const optionalEmailSchema = z
-  .string()
-  .trim()
-  .max(255)
-  .email()
-  .optional()
-  .or(z.literal(""));
 
 export const Route = createFileRoute("/send")({
   head: () => ({ meta: [{ title: "Skicka" }] }),
@@ -46,7 +39,7 @@ function SendPage() {
   const [to, setTo] = useState(settings.defaultRecipient);
   const [subject, setSubject] = useState(settings.defaultSubject);
   const [message, setMessage] = useState(settings.defaultMessage);
-  const [replyTo, setReplyTo] = useState("");
+  
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
@@ -117,13 +110,6 @@ function SendPage() {
     }
     const recipient = parsed.data;
 
-    // Reply-To is optional. Only forward it if it parses as a valid email.
-    const replyParsed = optionalEmailSchema.safeParse(replyTo);
-    const replyToValue =
-      replyParsed.success && replyParsed.data && replyParsed.data.length > 0
-        ? replyParsed.data
-        : undefined;
-
     setEmailError(null);
     setSending(true);
     setInfo(null);
@@ -155,7 +141,7 @@ function SendPage() {
             message: message || "",
             filename,
             pdfBase64,
-            ...(replyToValue ? { replyTo: replyToValue } : {}),
+            
           },
         })) as SendScanEmailResult;
       } catch (e) {
@@ -239,18 +225,6 @@ function SendPage() {
               ))}
             </div>
           )}
-        </Field>
-
-        <Field label={t("fieldReplyTo")}>
-          <input
-            type="email"
-            inputMode="email"
-            autoComplete="email"
-            value={replyTo}
-            onChange={(e) => setReplyTo(e.target.value)}
-            placeholder={t("placeholderReply")}
-            className="input"
-          />
         </Field>
 
         <Field label={t("fieldSubject")}>
