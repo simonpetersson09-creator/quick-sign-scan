@@ -497,60 +497,16 @@ function ScanPage() {
     // navigate them onward — otherwise capturedRef is locked, the stream
     // is dead, and the only escape is the back button → tillbaka till start.
     try {
-      const warped = warpQuadToRect(video, vw, vh, srcQuad, outW, outH);
+      let warped = warpQuadToRect(video, vw, vh, srcQuad, outW, outH);
 
       // Paper enhancement: normalize lighting and stretch whites so the
       // document looks like a clean scanned A4 (white paper, dark ink).
       try {
         enhancePaper(warped);
+        cleanPaperEdges(warped);
+        warped = autoOrientAndDeskewDocument(warped);
       } catch (e) {
-        console.error("[scan] enhancePaper failed, using raw warp", e);
-      }
-
-      // Aggressiv kantstädning — skanna upp till 18% från varje kant och
-      // ersätt rader/kolumner vars medelluminans är klart mörkare än
-      // papperets vita yta. Tröskeln är hög (220) för att även gråa skuggor
-      // och svaga mörkningar nära kanten ska försvinna och bli rent vita.
-      try {
-        const bctx = warped.getContext("2d");
-        if (bctx) {
-          const img = bctx.getImageData(0, 0, outW, outH);
-          const data = img.data;
-          const DARK_THRESHOLD = 220; // 0-255, högre = mer aggressiv städning
-          const isDarkRow = (y: number) => {
-            let sum = 0;
-            for (let x = 0; x < outW; x++) {
-              const i = (y * outW + x) * 4;
-              sum += data[i] + data[i + 1] + data[i + 2];
-            }
-            return sum / (outW * 3) < DARK_THRESHOLD;
-          };
-          const isDarkCol = (x: number) => {
-            let sum = 0;
-            for (let y = 0; y < outH; y++) {
-              const i = (y * outW + x) * 4;
-              sum += data[i] + data[i + 1] + data[i + 2];
-            }
-            return sum / (outH * 3) < DARK_THRESHOLD;
-          };
-          const maxBandX = Math.round(outW * 0.18);
-          const maxBandY = Math.round(outH * 0.18);
-          let top = 0;
-          while (top < maxBandY && isDarkRow(top)) top++;
-          let bottom = 0;
-          while (bottom < maxBandY && isDarkRow(outH - 1 - bottom)) bottom++;
-          let left = 0;
-          while (left < maxBandX && isDarkCol(left)) left++;
-          let right = 0;
-          while (right < maxBandX && isDarkCol(outW - 1 - right)) right++;
-          bctx.fillStyle = "#ffffff";
-          if (top > 0) bctx.fillRect(0, 0, outW, top);
-          if (bottom > 0) bctx.fillRect(0, outH - bottom, outW, bottom);
-          if (left > 0) bctx.fillRect(0, 0, left, outH);
-          if (right > 0) bctx.fillRect(outW - right, 0, right, outH);
-        }
-      } catch (e) {
-        console.error("[scan] edge cleanup failed", e);
+        console.error("[scan] enhance/orient failed, using raw warp", e);
       }
 
 
@@ -568,7 +524,7 @@ function ScanPage() {
         sourceDataUrl,
         pages: nextPages,
         detection: {
-          corners: normQuad,
+            corners: orderedNormQuad,
           a4Ratio: meta.a4Ratio,
           confidence: meta.confidence,
           debug: meta.debug,
