@@ -479,23 +479,23 @@ function ScanPage() {
       x: p.x * vw,
       y: p.y * vh,
     })) as [Point, Point, Point, Point];
+    const geometry = measureQuadGeometry(srcQuad);
 
-    // Beräkna output-aspekt från dom faktiska hörnen istället för att tvinga
-    // A4. Detta säkerställer att text inte blir sträckt/komprimerad och att
-    // dokumentet alltid är rakt och proportionerligt. Vi mäter medellängden
-    // av motstående sidor (TL→TR vs BL→BR för bredd, TL→BL vs TR→BR för höjd).
-    const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
-    const topW = dist(srcQuad[0], srcQuad[1]);
-    const bottomW = dist(srcQuad[3], srcQuad[2]);
-    const leftH = dist(srcQuad[0], srcQuad[3]);
-    const rightH = dist(srcQuad[1], srcQuad[2]);
-    const quadW = (topW + bottomW) / 2;
-    const quadH = (leftH + rightH) / 2;
-    const quadAspect = quadH / quadW; // >1 = portrait, <1 = landscape
-    // Begränsa till rimligt intervall så degenererade quads inte ger extrema mått
-    const aspect = Math.max(0.5, Math.min(2.0, quadAspect));
+    // För A4 ska output-ytan vara dokumentets verkliga proportion, inte
+    // kamerans/canvasens proportion. Själva innehållet mappas fortfarande från
+    // de fyra verkliga hörnen i srcQuad.
+    const aspect = geometry.height >= geometry.width ? Math.SQRT2 : 1 / Math.SQRT2;
     const outW = 1000;
     const outH = Math.round(outW * aspect);
+
+    logScanStage("camera-frame", { width: vw, height: vh, readyState: video.readyState });
+    logScanStage("detected-corners", {
+      normalized: formatQuad(orderedNormQuad),
+      sourcePixels: formatQuad(srcQuad),
+      confidence: meta.confidence,
+      detectionDebug: meta.debug,
+    });
+    logScanStage("document-angle-before-warp", geometry);
 
     // Yield to UI so the "capturing" state renders
     await new Promise((r) => requestAnimationFrame(() => r(null)));
@@ -506,13 +506,18 @@ function ScanPage() {
     // is dead, and the only escape is the back button → tillbaka till start.
     try {
       let warped = warpQuadToRect(video, vw, vh, srcQuad, outW, outH);
+      logScanCanvas("after-perspective-transform", warped, debugEnabled);
 
       // Paper enhancement: normalize lighting and stretch whites so the
       // document looks like a clean scanned A4 (white paper, dark ink).
+      let alignmentDiagnostics: DocumentAlignmentDiagnostics | null = null;
       try {
         enhancePaper(warped);
         cleanPaperEdges(warped);
-        warped = autoOrientAndDeskewDocument(warped);
+        warped = autoOrientAndDeskewDocument(warped, (diagnostics) => {
+          alignmentDiagnostics = diagnostics;
+        });
+        logScanStage("deskew", alignmentDiagnostics);
       } catch (e) {
         console.error("[scan] enhance/orient failed, using raw warp", e);
       }
@@ -524,6 +529,13 @@ function ScanPage() {
 
       const dataUrl = warped.toDataURL("image/jpeg", 0.92);
       const sourceDataUrl = sourceCanvas.toDataURL("image/jpeg", 0.86);
+      logScanCanvas("final-image-to-pdf", warped, debugEnabled);
+      logScanStage("pdf-input", {
+        sameDataUrlUsedForPreviewAndPdf: true,
+        imageWidth: warped.width,
+        imageHeight: warped.height,
+        dataUrlBytes: dataUrl.length,
+      });
       const existing = scanStore.get().pages;
       const nextPages = [...existing, dataUrl];
       scanStore.set({
