@@ -372,7 +372,7 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
     let t = (v - black) / range;
     if (t < 0) t = 0;
     else if (t > 1) t = 1;
-    t = Math.pow(t, 1.45);
+    t = Math.pow(t, 1.65);
     t = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
     lut[v] = (t * 255) | 0;
   }
