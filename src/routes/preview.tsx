@@ -52,14 +52,6 @@ function PreviewPage() {
     commitPages(next, nextActive);
   }
 
-  function movePage(i: number, dir: -1 | 1) {
-    const j = i + dir;
-    if (j < 0 || j >= pages.length) return;
-    const next = [...pages];
-    [next[i], next[j]] = [next[j], next[i]];
-    const nextActive = activeIndex === i ? j : activeIndex === j ? i : activeIndex;
-    commitPages(next, nextActive);
-  }
 
   function startOver() {
     scanStore.clear();
