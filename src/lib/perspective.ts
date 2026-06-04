@@ -786,8 +786,7 @@ export function detectDocumentQuad(
   const brightThreshold = Math.max(95, Math.min(225, otsuThreshold(hist, total) + 12));
   const paperMask = buildBrightPaperMask(lum, width, height, brightThreshold);
   components.push(...edgeComponents(maskBoundary(paperMask, width, height), width, height));
-  let best: DocumentDetection | null = null;
-  let bestScore = 0;
+  const allDetections: DocumentDetection[] = [];
   let candidateCount = 0;
 
   for (const component of components) {
@@ -826,11 +825,48 @@ export function detectDocumentQuad(
         candidateCount,
       });
       if (!detection) continue;
-      const score = detection.confidence;
-      if (score > bestScore) {
-        bestScore = score;
-        best = detection;
-      }
+      allDetections.push(detection);
+    }
+  }
+
+  // Drop inner candidates: if a detection's quad lies (almost) entirely
+  // inside another, larger detection's quad, it's content on the page —
+  // text blocks, photos, tables — not the outer A4 boundary. We only keep
+  // the OUTER polygon so the warp covers the full sheet.
+  const outerDetections = filterOuterDetections(allDetections);
+
+  // Re-rank survivors with a strong bias toward (1) largest area,
+  // (2) A4 aspect ratio, (3) proximity to image center. Inner contours
+  // can never beat the outer A4 because they were filtered above; among
+  // the remaining outer candidates we still prefer the most A4-like one
+  // that's centered in the frame.
+  const frameCx = width / 2;
+  const frameCy = height / 2;
+  const diag = Math.hypot(width, height);
+  let best: DocumentDetection | null = null;
+  let bestScore = 0;
+  for (const det of outerDetections) {
+    const ratioError = Math.abs(det.a4Ratio - A4_RATIO) / A4_RATIO;
+    const a4Score = clamp01(1 - ratioError / 0.9);
+    const areaScore = clamp01(det.debug.areaRatio / 0.6); // saturates at 60% of frame
+    const cx = (det.corners[0].x + det.corners[1].x + det.corners[2].x + det.corners[3].x) / 4;
+    const cy = (det.corners[0].y + det.corners[1].y + det.corners[2].y + det.corners[3].y) / 4;
+    const centerScore = clamp01(1 - (Math.hypot(cx - frameCx, cy - frameCy) / diag) * 2);
+    // Outer-prioritized confidence: area dominates, then A4 match, then
+    // edge support, then centeredness. Original confidence is folded in
+    // at a small weight so we still reward clean edges over noise.
+    const outerConfidence =
+      0.45 * areaScore +
+      0.2 * a4Score +
+      0.15 * det.debug.edgeScore +
+      0.1 * centerScore +
+      0.1 * det.confidence;
+    // Keep the original `confidence` field on the returned object so the
+    // MIN_DOCUMENT_CONFIDENCE gate and downstream logging stay meaningful,
+    // but pick the winner by outerConfidence.
+    if (outerConfidence > bestScore) {
+      bestScore = outerConfidence;
+      best = det;
     }
   }
 
@@ -848,6 +884,51 @@ export function findDocumentCorners(
 ): [Point, Point, Point, Point] | null {
   return detectDocumentQuad(data, width, height)?.corners ?? null;
 }
+
+// Remove inner detections — any quad whose centroid AND most of its
+// corners lie inside a larger quad is treated as content (text block,
+// photo, table) on top of the actual paper. Only outer polygons survive.
+function filterOuterDetections(detections: DocumentDetection[]): DocumentDetection[] {
+  if (detections.length <= 1) return detections;
+  // Sort by area descending so larger quads are considered as parents first.
+  const sorted = [...detections].sort((a, b) => b.debug.areaRatio - a.debug.areaRatio);
+  const kept: DocumentDetection[] = [];
+  for (const det of sorted) {
+    const cx = (det.corners[0].x + det.corners[1].x + det.corners[2].x + det.corners[3].x) / 4;
+    const cy = (det.corners[0].y + det.corners[1].y + det.corners[2].y + det.corners[3].y) / 4;
+    let containedBy: DocumentDetection | null = null;
+    for (const outer of kept) {
+      if (det.debug.areaRatio >= outer.debug.areaRatio * 0.92) continue; // similar size — keep both
+      if (!pointInQuad({ x: cx, y: cy }, outer.corners)) continue;
+      let cornersInside = 0;
+      for (const c of det.corners) {
+        if (pointInQuad(c, outer.corners)) cornersInside++;
+      }
+      if (cornersInside >= 3) {
+        containedBy = outer;
+        break;
+      }
+    }
+    if (!containedBy) kept.push(det);
+  }
+  return kept;
+}
+
+function pointInQuad(p: Point, quad: [Point, Point, Point, Point]): boolean {
+  let inside = false;
+  for (let i = 0, j = 3; i < 4; j = i++) {
+    const xi = quad[i].x;
+    const yi = quad[i].y;
+    const xj = quad[j].x;
+    const yj = quad[j].y;
+    const intersects =
+      yi > p.y !== yj > p.y &&
+      p.x < ((xj - xi) * (p.y - yi)) / (yj - yi + 1e-9) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
 
 function gaussianBlur(lum: Uint8ClampedArray, width: number, height: number): Uint8ClampedArray {
   const out = new Uint8ClampedArray(lum.length);
