@@ -217,13 +217,13 @@ function PreviewPage() {
             </button>
           )}
           <div
-            className="relative rounded-2xl overflow-hidden shadow-[var(--shadow-card)] border border-border bg-muted/30 p-3"
+            className="relative rounded-2xl overflow-hidden border border-border bg-muted/30 p-3"
             style={{ width: "min(78vw, 340px)", aspectRatio: "1 / 1.414" }}
           >
             <img
               src={displayUrl ?? originalImage}
               alt={t("scannedAlt")}
-              className="w-full h-full object-contain bg-white shadow-sm"
+              className="w-full h-full object-contain bg-white"
             />
             {filtering && (
               <div className="absolute inset-3 flex items-center justify-center bg-white/60 backdrop-blur-sm rounded-xl">

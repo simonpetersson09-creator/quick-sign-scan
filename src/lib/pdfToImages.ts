@@ -4,9 +4,9 @@
 
 export async function pdfFileToImages(
   file: File,
-  opts: { scale?: number; quality?: number; onProgress?: (current: number, total: number) => void } = {},
+  opts: { scale?: number; onProgress?: (current: number, total: number) => void } = {},
 ): Promise<string[]> {
-  const { scale = 2, quality = 0.85, onProgress } = opts;
+  const { scale = 2, onProgress } = opts;
   if (typeof window === "undefined") {
     throw new Error("pdfFileToImages can only run in the browser");
   }
@@ -30,7 +30,7 @@ export async function pdfFileToImages(
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     await page.render({ canvasContext: ctx, viewport, canvas }).promise;
-    pages.push(canvas.toDataURL("image/jpeg", quality));
+    pages.push(canvas.toDataURL("image/png"));
     onProgress?.(i, pdf.numPages);
   }
   return pages;

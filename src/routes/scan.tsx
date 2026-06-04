@@ -910,9 +910,11 @@ function ScanPage() {
     // Sortera alltid hörnen i exakt ordning TL, TR, BR, BL innan warp.
     const orderedNormQuad = orderQuad(normQuad);
 
-    // Tiny safety pad outward from centroid so we don't clip text right at
-    // the paper edge — but small enough to avoid pulling background in.
-    const EDGE_MARGIN = 0.008;
+    // Tiny inward safety crop from the detected document edge. Expanding the
+    // quad can pull table/background pixels into the warp and create dark
+    // edge streaks; shrinking by a fraction of a percent removes 1–3px edge
+    // contamination in the final A4 image.
+    const EDGE_MARGIN = -0.002;
     const cx = (orderedNormQuad[0].x + orderedNormQuad[1].x + orderedNormQuad[2].x + orderedNormQuad[3].x) / 4;
     const cy = (orderedNormQuad[0].y + orderedNormQuad[1].y + orderedNormQuad[2].y + orderedNormQuad[3].y) / 4;
     const expandedNormQuad = orderedNormQuad.map((p) => ({
@@ -1027,7 +1029,7 @@ function ScanPage() {
       sourceCanvas.height = vh;
       sourceCanvas.getContext("2d")!.drawImage(video, 0, 0, vw, vh);
 
-      const dataUrl = warped.toDataURL("image/jpeg", 0.95);
+      const dataUrl = warped.toDataURL("image/png");
       const sourceDataUrl = sourceCanvas.toDataURL("image/jpeg", 0.9);
 
       logScanCanvas("final-image-to-pdf", warped, debugEnabled);

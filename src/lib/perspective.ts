@@ -106,6 +106,8 @@ export function warpQuadToRect(
   srcCanvas.width = srcW;
   srcCanvas.height = srcH;
   const sctx = srcCanvas.getContext("2d", { willReadFrequently: true })!;
+  sctx.fillStyle = "#ffffff";
+  sctx.fillRect(0, 0, srcW, srcH);
   sctx.drawImage(source, 0, 0, srcW, srcH);
   const srcImg = sctx.getImageData(0, 0, srcW, srcH);
   const srcData = srcImg.data;
@@ -120,15 +122,15 @@ export function warpQuadToRect(
   const t = unitSquareToQuad(quad);
 
   for (let y = 0; y < outH; y++) {
-    const v = y / outH;
+    const v = (y + 0.5) / outH;
     for (let x = 0; x < outW; x++) {
-      const u = x / outW;
+      const u = (x + 0.5) / outW;
       const denom = t.g * u + t.h * v + 1;
       const sxF = (t.a * u + t.b * v + t.c) / denom;
       const syF = (t.d * u + t.e * v + t.f) / denom;
 
       const oi = (y * outW + x) * 4;
-      if (sxF < 0 || syF < 0 || sxF >= srcW - 1 || syF >= srcH - 1) {
+      if (!Number.isFinite(sxF) || !Number.isFinite(syF) || sxF < 0 || syF < 0 || sxF >= srcW - 1 || syF >= srcH - 1) {
         outData[oi] = 255;
         outData[oi + 1] = 255;
         outData[oi + 2] = 255;
@@ -677,13 +679,46 @@ export function cleanPaperEdges(canvas: HTMLCanvasElement): HTMLCanvasElement {
   const edgeBandY = Math.round(h * 0.2);
   const colDark = new Uint32Array(w);
   const rowDark = new Uint32Array(h);
+  const colRun = new Uint32Array(w);
+  const rowRun = new Uint32Array(h);
   for (let y = 0; y < h; y++) {
+    let runX = 0;
     for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 4;
       if (dark(i)) {
         colDark[x]++;
         rowDark[y]++;
+        runX++;
+        if (runX > rowRun[y]) rowRun[y] = runX;
+      } else {
+        runX = 0;
       }
+    }
+  }
+  for (let x = 0; x < w; x++) {
+    let runY = 0;
+    for (let y = 0; y < h; y++) {
+      const i = (y * w + x) * 4;
+      if (dark(i)) {
+        runY++;
+        if (runY > colRun[x]) colRun[x] = runY;
+      } else {
+        runY = 0;
+      }
+    }
+  }
+  const trimPxX = Math.min(3, Math.max(1, Math.round(w * 0.0012)));
+  const trimPxY = Math.min(3, Math.max(1, Math.round(h * 0.0012)));
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < trimPxX; x++) {
+      whitenPx((y * w + x) * 4);
+      whitenPx((y * w + (w - 1 - x)) * 4);
+    }
+  }
+  for (let y = 0; y < trimPxY; y++) {
+    for (let x = 0; x < w; x++) {
+      whitenPx((y * w + x) * 4);
+      whitenPx(((h - 1 - y) * w + x) * 4);
     }
   }
   const bleachDarkColumn = (x0: number, x1: number) => {
@@ -706,6 +741,7 @@ export function cleanPaperEdges(canvas: HTMLCanvasElement): HTMLCanvasElement {
   for (let x = 0; x < w; x++) {
     if (x >= edgeBandX && x < w - edgeBandX) continue;
     if (colDark[x] < h * 0.018) continue;
+    if (colRun[x] < h * 0.014) continue;
     let x0 = x;
     let x1 = x;
     while (x0 > 0 && colDark[x0 - 1] >= h * 0.006) x0--;
@@ -718,6 +754,7 @@ export function cleanPaperEdges(canvas: HTMLCanvasElement): HTMLCanvasElement {
   for (let y = 0; y < h; y++) {
     if (y >= edgeBandY && y < h - edgeBandY) continue;
     if (rowDark[y] < w * 0.018) continue;
+    if (rowRun[y] < w * 0.014) continue;
     let y0 = y;
     let y1 = y;
     while (y0 > 0 && rowDark[y0 - 1] >= w * 0.006) y0--;
@@ -787,6 +824,7 @@ export function autoOrientAndDeskewDocument(
 
   cleanPaperEdges(oriented);
   const finalCanvas = renderToA4Portrait(oriented);
+  cleanPaperEdges(finalCanvas);
   onDiagnostics?.({
     input: { width: canvas.width, height: canvas.height },
     orientationCandidates,

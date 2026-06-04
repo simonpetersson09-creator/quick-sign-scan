@@ -109,6 +109,5 @@ export async function applyFilter(
   const canvas = toCanvas(img);
   if (mode === "gray") applyGrayscale(canvas);
   else if (mode === "bw") applySauvola(canvas);
-  const quality = mode === "bw" ? 0.9 : 0.92;
-  return canvas.toDataURL("image/jpeg", quality);
+  return canvas.toDataURL("image/png");
 }

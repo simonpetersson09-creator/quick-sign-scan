@@ -24,6 +24,8 @@ export async function buildPdf(
   pages.forEach((imageDataUrl, idx) => {
     if (idx > 0) pdf.addPage("a4", "portrait");
     const imgFormat = detectImageFormat(imageDataUrl);
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(0, 0, pageW, pageH, "F");
     // eslint-disable-next-line no-console
     console.log("[scan:pdf-generation]", {
       pageIndex: idx,
@@ -32,8 +34,9 @@ export async function buildPdf(
       imageFormat: imgFormat,
       dataUrlBytes: imageDataUrl.length,
     });
-    // SLOW = best quality compression in jsPDF (uses higher-quality DCT).
-    pdf.addImage(imageDataUrl, imgFormat, 0, 0, pageW, pageH, undefined, "SLOW");
+    // PNG keeps exact edge pixels; JPEG pages use SLOW as best-quality DCT.
+    const compression = imgFormat === "JPEG" ? "SLOW" : undefined;
+    pdf.addImage(imageDataUrl, imgFormat, 0, 0, pageW, pageH, undefined, compression);
 
   });
 
