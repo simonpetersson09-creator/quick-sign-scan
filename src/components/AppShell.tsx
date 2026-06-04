@@ -15,22 +15,20 @@ export function AppShell({ title, back, children, rightSlot }: Props) {
   return (
     <div className="min-h-dvh flex flex-col bg-background">
       {(title || back) && (
-        <header className="pt-safe px-5 pb-3 flex items-center gap-2">
-          {back ? (
+        <header className="pt-safe px-5 pb-3 relative flex items-center justify-center min-h-[44px]">
+          {back && (
             <Link
               to={back}
-              className="-ml-2 inline-flex items-center justify-center h-10 w-10 rounded-full text-foreground/70 hover:bg-secondary transition"
+              className="absolute left-5 inline-flex items-center justify-center h-10 w-10 rounded-full bg-primary text-primary-foreground shadow-[var(--shadow-soft)] hover:opacity-95 active:scale-[0.97] transition"
               aria-label={t("back")}
             >
-              <ChevronLeft className="h-6 w-6" />
+              <ChevronLeft className="h-5 w-5" />
             </Link>
-          ) : (
-            <div className="w-2" />
           )}
-          <h1 className="flex-1 text-[17px] font-semibold tracking-tight">
+          <h1 className="text-[17px] font-semibold tracking-tight text-center">
             {title}
           </h1>
-          {rightSlot}
+          {rightSlot && <div className="absolute right-5">{rightSlot}</div>}
         </header>
       )}
       <main className="flex-1 flex flex-col px-5 pb-safe">{children}</main>
