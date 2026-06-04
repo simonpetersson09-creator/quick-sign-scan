@@ -1326,18 +1326,30 @@ function evaluateEdgeQuad(args: {
   const textScore = clamp01(stats.darkRatio / 0.055);
   const areaScore =
     areaRatio <= 0.7 ? clamp01((areaRatio - 0.02) / 0.18) : clamp01((0.98 - areaRatio) / 0.2);
+  const contrastScore = clamp01((stats.mean - stats.exteriorMean) / 60);
+  const purityScore = clamp01(stats.brightRatio / 0.85);
   const confidence =
-    0.38 * edgeScore + // höjd vikt — kanttäckning är viktigast mot bakgrund
-    0.18 * straightScore +
-    0.10 * a4Score +
-    0.10 * brightnessScore +
-    0.06 * textScore +
-    0.10 * perspectiveScore +
-    0.08 * areaScore;
+    0.32 * edgeScore + // kanttäckning är viktigast mot bakgrund
+    0.16 * straightScore +
+    0.08 * a4Score +
+    0.08 * brightnessScore +
+    0.05 * textScore +
+    0.08 * perspectiveScore +
+    0.07 * areaScore +
+    0.08 * contrastScore +
+    0.08 * purityScore;
 
   // Hårdare kanttäckningsgrind: utan riktiga kanter under polygonens sidor
   // är det en bakgrundsfyrhörning och inte ett dokument.
   if (edgeScore < 0.18) return null;
+
+  // Hårdare "är detta verkligen papper?"-grindar. Förhindrar att ramen sväljer
+  // tangentbord, sladdar eller andra mörka prylar bredvid A4:et: interiören
+  // måste vara ljus, övervägande vit, och tydligt ljusare än omgivningen.
+  if (stats.mean < 135) return null;
+  if (stats.brightRatio < 0.55) return null;
+  if (stats.darkRatio > 0.32) return null;
+  if (stats.mean - stats.exteriorMean < 12) return null;
 
   return {
     corners: ordered,
@@ -1364,32 +1376,75 @@ function polygonImageStats(
   lum: Uint8ClampedArray,
   width: number,
   height: number,
-): { mean: number; darkRatio: number } {
+): { mean: number; darkRatio: number; brightRatio: number; exteriorMean: number } {
   const minX = Math.max(1, Math.floor(Math.min(...quad.map((p) => p.x))));
   const minY = Math.max(1, Math.floor(Math.min(...quad.map((p) => p.y))));
   const maxX = Math.min(width - 2, Math.ceil(Math.max(...quad.map((p) => p.x))));
   const maxY = Math.min(height - 2, Math.ceil(Math.max(...quad.map((p) => p.y))));
+
+  // Centroid of the quad (used to define a slightly shrunk "inner" polygon so
+  // we don't sample exactly on the document edge where a halo of background
+  // can pollute brightness stats).
+  const cx = (quad[0].x + quad[1].x + quad[2].x + quad[3].x) / 4;
+  const cy = (quad[0].y + quad[1].y + quad[2].y + quad[3].y) / 4;
+  const shrink = 0.92;
+  const inner: [Point, Point, Point, Point] = [
+    { x: cx + (quad[0].x - cx) * shrink, y: cy + (quad[0].y - cy) * shrink },
+    { x: cx + (quad[1].x - cx) * shrink, y: cy + (quad[1].y - cy) * shrink },
+    { x: cx + (quad[2].x - cx) * shrink, y: cy + (quad[2].y - cy) * shrink },
+    { x: cx + (quad[3].x - cx) * shrink, y: cy + (quad[3].y - cy) * shrink },
+  ];
+  // Slightly expanded polygon used to sample the surrounding background ring.
+  const grow = 1.12;
+  const outer: [Point, Point, Point, Point] = [
+    { x: cx + (quad[0].x - cx) * grow, y: cy + (quad[0].y - cy) * grow },
+    { x: cx + (quad[1].x - cx) * grow, y: cy + (quad[1].y - cy) * grow },
+    { x: cx + (quad[2].x - cx) * grow, y: cy + (quad[2].y - cy) * grow },
+    { x: cx + (quad[3].x - cx) * grow, y: cy + (quad[3].y - cy) * grow },
+  ];
+
   let sum = 0;
   let count = 0;
-  const samples: number[] = [];
+  let dark = 0;
+  let bright = 0;
+  // Fixed cutoffs — paper is bright (>=170), ink/keys/cables are dark (<110).
+  const darkCutoff = 110;
+  const brightCutoff = 170;
 
   for (let y = minY; y <= maxY; y += 2) {
     for (let x = minX; x <= maxX; x += 2) {
-      if (!pointInPolygon({ x, y }, quad)) continue;
+      if (!pointInPolygon({ x, y }, inner)) continue;
       const value = lum[y * width + x];
       sum += value;
       count++;
-      samples.push(value);
+      if (value < darkCutoff) dark++;
+      if (value >= brightCutoff) bright++;
     }
   }
 
   const mean = count ? sum / count : 0;
-  let dark = 0;
-  const darkCutoff = Math.max(35, mean - 45);
-  for (const value of samples) {
-    if (value < darkCutoff) dark++;
+  const darkRatio = count ? dark / count : 0;
+  const brightRatio = count ? bright / count : 0;
+
+  // Sample a ring just outside the quad (inside `outer`, outside `quad`) to
+  // estimate background brightness.
+  const oMinX = Math.max(1, Math.floor(Math.min(...outer.map((p) => p.x))));
+  const oMinY = Math.max(1, Math.floor(Math.min(...outer.map((p) => p.y))));
+  const oMaxX = Math.min(width - 2, Math.ceil(Math.max(...outer.map((p) => p.x))));
+  const oMaxY = Math.min(height - 2, Math.ceil(Math.max(...outer.map((p) => p.y))));
+  let extSum = 0;
+  let extCount = 0;
+  for (let y = oMinY; y <= oMaxY; y += 3) {
+    for (let x = oMinX; x <= oMaxX; x += 3) {
+      if (!pointInPolygon({ x, y }, outer)) continue;
+      if (pointInPolygon({ x, y }, quad)) continue;
+      extSum += lum[y * width + x];
+      extCount++;
+    }
   }
-  return { mean, darkRatio: count ? dark / count : 0 };
+  const exteriorMean = extCount ? extSum / extCount : mean;
+
+  return { mean, darkRatio, brightRatio, exteriorMean };
 }
 
 function quadEdgeSupport(
