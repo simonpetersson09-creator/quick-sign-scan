@@ -28,6 +28,7 @@ type Status =
   | "hold"
   | "focusing"
   | "moveBack"
+  | "lowLight"
   | "ready"
   | "capturing"
   | "error";
