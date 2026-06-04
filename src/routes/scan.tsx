@@ -1117,17 +1117,7 @@ function ScanPage() {
             <span className="ml-2 opacity-80">{Math.round(progress * 100)}%</span>
           )}
         </div>
-        {pageCount > 0 ? (
-          <button
-            onClick={finishScanning}
-            className="px-4 py-2 rounded-full bg-white text-black text-[13px] font-semibold tracking-tight shadow-md active:scale-95 transition flex items-center gap-1.5"
-          >
-            {t("doneButton")}
-            <ArrowRight className="h-4 w-4" />
-          </button>
-        ) : (
-          <div className="w-10" />
-        )}
+        <div className="w-10" />
       </div>
 
       <div className="flex-1" />
