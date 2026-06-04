@@ -683,6 +683,29 @@ function ScanPage() {
       y1: maxSy - padY,
     });
     sharpnessRef.current = sharpness;
+
+    // Sample interior luminance of the detected paper and meter the camera
+    // toward that region so backlight/dark surroundings don't bias exposure.
+    {
+      const ix0 = Math.max(0, Math.floor(minSx + padX));
+      const ix1 = Math.min(dw, Math.ceil(maxSx - padX));
+      const iy0 = Math.max(0, Math.floor(minSy + padY));
+      const iy1 = Math.min(dh, Math.ceil(maxSy - padY));
+      let dLumSum = 0;
+      let dLumCount = 0;
+      for (let y = iy0; y < iy1; y += 6) {
+        for (let x = ix0; x < ix1; x += 6) {
+          const i = (y * dw + x) * 4;
+          dLumSum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+          dLumCount++;
+        }
+      }
+      const docLum = dLumCount ? dLumSum / dLumCount : meanLum;
+      docLumRef.current = docLum;
+      const cxN = (minSx + maxSx) / 2 / dw;
+      const cyN = (minSy + maxSy) / 2 / dh;
+      meterTowardsDoc(cxN, cyN, docLum);
+    }
     const isSharp = sharpness >= SHARPNESS_LIVE_MIN;
     if (!isSharp) {
       blurFramesRef.current++;
