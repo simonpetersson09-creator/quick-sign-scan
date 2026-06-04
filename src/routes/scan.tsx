@@ -585,6 +585,27 @@ function ScanPage() {
         console.error("[scan] enhance/orient failed, using raw warp", e);
       }
 
+      // Post-capture sharpness gate. If the warped doc is blurry we abandon
+      // this capture and let auto-focus retry — better to wait a second
+      // longer than to save an unreadable PDF page. Bail after a few retries
+      // so the user is never stuck.
+      const postSharpness = canvasLaplacianVariance(warped);
+      logScanStage("post-capture-sharpness", {
+        value: postSharpness,
+        threshold: SHARPNESS_CAPTURE_MIN,
+        retries: captureRetryRef.current,
+      });
+      if (postSharpness < SHARPNESS_CAPTURE_MIN && captureRetryRef.current < 3) {
+        captureRetryRef.current++;
+        capturedRef.current = false;
+        stableCount.current = 0;
+        blurFramesRef.current = BLUR_HINT_FRAMES + 1;
+        setProgress(0);
+        setStatus("focusing");
+        return;
+      }
+      captureRetryRef.current = 0;
+
       const sourceCanvas = document.createElement("canvas");
       sourceCanvas.width = vw;
       sourceCanvas.height = vh;
