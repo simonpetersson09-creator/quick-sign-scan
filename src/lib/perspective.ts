@@ -357,7 +357,7 @@ export function autoOrientAndDeskewDocument(
   let appliedDeskewSource: DocumentAlignmentDiagnostics["appliedDeskewSource"] = "none";
 
   if (edgeSkew.confidence >= 0.55 && Math.abs(edgeSkew.angle) > 0.5) {
-    appliedDeskewAngle = -edgeSkew.angle;
+    appliedDeskewAngle = edgeSkew.angle;
     appliedDeskewSource = "vertical-edges";
   } else if ((foundText || skew.hasText) && Math.abs(skew.angle) > 0.2) {
     appliedDeskewAngle = skew.angle;
