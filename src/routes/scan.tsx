@@ -20,6 +20,15 @@ import {
 import type { DocumentAlignmentDiagnostics } from "@/lib/perspective";
 import { useT } from "@/lib/i18n";
 import { Camera, CameraOff, X, RefreshCw, ArrowLeft, ArrowRight } from "lucide-react";
+import { Haptics, ImpactStyle } from "@capacitor/haptics";
+
+function triggerCaptureHaptic() {
+  Haptics.impact({ style: ImpactStyle.Medium }).catch(() => {
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      try { navigator.vibrate(30); } catch {}
+    }
+  });
+}
 
 type Status =
   | "starting"
