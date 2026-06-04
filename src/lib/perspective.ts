@@ -688,6 +688,20 @@ export function cleanPaperEdges(canvas: HTMLCanvasElement): HTMLCanvasElement {
       }
     }
   }
+  const trimPxX = Math.min(3, Math.max(1, Math.round(w * 0.0012)));
+  const trimPxY = Math.min(3, Math.max(1, Math.round(h * 0.0012)));
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < trimPxX; x++) {
+      whitenPx((y * w + x) * 4);
+      whitenPx((y * w + (w - 1 - x)) * 4);
+    }
+  }
+  for (let y = 0; y < trimPxY; y++) {
+    for (let x = 0; x < w; x++) {
+      whitenPx((y * w + x) * 4);
+      whitenPx(((h - 1 - y) * w + x) * 4);
+    }
+  }
   const bleachDarkColumn = (x0: number, x1: number) => {
     for (let y = 0; y < h; y++) {
       for (let x = x0; x <= x1; x++) {
