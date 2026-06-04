@@ -21,6 +21,8 @@ function Home() {
   const { lang, toggle, t } = useLang();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
 
   const steps = [
     { icon: ScanLine, label: t("step_scan") },
