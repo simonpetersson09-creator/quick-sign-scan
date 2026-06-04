@@ -128,8 +128,13 @@ function ScanPage() {
   const [lastThumbnail, setLastThumbnail] = useState<string | null>(
     () => scanStore.get().imageDataUrl ?? null,
   );
-  const [flashOn, setFlashOn] = useState(false);
-  const flashTimerRef = useRef<number | null>(null);
+  const [savedOverlay, setSavedOverlay] = useState<{
+    dataUrl: string;
+    visible: boolean;
+  } | null>(null);
+  const savedTimer1Ref = useRef<number | null>(null);
+  const savedTimer2Ref = useRef<number | null>(null);
+  const savedTimer3Ref = useRef<number | null>(null);
   const [debugInfo, setDebugInfo] = useState<{
     vw: number;
     vh: number;
@@ -868,21 +873,14 @@ function ScanPage() {
     finishPageCapture(dataUrl, nextPages.length);
   }
 
-  // After a successful capture: brief visual flash + thumbnail update, then
-  // automatically resume detection so the user can scan the next page without
-  // leaving the camera. The camera stream stays alive the entire time.
+  // After a successful capture: show the cropped A4 page full-screen with a
+  // small "Sparar sida…" spinner, then softly fade it out and resume the
+  // camera for the next page. No black flash, no preview detour.
   function finishPageCapture(dataUrl: string, count: number) {
     setPageCount(count);
     setLastThumbnail(dataUrl);
-    // Visual confirmation flash
-    setFlashOn(true);
-    if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current);
-    flashTimerRef.current = window.setTimeout(() => setFlashOn(false), 200);
 
     // Reset detection state so auto-capture starts fresh for the next page.
-    // We deliberately keep `smoothQuad.current` for one frame as a soft hint
-    // — but clear it for a clean slate so page 2 doesn't lock onto a stale
-    // quad from page 1's final frame.
     stableCount.current = 0;
     detectCount.current = 0;
     missCount.current = 0;
@@ -898,27 +896,40 @@ function ScanPage() {
     setProgress(0);
     drawOverlay(null, "search");
 
-    // Smart transition: show a brief "Sida sparad ✓" confirmation so the
-    // user knows page N landed before the camera goes back to hunting. This
-    // turns the previously abrupt jump into a clear beat.
     setStatus("saved");
 
-    // Phase 1 (0–450ms): user sees the saved confirmation, no detection.
-    // Phase 2 (450–700ms): silently pre-warm the detector so page 2 has the
-    //   same detection quality as page 1 the moment the user places it.
-    // Phase 3 (700ms+): full auto-capture loop resumes.
-    window.setTimeout(() => {
+    // Phase 1: present the captured A4 page full-screen with the spinner.
+    if (savedTimer1Ref.current) window.clearTimeout(savedTimer1Ref.current);
+    if (savedTimer2Ref.current) window.clearTimeout(savedTimer2Ref.current);
+    if (savedTimer3Ref.current) window.clearTimeout(savedTimer3Ref.current);
+    setSavedOverlay({ dataUrl, visible: true });
+
+    // Phase 2 (~750ms): start the soft fade-out of the page overlay.
+    savedTimer1Ref.current = window.setTimeout(() => {
       if (cancelledRef.current) return;
-      // Pre-warm: allow detect() to run but block any capture firing.
+      setSavedOverlay((s) => (s ? { ...s, visible: false } : s));
+    }, 750);
+
+    // Phase 3 (~1150ms): overlay finished fading — resume detection loop.
+    savedTimer2Ref.current = window.setTimeout(() => {
+      if (cancelledRef.current) return;
       capturedRef.current = false;
       setStatus("searching");
       loop();
-    }, 700);
+    }, 1150);
+
+    // Phase 4 (~1450ms): unmount the overlay node entirely.
+    savedTimer3Ref.current = window.setTimeout(() => {
+      if (cancelledRef.current) return;
+      setSavedOverlay(null);
+    }, 1450);
   }
 
 
   function finishScanning() {
-    if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current);
+    if (savedTimer1Ref.current) window.clearTimeout(savedTimer1Ref.current);
+    if (savedTimer2Ref.current) window.clearTimeout(savedTimer2Ref.current);
+    if (savedTimer3Ref.current) window.clearTimeout(savedTimer3Ref.current);
     streamRef.current?.getTracks().forEach((tr) => tr.stop());
     navigate({ to: "/preview" });
   }
@@ -1185,9 +1196,36 @@ function ScanPage() {
         </p>
       </div>
 
-      {/* Capture flash — brief visual confirmation after each page */}
-      {flashOn && (
-        <div className="pointer-events-none absolute inset-0 z-30 bg-white/40 animate-in fade-in duration-100" />
+      {/* Saved-page overlay — shows captured A4 full-screen with a small
+          spinner + "Sparar sida…", then softly fades to reveal the camera. */}
+      {savedOverlay && (
+        <div
+          className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-black"
+          style={{
+            opacity: savedOverlay.visible ? 1 : 0,
+            transition: "opacity 380ms ease-out",
+          }}
+        >
+          <img
+            src={savedOverlay.dataUrl}
+            alt=""
+            className="max-w-full max-h-full object-contain shadow-2xl"
+            style={{ aspectRatio: "1 / 1.414" }}
+          />
+          <div className="absolute inset-0 bg-black/35" />
+          <div className="absolute flex flex-col items-center gap-3 text-white">
+            <div
+              className="h-10 w-10 rounded-full border-[3px] border-white/30 border-t-white animate-spin"
+              aria-hidden="true"
+            />
+            <p className="text-[15px] font-medium tracking-tight tabular-nums">
+              {t("savingPage")}
+            </p>
+            <p className="text-[12px] text-white/80 tabular-nums">
+              {pageCount} {pageCount === 1 ? t("pageSingular") : t("pagePlural")}
+            </p>
+          </div>
+        </div>
       )}
 
       {/* Debug overlay — enable with ?debug=1 in the URL */}
