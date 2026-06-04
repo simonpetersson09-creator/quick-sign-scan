@@ -149,6 +149,15 @@ function ScanPage() {
   const motionMagRef = useRef(0);
   const motionAvailableRef = useRef(false);
   const MOTION_STILL_THRESHOLD = 0.45; // m/s² — empirical, tolerates breathing
+  // Document-targeted exposure metering. We periodically nudge the camera to
+  // expose for the paper itself (point-of-interest on the quad centroid, plus
+  // a brightness-driven exposureCompensation fallback) so a backlit window or
+  // a dark desk doesn't pull metering off the page.
+  const lastMeterAtRef = useRef(0);
+  const docLumRef = useRef(0);
+  const ecAppliedRef = useRef(0);
+  const METER_INTERVAL_MS = 600;
+  const METER_TARGET_LUM = 165;
 
   const [torchOn, setTorchOn] = useState(false);
   const [torchAvailable, setTorchAvailable] = useState(false);
