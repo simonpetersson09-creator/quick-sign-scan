@@ -24,6 +24,14 @@ export async function buildPdf(
   pages.forEach((imageDataUrl, idx) => {
     if (idx > 0) pdf.addPage("a4", "portrait");
     const imgFormat = detectImageFormat(imageDataUrl);
+    // eslint-disable-next-line no-console
+    console.log("[scan:pdf-generation]", {
+      pageIndex: idx,
+      pageWidthMm: pageW,
+      pageHeightMm: pageH,
+      imageFormat: imgFormat,
+      dataUrlBytes: imageDataUrl.length,
+    });
     pdf.addImage(imageDataUrl, imgFormat, 0, 0, pageW, pageH, undefined, "FAST");
   });
 
