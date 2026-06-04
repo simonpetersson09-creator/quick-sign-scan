@@ -394,6 +394,23 @@ function ScanPage() {
     ctx.drawImage(video, 0, 0, dw, dh);
     const { data } = ctx.getImageData(0, 0, dw, dh);
 
+    // Cheap mean luminance over a center sample — drives the low-light gate.
+    let lumSum = 0;
+    let lumCount = 0;
+    const sampleStep = 8;
+    for (let y = Math.floor(dh * 0.15); y < dh * 0.85; y += sampleStep) {
+      for (let x = Math.floor(dw * 0.15); x < dw * 0.85; x += sampleStep) {
+        const i = (y * dw + x) * 4;
+        lumSum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        lumCount++;
+      }
+    }
+    const meanLum = lumCount ? lumSum / lumCount : 255;
+    brightnessRef.current = meanLum;
+    const isBrightEnough = meanLum >= BRIGHTNESS_MIN;
+    if (!isBrightEnough) lowLightFramesRef.current++;
+    else lowLightFramesRef.current = Math.max(0, lowLightFramesRef.current - 2);
+
     const detection = detectDocumentQuad(data, dw, dh);
     const corners = detection?.corners ?? null;
 
@@ -402,13 +419,23 @@ function ScanPage() {
       detectCount.current = Math.max(0, detectCount.current - 1);
       detectionMeta.current = null;
       missCount.current++;
+      lockedRef.current = false;
+      lockBreakFramesRef.current = 0;
       if (detectCount.current === 0) {
         smoothQuad.current = null;
         lastRawQuad.current = null;
-        drawOverlay(null, false);
+        drawOverlay(null, "search");
         setProgress(0);
       }
-      setStatus((s) => (s === "starting" ? s : missCount.current > 45 ? "uncertain" : "searching"));
+      setStatus((s) =>
+        s === "starting"
+          ? s
+          : lowLightFramesRef.current > 30
+            ? "lowLight"
+            : missCount.current > 45
+              ? "uncertain"
+              : "searching",
+      );
       return;
     }
 
@@ -419,9 +446,35 @@ function ScanPage() {
     // Normalize to 0..1
     const norm = corners.map((p) => ({ x: p.x / dw, y: p.y / dh })) as [Point, Point, Point, Point];
 
-    // Stronger smoothing — slower lock-in, more reliable corners
+    // Outlier rejection — if a raw frame jumped wildly from the smoothed
+    // estimate, treat it as noise and skip the update. Prevents the polygon
+    // from twitching when one frame detects a wrong contour.
     const previousSmooth = smoothQuad.current;
-    const smoothed = emaQuad(smoothQuad.current, norm, 0.22);
+    let rawDeltaFromSmooth = 0;
+    if (previousSmooth) {
+      rawDeltaFromSmooth = maxCornerDelta(norm, previousSmooth);
+      if (rawDeltaFromSmooth > OUTLIER_DELTA && rawDeltaFromSmooth < LOCK_BREAK_DELTA) {
+        // mild outlier — keep current smooth, don't add to stability either
+        drawOverlay(previousSmooth, lockedRef.current ? "ready" : "hold");
+        return;
+      }
+      if (rawDeltaFromSmooth >= LOCK_BREAK_DELTA) {
+        // large movement — break the lock and re-track
+        lockBreakFramesRef.current++;
+        if (lockBreakFramesRef.current > 3) {
+          lockedRef.current = false;
+          lockBreakFramesRef.current = 0;
+          stableCount.current = 0;
+        }
+      } else {
+        lockBreakFramesRef.current = 0;
+      }
+    }
+
+    // Adaptive smoothing — gentler once locked, so the on-screen polygon
+    // barely moves frame-to-frame.
+    const alpha = lockedRef.current ? ALPHA_POST_LOCK : ALPHA_PRE_LOCK;
+    const smoothed = emaQuad(smoothQuad.current, norm, alpha);
     smoothQuad.current = smoothed;
 
     const last = lastRawQuad.current;
@@ -449,47 +502,55 @@ function ScanPage() {
     const isSharp = sharpness >= SHARPNESS_LIVE_MIN;
     if (!isSharp) {
       blurFramesRef.current++;
-      // Hold back stability progress while the camera is still refocusing.
       stableCount.current = Math.min(stableCount.current, READY_FRAMES - 1);
     } else {
       blurFramesRef.current = 0;
+    }
+    if (!isBrightEnough) {
+      stableCount.current = Math.min(stableCount.current, READY_FRAMES - 1);
+    }
+
+    // Engage lock once we've reached the READY threshold with good conditions.
+    if (stableCount.current >= READY_FRAMES && isSharp && isBrightEnough) {
+      lockedRef.current = true;
     }
 
     // Progress 0..1 — fills up as the document stays stable, hits 1.0 right before capture.
     const pct = Math.max(0, Math.min(1, stableCount.current / STABLE_FRAMES));
     setProgress(pct);
 
-    // Wait for enough consecutive detections before moving to "found" status.
-    // The frame itself is drawn as soon as a 4-corner quad exists, otherwise it
-    // feels like the scanner is doing nothing even when detection is active.
     if (detectCount.current < DETECT_FRAMES) {
-      drawOverlay(smoothed, true);
+      drawOverlay(smoothed, "search");
       setStatus("searching");
       return;
     }
 
-    if (stableCount.current < HOLD_FRAMES) {
-      drawOverlay(smoothed, true);
+    if (!isBrightEnough && lowLightFramesRef.current > 15) {
+      drawOverlay(smoothed, "hold");
+      setStatus("lowLight");
+    } else if (stableCount.current < HOLD_FRAMES) {
+      drawOverlay(smoothed, "hold");
       setStatus("align");
     } else if (!isSharp) {
-      drawOverlay(smoothed, true);
-      // After ~2.5s of unsharp frames, prompt the user to back off — usually
-      // the document is closer than the minimum focus distance.
+      drawOverlay(smoothed, "hold");
       setStatus(blurFramesRef.current > BLUR_HINT_FRAMES ? "moveBack" : "focusing");
     } else if (stableCount.current < READY_FRAMES) {
-      drawOverlay(smoothed, true);
+      drawOverlay(smoothed, "hold");
       setStatus("hold");
     } else if (stableCount.current < STABLE_FRAMES) {
-      drawOverlay(smoothed, true);
+      drawOverlay(smoothed, "ready");
       setStatus("ready");
     } else {
-      drawOverlay(smoothed, true);
+      drawOverlay(smoothed, "ready");
       setStatus("capturing");
       capture(smoothed);
     }
   }
 
-  function drawOverlay(quad: [Point, Point, Point, Point] | null, active: boolean) {
+  function drawOverlay(
+    quad: [Point, Point, Point, Point] | null,
+    phase: "search" | "hold" | "ready",
+  ) {
     const svg = svgRef.current;
     const poly = polyRef.current;
     if (!svg || !poly) return;
@@ -509,7 +570,6 @@ function ScanPage() {
       svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
     }
 
-    // Account for object-fit: cover scaling between video and container
     const video = videoRef.current!;
     const vw = video.videoWidth;
     const vh = video.videoHeight;
@@ -522,18 +582,32 @@ function ScanPage() {
     const pts = quad.map((p) => `${offX + p.x * dispW},${offY + p.y * dispH}`).join(" ");
     poly.setAttribute("points", pts);
     poly.style.opacity = "1";
-    poly.setAttribute("stroke", active ? "var(--success)" : "rgba(255,255,255,0.95)");
-    poly.setAttribute(
-      "fill",
-      active ? "color-mix(in oklab, var(--success) 18%, transparent)" : "rgba(255,255,255,0.06)",
-    );
+
+    // Color phases: white (searching) → yellow (held, focusing) → green (ready)
+    const stroke =
+      phase === "ready"
+        ? "var(--success)"
+        : phase === "hold"
+          ? "rgb(250,204,21)" // amber-400 — clear yellow signal
+          : "rgba(255,255,255,0.95)";
+    const fill =
+      phase === "ready"
+        ? "color-mix(in oklab, var(--success) 18%, transparent)"
+        : phase === "hold"
+          ? "color-mix(in oklab, rgb(250,204,21) 14%, transparent)"
+          : "rgba(255,255,255,0.06)";
+    poly.setAttribute("stroke", stroke);
+    poly.setAttribute("fill", fill);
 
     quad.forEach((p, i) => {
       const c = cornerRefs.current[i];
       if (!c) return;
       c.setAttribute("cx", String(offX + p.x * dispW));
       c.setAttribute("cy", String(offY + p.y * dispH));
-      c.setAttribute("fill", active ? "var(--success)" : "white");
+      c.setAttribute(
+        "fill",
+        phase === "ready" ? "var(--success)" : phase === "hold" ? "rgb(250,204,21)" : "white",
+      );
       c.style.opacity = "1";
     });
   }
