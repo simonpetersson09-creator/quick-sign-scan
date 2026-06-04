@@ -617,7 +617,23 @@ function ScanPage() {
     const meta = detectionMeta.current;
     if (!meta || meta.confidence < MIN_DOCUMENT_CONFIDENCE) {
       stableCount.current = 0;
+      lockedRef.current = false;
       setStatus("uncertain");
+      return;
+    }
+    // Final A4 ratio gate — reject quads whose proportions diverge too far
+    // from sqrt(2). Manual capture from `manualCapture` bypasses this since
+    // user intent is explicit.
+    const ratio = meta.a4Ratio;
+    const a4Diff = Math.min(
+      Math.abs(ratio - Math.SQRT2),
+      Math.abs(ratio - 1 / Math.SQRT2),
+    );
+    if (a4Diff > A4_RATIO_TOLERANCE) {
+      stableCount.current = 0;
+      lockedRef.current = false;
+      setStatus("align");
+      capturedRef.current = false;
       return;
     }
     const video = videoRef.current;
