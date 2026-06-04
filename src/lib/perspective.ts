@@ -796,11 +796,17 @@ export interface DocumentDetection {
     sideDeviation: number;
     perspectiveError: number;
     polygonFill: number;
+    /** Fraction of sampled side-points that snapped onto a strong edge (0..1). */
+    edgeTightness: number;
+    /** Mean perpendicular distance (source-pixel units) between final sides
+     *  and the nearest strong gradient after snap. Lower = tighter frame. */
+    meanEdgeOffset: number;
   };
 }
 
 const A4_RATIO = Math.SQRT2;
-export const MIN_DOCUMENT_CONFIDENCE = 0.1;
+export const MIN_DOCUMENT_CONFIDENCE = 0.12;
+export const MIN_EDGE_TIGHTNESS_FOR_CAPTURE = 0.7;
 
 
 // Detect the document from its contour: isolate candidate paper, extract the
