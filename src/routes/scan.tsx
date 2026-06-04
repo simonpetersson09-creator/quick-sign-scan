@@ -871,6 +871,7 @@ function ScanPage() {
     const video = videoRef.current;
     if (!video || !video.videoWidth || !video.videoHeight) return;
     capturedRef.current = true;
+    triggerCaptureHaptic();
     const vw = video.videoWidth;
     const vh = video.videoHeight;
     const canvas = document.createElement("canvas");
