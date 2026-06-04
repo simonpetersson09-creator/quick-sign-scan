@@ -765,6 +765,8 @@ function ScanPage() {
     setStatus("searching");
     startCamera({ restartStream: true });
   }
+  // Suppress unused warning — kept for potential future re-entry point.
+  void startOverScan;
 
   function cancelScan() {
     streamRef.current?.getTracks().forEach((tr) => tr.stop());
