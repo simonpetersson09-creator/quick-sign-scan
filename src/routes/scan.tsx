@@ -90,6 +90,9 @@ function ScanPage() {
   const detectCount = useRef(0);
   const missCount = useRef(0);
   const capturedRef = useRef(false);
+  const sharpnessRef = useRef(0);
+  const blurFramesRef = useRef(0);
+  const captureRetryRef = useRef(0);
 
   const [status, setStatus] = useState<Status>("starting");
   const [progress, setProgress] = useState(0); // 0..1 — visual lock-in progress
