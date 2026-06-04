@@ -216,10 +216,10 @@ function PlacePage() {
                 onPointerCancel={onSigUp}
                 role="button"
                 aria-label={t("signatureLabel")}
-                className={`relative flex items-center touch-none select-none rounded-lg transition-shadow ${
+                className={`relative flex items-center touch-none select-none rounded-lg transition ${
                   isDraggingSig
-                    ? "cursor-grabbing shadow-[0_0_0_3px_hsl(var(--primary)/0.25)]"
-                    : "cursor-grab hover:shadow-[0_0_0_2px_hsl(var(--primary)/0.18)]"
+                    ? "cursor-grabbing ring-2 ring-primary/50"
+                    : "cursor-grab ring-1 ring-primary/30 hover:ring-2 hover:ring-primary/50"
                 }`}
                 style={{
                   width: `${140 / zoom}px`,
