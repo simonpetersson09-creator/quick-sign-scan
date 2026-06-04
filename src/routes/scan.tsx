@@ -1043,6 +1043,20 @@ function ScanPage() {
           className="absolute inset-0 w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-black/20 pointer-events-none" />
+        {/* Tap-to-cancel layer — only catches taps during ready countdown so user can abort auto-capture */}
+        {status === "ready" && (
+          <button
+            type="button"
+            aria-label={t("cancel")}
+            onClick={() => {
+              stableCount.current = 0;
+              lockedRef.current = false;
+              setProgress(0);
+              setStatus("align");
+            }}
+            className="absolute inset-0 z-10 bg-transparent"
+          />
+        )}
         {/* Detected document frame — soft, Genius Scan-style yellow with
             outer glow and an animated trace when ready. */}
         <svg
