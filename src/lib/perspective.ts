@@ -300,9 +300,11 @@ export function autoOrientAndDeskewDocument(canvas: HTMLCanvasElement): HTMLCanv
     oriented = rotateCanvas(oriented, skew.angle);
   }
 
-  const a4 = renderToA4Portrait(oriented);
-  cleanPaperEdges(a4);
-  return a4;
+  // Viktigt: vi padda INTE upp till en fast A4-ruta här. Sidan behåller sin
+  // egna proportion från quaden, så preview = PDF och inga konstgjorda
+  // marginaler smyger in (vilket annars syns som asymmetriska kanter).
+  cleanPaperEdges(oriented);
+  return oriented;
 }
 
 function renderToA4Portrait(source: HTMLCanvasElement): HTMLCanvasElement {
