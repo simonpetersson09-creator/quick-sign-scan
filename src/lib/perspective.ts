@@ -507,6 +507,89 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
     }
   }
 
+  // 10) Isolated dark-artifact suppression — removes remaining black scan
+  //     defects like the tall left-margin streak and tiny specks. We only
+  //     delete connected dark components that are isolated from other ink,
+  //     so normal text, dots over letters, stamps and dense form content stay.
+  {
+    const darkThreshold = 165;
+    const finalLum = new Uint8ClampedArray(n);
+    for (let i = 0, j = 0; i < d.length; i += 4, j++) {
+      finalLum[j] = (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) | 0;
+    }
+
+    const visited = new Uint8Array(n);
+    const stack = new Int32Array(n);
+    const pad = Math.max(14, Math.round(Math.max(w, h) * 0.018));
+    const maxSpeckArea = Math.max(36, Math.round(n * 0.00002));
+    const whitenComponent = (pixels: number[]) => {
+      for (const j of pixels) {
+        const i = j * 4;
+        d[i] = 255;
+        d[i + 1] = 255;
+        d[i + 2] = 255;
+        finalLum[j] = 255;
+      }
+    };
+
+    for (let start = 0; start < n; start++) {
+      if (visited[start] || finalLum[start] >= darkThreshold) continue;
+      let sp = 0;
+      stack[sp++] = start;
+      visited[start] = 1;
+      const pixels: number[] = [];
+      let minX = w;
+      let maxX = 0;
+      let minY = h;
+      let maxY = 0;
+
+      while (sp > 0) {
+        const j = stack[--sp];
+        pixels.push(j);
+        const x = j % w;
+        const y = (j / w) | 0;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+
+        const tryPush = (next: number) => {
+          if (!visited[next] && finalLum[next] < darkThreshold) {
+            visited[next] = 1;
+            stack[sp++] = next;
+          }
+        };
+        if (x > 0) tryPush(j - 1);
+        if (x < w - 1) tryPush(j + 1);
+        if (y > 0) tryPush(j - w);
+        if (y < h - 1) tryPush(j + w);
+      }
+
+      const area = pixels.length;
+      const bw = maxX - minX + 1;
+      const bh = maxY - minY + 1;
+      const tallStreak = bh > h * 0.06 && bw <= w * 0.035 && bh / Math.max(1, bw) > 5;
+      const flatStreak = bw > w * 0.06 && bh <= h * 0.025 && bw / Math.max(1, bh) > 5;
+      const smallSpeck = area <= maxSpeckArea && bw <= w * 0.035 && bh <= h * 0.035;
+      if (!tallStreak && !flatStreak && !smallSpeck) continue;
+
+      const x0 = Math.max(0, minX - pad);
+      const x1 = Math.min(w - 1, maxX + pad);
+      const y0 = Math.max(0, minY - pad);
+      const y1 = Math.min(h - 1, maxY + pad);
+      let nearbyDark = 0;
+      for (let yy = y0; yy <= y1; yy++) {
+        const row = yy * w;
+        for (let xx = x0; xx <= x1; xx++) {
+          if (finalLum[row + xx] < darkThreshold) nearbyDark++;
+        }
+      }
+      const surroundingDark = Math.max(0, nearbyDark - area);
+      const isolated = surroundingDark <= Math.max(70, Math.round(area * 0.35));
+      if (isolated) whitenComponent(pixels);
+    }
+  }
+
   ctx.putImageData(img, 0, 0);
   return canvas;
 }
