@@ -3,8 +3,10 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { scanStore } from "@/lib/scanStore";
 import {
   autoOrientAndDeskewDocument,
+  canvasLaplacianVariance,
   cleanPaperEdges,
   detectDocumentQuad,
+  laplacianVariance,
   MIN_DOCUMENT_CONFIDENCE,
   measureQuadGeometry,
   orderQuad,
