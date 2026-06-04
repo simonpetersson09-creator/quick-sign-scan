@@ -196,6 +196,8 @@ const en: Dict = {
   statusUncertain: "Couldn't detect the document's edges.",
   statusAlign: "Align the document",
   statusHold: "Hold still…",
+  statusFocusing: "Focusing…",
+  statusMoveBack: "Move the phone slightly further from the document.",
   statusReady: "Document found",
   statusCapturing: "Scanning and straightening…",
   statusError: "Error",
