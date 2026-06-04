@@ -16,6 +16,8 @@ export const Route = createFileRoute("/")({
 
 function Home() {
   const { lang, toggle, t } = useLang();
+  const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const steps = [
     { icon: ScanLine, label: t("step_scan") },
