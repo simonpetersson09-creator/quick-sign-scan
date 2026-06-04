@@ -828,6 +828,10 @@ export function detectDocumentQuad(
 
   const blurred = gaussianBlur(lum, width, height);
   const { edges, highThreshold } = cannyEdges(blurred, width, height);
+  // Raw gradient magnitude (Sobel) — used to snap the polygon sides onto
+  // the strongest local edge with sub-pixel-class precision. Canny output
+  // alone is too sparse to refine corner positions accurately.
+  const gradMag = sobelMagnitude(blurred, width, height);
   const connectedEdges = closeEdgeGaps(edges, width, height);
   const components = edgeComponents(connectedEdges, width, height);
   const brightThreshold = Math.max(95, Math.min(225, otsuThreshold(hist, total) + 12));
@@ -865,6 +869,7 @@ export function detectDocumentQuad(
         hull,
         lum,
         edges,
+        gradMag,
         width,
         height,
         frameArea: total,
