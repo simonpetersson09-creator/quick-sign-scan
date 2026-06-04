@@ -886,53 +886,104 @@ function ScanPage() {
 
       <div className="flex-1" />
 
-      {/* Bottom hint / manual capture */}
+      {/* Bottom hint / manual capture / page thumbnail */}
       <div className="relative pb-safe px-5 pt-4 flex flex-col items-center gap-3">
         {error && status !== "error" && (
           <p className="text-center text-sm text-red-200 max-w-xs">{error}</p>
         )}
-        <div className="relative h-20 w-20 flex items-center justify-center">
-          {/* Progress ring — fills as the document locks in, hits 100% then auto-captures */}
-          <svg
-            className="absolute inset-0 h-full w-full -rotate-90 pointer-events-none"
-            viewBox="0 0 80 80"
-            aria-hidden="true"
-          >
-            <circle
-              cx="40"
-              cy="40"
-              r="36"
-              fill="none"
-              stroke="rgba(255,255,255,0.18)"
-              strokeWidth="3"
-            />
-            <circle
-              cx="40"
-              cy="40"
-              r="36"
-              fill="none"
-              stroke="var(--success)"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeDasharray={2 * Math.PI * 36}
-              strokeDashoffset={2 * Math.PI * 36 * (1 - progress)}
-              style={{ transition: "stroke-dashoffset 120ms linear, opacity 200ms" }}
-              opacity={progress > 0 ? 1 : 0}
-            />
-          </svg>
-          <button
-            onClick={manualCapture}
-            disabled={
-              !cameraReady || status === "starting" || status === "error" || status === "capturing"
-            }
-            className="h-16 w-16 rounded-full bg-white text-black flex items-center justify-center shadow-lg active:scale-95 disabled:opacity-40"
-            aria-label={t("manualCapture")}
-          >
-            <Camera className="h-7 w-7" />
-          </button>
+        <div className="w-full flex items-end justify-between gap-3">
+          {/* Left: thumbnail of last scanned page + counter */}
+          <div className="w-20 flex flex-col items-center gap-1">
+            {lastThumbnail ? (
+              <button
+                onClick={finishScanning}
+                className="relative rounded-md overflow-hidden border-2 border-white/70 bg-white shadow-lg active:scale-95 transition"
+                style={{ width: 56, aspectRatio: "1 / 1.414" }}
+                aria-label={t("doneButton")}
+              >
+                <img
+                  src={lastThumbnail}
+                  alt=""
+                  className="block w-full h-full object-cover"
+                />
+                <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-success text-success-foreground text-[11px] font-bold flex items-center justify-center tabular-nums shadow">
+                  {pageCount}
+                </span>
+              </button>
+            ) : (
+              <div style={{ width: 56 }} />
+            )}
+            {pageCount > 0 && (
+              <span className="text-[10px] text-white/70 tabular-nums">
+                {pageCount} {pageCount === 1 ? t("pageSingular") : t("pagePlural")}
+              </span>
+            )}
+          </div>
+
+          {/* Center: capture button */}
+          <div className="relative h-20 w-20 flex items-center justify-center shrink-0">
+            <svg
+              className="absolute inset-0 h-full w-full -rotate-90 pointer-events-none"
+              viewBox="0 0 80 80"
+              aria-hidden="true"
+            >
+              <circle
+                cx="40"
+                cy="40"
+                r="36"
+                fill="none"
+                stroke="rgba(255,255,255,0.18)"
+                strokeWidth="3"
+              />
+              <circle
+                cx="40"
+                cy="40"
+                r="36"
+                fill="none"
+                stroke="var(--success)"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeDasharray={2 * Math.PI * 36}
+                strokeDashoffset={2 * Math.PI * 36 * (1 - progress)}
+                style={{ transition: "stroke-dashoffset 120ms linear, opacity 200ms" }}
+                opacity={progress > 0 ? 1 : 0}
+              />
+            </svg>
+            <button
+              onClick={manualCapture}
+              disabled={
+                !cameraReady || status === "starting" || status === "error" || status === "capturing"
+              }
+              className="h-16 w-16 rounded-full bg-white text-black flex items-center justify-center shadow-lg active:scale-95 disabled:opacity-40"
+              aria-label={t("manualCapture")}
+            >
+              <Camera className="h-7 w-7" />
+            </button>
+          </div>
+
+          {/* Right: Klar button (only when pages exist) */}
+          <div className="w-20 flex justify-center">
+            {pageCount > 0 ? (
+              <button
+                onClick={finishScanning}
+                className="rounded-full bg-success text-success-foreground px-4 py-2.5 text-[14px] font-semibold tracking-tight shadow-lg active:scale-95 transition flex items-center gap-1"
+              >
+                {t("doneButton")}
+              </button>
+            ) : (
+              <div className="w-12" />
+            )}
+          </div>
         </div>
-        <p className="text-xs text-white/75 text-center max-w-[260px]">{t("scanHint")}</p>
+        <p className="text-xs text-white/75 text-center max-w-[260px]">
+          {pageCount > 0 ? t("scanHintMulti") : t("scanHint")}
+        </p>
       </div>
+
+      {/* Capture flash — brief visual confirmation after each page */}
+      {flashOn && (
+        <div className="pointer-events-none absolute inset-0 z-30 bg-white/40 animate-in fade-in duration-100" />
+      )}
 
       {/* Debug overlay — enable with ?debug=1 in the URL */}
       {debugEnabled && (
