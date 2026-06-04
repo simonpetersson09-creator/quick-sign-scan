@@ -448,41 +448,76 @@ export function cleanPaperEdges(canvas: HTMLCanvasElement): HTMLCanvasElement {
 
   const img = ctx.getImageData(0, 0, w, h);
   const data = img.data;
-  const edgeLimitX = Math.round(w * 0.16);
-  const edgeLimitY = Math.round(h * 0.16);
-  const darkThreshold = 226;
+  // Max inward depth we'll whiten per row/col (12% — enough to swallow
+  // shadow bands and stray background from over-expanded quads, but not
+  // so deep we eat into the document body).
+  const maxDepthX = Math.round(w * 0.12);
+  const maxDepthY = Math.round(h * 0.12);
+  // Pixel is "paper-white-ish" if all channels are above this.
+  const PAPER_MIN = 232;
+  // Consecutive paper-white pixels needed to stop whitening.
+  const STOP_RUN = 8;
 
-  const isDarkRow = (y: number) => {
-    let sum = 0;
-    for (let x = 0; x < w; x++) {
-      const i = (y * w + x) * 4;
-      sum += data[i] + data[i + 1] + data[i + 2];
-    }
-    return sum / (w * 3) < darkThreshold;
-  };
-  const isDarkCol = (x: number) => {
-    let sum = 0;
-    for (let y = 0; y < h; y++) {
-      const i = (y * w + x) * 4;
-      sum += data[i] + data[i + 1] + data[i + 2];
-    }
-    return sum / (h * 3) < darkThreshold;
+  const isPaper = (i: number) =>
+    data[i] >= PAPER_MIN && data[i + 1] >= PAPER_MIN && data[i + 2] >= PAPER_MIN;
+  const whitenPx = (i: number) => {
+    data[i] = 255;
+    data[i + 1] = 255;
+    data[i + 2] = 255;
   };
 
-  let top = 0;
-  while (top < edgeLimitY && isDarkRow(top)) top++;
-  let bottom = 0;
-  while (bottom < edgeLimitY && isDarkRow(h - 1 - bottom)) bottom++;
-  let left = 0;
-  while (left < edgeLimitX && isDarkCol(left)) left++;
-  let right = 0;
-  while (right < edgeLimitX && isDarkCol(w - 1 - right)) right++;
+  // Sweep from each edge inward, per scanline, whitening non-paper pixels
+  // until we've seen STOP_RUN consecutive paper pixels.
+  for (let y = 0; y < h; y++) {
+    let run = 0;
+    for (let x = 0; x < maxDepthX; x++) {
+      const i = (y * w + x) * 4;
+      if (isPaper(i)) {
+        run++;
+        if (run >= STOP_RUN) break;
+      } else {
+        run = 0;
+        whitenPx(i);
+      }
+    }
+    run = 0;
+    for (let x = 0; x < maxDepthX; x++) {
+      const i = (y * w + (w - 1 - x)) * 4;
+      if (isPaper(i)) {
+        run++;
+        if (run >= STOP_RUN) break;
+      } else {
+        run = 0;
+        whitenPx(i);
+      }
+    }
+  }
+  for (let x = 0; x < w; x++) {
+    let run = 0;
+    for (let y = 0; y < maxDepthY; y++) {
+      const i = (y * w + x) * 4;
+      if (isPaper(i)) {
+        run++;
+        if (run >= STOP_RUN) break;
+      } else {
+        run = 0;
+        whitenPx(i);
+      }
+    }
+    run = 0;
+    for (let y = 0; y < maxDepthY; y++) {
+      const i = ((h - 1 - y) * w + x) * 4;
+      if (isPaper(i)) {
+        run++;
+        if (run >= STOP_RUN) break;
+      } else {
+        run = 0;
+        whitenPx(i);
+      }
+    }
+  }
 
-  ctx.fillStyle = "#ffffff";
-  if (top > 0) ctx.fillRect(0, 0, w, top);
-  if (bottom > 0) ctx.fillRect(0, h - bottom, w, bottom);
-  if (left > 0) ctx.fillRect(0, 0, left, h);
-  if (right > 0) ctx.fillRect(w - right, 0, right, h);
+  ctx.putImageData(img, 0, 0);
   return canvas;
 }
 
