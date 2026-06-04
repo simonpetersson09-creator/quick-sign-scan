@@ -106,6 +106,8 @@ export function warpQuadToRect(
   srcCanvas.width = srcW;
   srcCanvas.height = srcH;
   const sctx = srcCanvas.getContext("2d", { willReadFrequently: true })!;
+  sctx.fillStyle = "#ffffff";
+  sctx.fillRect(0, 0, srcW, srcH);
   sctx.drawImage(source, 0, 0, srcW, srcH);
   const srcImg = sctx.getImageData(0, 0, srcW, srcH);
   const srcData = srcImg.data;
@@ -120,15 +122,15 @@ export function warpQuadToRect(
   const t = unitSquareToQuad(quad);
 
   for (let y = 0; y < outH; y++) {
-    const v = y / outH;
+    const v = (y + 0.5) / outH;
     for (let x = 0; x < outW; x++) {
-      const u = x / outW;
+      const u = (x + 0.5) / outW;
       const denom = t.g * u + t.h * v + 1;
       const sxF = (t.a * u + t.b * v + t.c) / denom;
       const syF = (t.d * u + t.e * v + t.f) / denom;
 
       const oi = (y * outW + x) * 4;
-      if (sxF < 0 || syF < 0 || sxF >= srcW - 1 || syF >= srcH - 1) {
+      if (!Number.isFinite(sxF) || !Number.isFinite(syF) || sxF < 0 || syF < 0 || sxF >= srcW - 1 || syF >= srcH - 1) {
         outData[oi] = 255;
         outData[oi + 1] = 255;
         outData[oi + 2] = 255;
