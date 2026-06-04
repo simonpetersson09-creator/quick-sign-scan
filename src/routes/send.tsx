@@ -37,8 +37,8 @@ function SendPage() {
   const sendEmailFn = useServerFn(sendScanEmail);
   const settings = useMemo(() => loadSettings(), []);
   const [to, setTo] = useState(settings.defaultRecipient);
-  const [subject, setSubject] = useState(settings.defaultSubject);
-  const [message, setMessage] = useState(settings.defaultMessage);
+  const [subject, setSubject] = useState(settings.defaultSubject || t("defaultSubjectInitial"));
+  const [message, setMessage] = useState(settings.defaultMessage || t("defaultMessageInitial"));
   
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
