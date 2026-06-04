@@ -20,6 +20,15 @@ import {
 import type { DocumentAlignmentDiagnostics } from "@/lib/perspective";
 import { useT } from "@/lib/i18n";
 import { Camera, CameraOff, X, RefreshCw, ArrowLeft, ArrowRight } from "lucide-react";
+import { Haptics, ImpactStyle } from "@capacitor/haptics";
+
+function triggerCaptureHaptic() {
+  Haptics.impact({ style: ImpactStyle.Medium }).catch(() => {
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      try { navigator.vibrate(30); } catch {}
+    }
+  });
+}
 
 type Status =
   | "starting"
@@ -75,7 +84,7 @@ const LOCK_BREAK_DELTA = 0.2; // sustained delta this large breaks the lock and 
 // (in-camera) and the warped doc (post-capture). Tuned conservatively så
 // en suddig sida aldrig sparas, oavsett hur snabbt användaren rör mobilen.
 const SHARPNESS_LIVE_MIN = 35;
-const SHARPNESS_CAPTURE_MIN = 80;
+const SHARPNESS_CAPTURE_MIN = 60;
 const BLUR_HINT_FRAMES = 75; // ~2.5s of blur before suggesting "move back"
 // Lighting gate — mean luminance below this is "too dark to scan reliably"
 const BRIGHTNESS_MIN = 55;
@@ -716,6 +725,7 @@ function ScanPage() {
       return;
     }
     capturedRef.current = true;
+    triggerCaptureHaptic();
     const vw = video.videoWidth;
     const vh = video.videoHeight;
     if (debugEnabled) {
@@ -861,6 +871,7 @@ function ScanPage() {
     const video = videoRef.current;
     if (!video || !video.videoWidth || !video.videoHeight) return;
     capturedRef.current = true;
+    triggerCaptureHaptic();
     const vw = video.videoWidth;
     const vh = video.videoHeight;
     const canvas = document.createElement("canvas");
@@ -1032,6 +1043,20 @@ function ScanPage() {
           className="absolute inset-0 w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-black/20 pointer-events-none" />
+        {/* Tap-to-cancel layer — only catches taps during ready countdown so user can abort auto-capture */}
+        {status === "ready" && (
+          <button
+            type="button"
+            aria-label={t("cancel")}
+            onClick={() => {
+              stableCount.current = 0;
+              lockedRef.current = false;
+              setProgress(0);
+              setStatus("align");
+            }}
+            className="absolute inset-0 z-10 bg-transparent"
+          />
+        )}
         {/* Detected document frame — soft, Genius Scan-style yellow with
             outer glow and an animated trace when ready. */}
         <svg
