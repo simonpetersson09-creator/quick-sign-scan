@@ -136,6 +136,11 @@ function ScanPage() {
   const lowLightFramesRef = useRef(0);
   const exposureLockedRef = useRef(false);
   const trackCapsRef = useRef<Record<string, unknown>>({});
+  // Auto-capture is "armed" only after this timestamp — used to enforce a short
+  // re-aim pause after a saved page so the camera doesn't immediately snap
+  // the same document again.
+  const armedAtRef = useRef(0);
+  const REARM_DELAY_MS = 1200;
 
   const [torchOn, setTorchOn] = useState(false);
   const [torchAvailable, setTorchAvailable] = useState(false);
