@@ -19,7 +19,7 @@ import {
 } from "@/lib/perspective";
 import type { DocumentAlignmentDiagnostics } from "@/lib/perspective";
 import { useT } from "@/lib/i18n";
-import { Camera, CameraOff, X, RefreshCw, ArrowLeft, ArrowRight } from "lucide-react";
+import { Camera, CameraOff, X, RefreshCw, ArrowLeft, ArrowRight, Zap, ZapOff } from "lucide-react";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 
 function triggerCaptureHaptic() {
@@ -134,6 +134,11 @@ function ScanPage() {
   const lockBreakFramesRef = useRef(0);
   const brightnessRef = useRef(255);
   const lowLightFramesRef = useRef(0);
+  const exposureLockedRef = useRef(false);
+  const trackCapsRef = useRef<Record<string, unknown>>({});
+
+  const [torchOn, setTorchOn] = useState(false);
+  const [torchAvailable, setTorchAvailable] = useState(false);
 
   const [status, setStatus] = useState<Status>("starting");
   const [progress, setProgress] = useState(0); // 0..1 — visual lock-in progress
@@ -161,6 +166,45 @@ function ScanPage() {
   const debugEnabled =
     typeof window !== "undefined" && /[?&]debug=1\b/.test(window.location.search);
   const cancelledRef = useRef(false);
+
+  const toggleTorch = useCallback(async () => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    const next = !torchOn;
+    try {
+      await track.applyConstraints({
+        advanced: [{ torch: next } as MediaTrackConstraintSet],
+      });
+      setTorchOn(next);
+    } catch {
+      // capability missing or denied — hide the button
+      setTorchAvailable(false);
+    }
+  }, [torchOn]);
+
+  // Exposure lock: when the doc is "ready" lock exposure so brightness doesn't
+  // shift in the milliseconds before capture. Release it as soon as we're no
+  // longer ready so the next document gets a fresh metering.
+  useEffect(() => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    const caps = trackCapsRef.current as { exposureMode?: string[] };
+    if (!Array.isArray(caps.exposureMode)) return;
+    const shouldLock = status === "ready" || status === "capturing";
+    if (shouldLock === exposureLockedRef.current) return;
+    if (shouldLock && caps.exposureMode.includes("manual")) {
+      track
+        .applyConstraints({ advanced: [{ exposureMode: "manual" } as MediaTrackConstraintSet] })
+        .then(() => { exposureLockedRef.current = true; })
+        .catch(() => {});
+    } else if (!shouldLock && caps.exposureMode.includes("continuous")) {
+      track
+        .applyConstraints({ advanced: [{ exposureMode: "continuous" } as MediaTrackConstraintSet] })
+        .then(() => { exposureLockedRef.current = false; })
+        .catch(() => {});
+    }
+  }, [status]);
+
 
   const startCamera = useCallback(
     async (options: StartCameraOptions = {}) => {
@@ -290,6 +334,10 @@ function ScanPage() {
           if (advanced.length) {
             await track.applyConstraints({ advanced }).catch(() => {});
           }
+          trackCapsRef.current = caps;
+          setTorchAvailable(Boolean((caps as { torch?: boolean }).torch));
+          setTorchOn(false);
+          exposureLockedRef.current = false;
         } catch {
           // ignore — camera will still work with defaults
         }
@@ -1142,7 +1190,20 @@ function ScanPage() {
             <span className="ml-2 opacity-80">{Math.round(progress * 100)}%</span>
           )}
         </div>
-        <div className="w-10" />
+        {torchAvailable ? (
+          <button
+            onClick={toggleTorch}
+            className={`h-10 w-10 rounded-full backdrop-blur flex items-center justify-center transition ${
+              torchOn ? "bg-yellow-400 text-black" : "bg-black/55 text-white"
+            }`}
+            aria-label="Torch"
+            aria-pressed={torchOn}
+          >
+            {torchOn ? <Zap className="h-5 w-5" /> : <ZapOff className="h-5 w-5" />}
+          </button>
+        ) : (
+          <div className="w-10" />
+        )}
       </div>
 
       <div className="flex-1" />
