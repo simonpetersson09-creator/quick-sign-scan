@@ -167,6 +167,45 @@ function ScanPage() {
     typeof window !== "undefined" && /[?&]debug=1\b/.test(window.location.search);
   const cancelledRef = useRef(false);
 
+  const toggleTorch = useCallback(async () => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    const next = !torchOn;
+    try {
+      await track.applyConstraints({
+        advanced: [{ torch: next } as MediaTrackConstraintSet],
+      });
+      setTorchOn(next);
+    } catch {
+      // capability missing or denied — hide the button
+      setTorchAvailable(false);
+    }
+  }, [torchOn]);
+
+  // Exposure lock: when the doc is "ready" lock exposure so brightness doesn't
+  // shift in the milliseconds before capture. Release it as soon as we're no
+  // longer ready so the next document gets a fresh metering.
+  useEffect(() => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    const caps = trackCapsRef.current as { exposureMode?: string[] };
+    if (!Array.isArray(caps.exposureMode)) return;
+    const shouldLock = status === "ready" || status === "capturing";
+    if (shouldLock === exposureLockedRef.current) return;
+    if (shouldLock && caps.exposureMode.includes("manual")) {
+      track
+        .applyConstraints({ advanced: [{ exposureMode: "manual" } as MediaTrackConstraintSet] })
+        .then(() => { exposureLockedRef.current = true; })
+        .catch(() => {});
+    } else if (!shouldLock && caps.exposureMode.includes("continuous")) {
+      track
+        .applyConstraints({ advanced: [{ exposureMode: "continuous" } as MediaTrackConstraintSet] })
+        .then(() => { exposureLockedRef.current = false; })
+        .catch(() => {});
+    }
+  }, [status]);
+
+
   const startCamera = useCallback(
     async (options: StartCameraOptions = {}) => {
       if (rafRef.current) {
