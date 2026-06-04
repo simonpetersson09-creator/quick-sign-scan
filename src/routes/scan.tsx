@@ -725,6 +725,7 @@ function ScanPage() {
       return;
     }
     capturedRef.current = true;
+    triggerCaptureHaptic();
     const vw = video.videoWidth;
     const vh = video.videoHeight;
     if (debugEnabled) {
