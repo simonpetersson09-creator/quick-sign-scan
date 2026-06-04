@@ -26,6 +26,8 @@ type Status =
   | "uncertain"
   | "align"
   | "hold"
+  | "focusing"
+  | "moveBack"
   | "ready"
   | "capturing"
   | "error";
