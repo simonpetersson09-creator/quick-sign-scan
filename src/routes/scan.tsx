@@ -1190,7 +1190,20 @@ function ScanPage() {
             <span className="ml-2 opacity-80">{Math.round(progress * 100)}%</span>
           )}
         </div>
-        <div className="w-10" />
+        {torchAvailable ? (
+          <button
+            onClick={toggleTorch}
+            className={`h-10 w-10 rounded-full backdrop-blur flex items-center justify-center transition ${
+              torchOn ? "bg-yellow-400 text-black" : "bg-black/55 text-white"
+            }`}
+            aria-label="Torch"
+            aria-pressed={torchOn}
+          >
+            {torchOn ? <Zap className="h-5 w-5" /> : <ZapOff className="h-5 w-5" />}
+          </button>
+        ) : (
+          <div className="w-10" />
+        )}
       </div>
 
       <div className="flex-1" />
