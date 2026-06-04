@@ -1196,9 +1196,36 @@ function ScanPage() {
         </p>
       </div>
 
-      {/* Capture flash — brief visual confirmation after each page */}
-      {flashOn && (
-        <div className="pointer-events-none absolute inset-0 z-30 bg-white/40 animate-in fade-in duration-100" />
+      {/* Saved-page overlay — shows captured A4 full-screen with a small
+          spinner + "Sparar sida…", then softly fades to reveal the camera. */}
+      {savedOverlay && (
+        <div
+          className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-black"
+          style={{
+            opacity: savedOverlay.visible ? 1 : 0,
+            transition: "opacity 380ms ease-out",
+          }}
+        >
+          <img
+            src={savedOverlay.dataUrl}
+            alt=""
+            className="max-w-full max-h-full object-contain shadow-2xl"
+            style={{ aspectRatio: "1 / 1.414" }}
+          />
+          <div className="absolute inset-0 bg-black/35" />
+          <div className="absolute flex flex-col items-center gap-3 text-white">
+            <div
+              className="h-10 w-10 rounded-full border-[3px] border-white/30 border-t-white animate-spin"
+              aria-hidden="true"
+            />
+            <p className="text-[15px] font-medium tracking-tight tabular-nums">
+              {t("savingPage")}
+            </p>
+            <p className="text-[12px] text-white/80 tabular-nums">
+              {pageCount} {pageCount === 1 ? t("pageSingular") : t("pagePlural")}
+            </p>
+          </div>
+        </div>
       )}
 
       {/* Debug overlay — enable with ?debug=1 in the URL */}
