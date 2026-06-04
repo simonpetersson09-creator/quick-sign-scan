@@ -314,7 +314,7 @@ function ReviewPage() {
                   ref={imgRef}
                   src={currentImg}
                   alt={t("scannedAlt")}
-                  className="absolute inset-0 w-full h-full object-contain pointer-events-none bg-white shadow-sm"
+                  className="absolute inset-0 w-full h-full object-contain pointer-events-none bg-white"
                   draggable={false}
                 />
               )}
