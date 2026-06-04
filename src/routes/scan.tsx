@@ -833,7 +833,7 @@ function ScanPage() {
               </p>
             </div>
             <div
-              className="rounded-xl overflow-hidden border border-white/15 bg-white shadow-xl"
+              className="rounded-sm overflow-hidden border border-white/15 bg-white shadow-xl"
               style={{ width: "min(60vw, 240px)", aspectRatio: "1 / 1.414" }}
             >
               <img
