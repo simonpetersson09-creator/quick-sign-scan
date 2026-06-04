@@ -666,8 +666,11 @@ function ScanPage() {
     // kamerans/canvasens proportion. Själva innehållet mappas fortfarande från
     // de fyra verkliga hörnen i srcQuad.
     const aspect = geometry.height >= geometry.width ? Math.SQRT2 : 1 / Math.SQRT2;
-    const outW = 1000;
+    // 300 DPI A4 (210 mm × 297 mm) ≈ 2480 × 3508 px. Print-quality output
+    // for contracts, signatures and small text.
+    const outW = 2480;
     const outH = Math.round(outW * aspect);
+
 
     logScanStage("camera-frame", { width: vw, height: vh, readyState: video.readyState });
     logScanStage("detected-corners", {
