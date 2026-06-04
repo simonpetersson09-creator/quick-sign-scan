@@ -1912,6 +1912,8 @@ function evaluateContour(
       sideDeviation,
       perspectiveError,
       polygonFill,
+      edgeTightness: 0,
+      meanEdgeOffset: 999,
     },
   };
 }
