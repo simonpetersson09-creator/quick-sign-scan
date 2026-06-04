@@ -512,7 +512,7 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
   //     delete connected dark components that are isolated from other ink,
   //     so normal text, dots over letters, stamps and dense form content stay.
   {
-    const darkThreshold = 165;
+    const darkThreshold = 205;
     const finalLum = new Uint8ClampedArray(n);
     for (let i = 0, j = 0; i < d.length; i += 4, j++) {
       finalLum[j] = (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) | 0;
@@ -521,7 +521,9 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
     const visited = new Uint8Array(n);
     const stack = new Int32Array(n);
     const pad = Math.max(14, Math.round(Math.max(w, h) * 0.018));
-    const maxSpeckArea = Math.max(36, Math.round(n * 0.00002));
+    const maxSpeckArea = Math.max(48, Math.round(n * 0.000035));
+    const marginX = Math.round(w * 0.24);
+    const marginY = Math.round(h * 0.18);
     const whitenComponent = (pixels: number[]) => {
       for (const j of pixels) {
         const i = j * 4;
@@ -568,10 +570,18 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
       const area = pixels.length;
       const bw = maxX - minX + 1;
       const bh = maxY - minY + 1;
-      const tallStreak = bh > h * 0.06 && bw <= w * 0.035 && bh / Math.max(1, bw) > 5;
-      const flatStreak = bw > w * 0.06 && bh <= h * 0.025 && bw / Math.max(1, bh) > 5;
-      const smallSpeck = area <= maxSpeckArea && bw <= w * 0.035 && bh <= h * 0.035;
+      const inEdgeBand = minX < marginX || maxX >= w - marginX || minY < marginY || maxY >= h - marginY;
+      const tallStreak =
+        inEdgeBand && bh > h * 0.035 && bw <= w * 0.05 && bh / Math.max(1, bw) > 2.8;
+      const flatStreak =
+        inEdgeBand && bw > w * 0.045 && bh <= h * 0.04 && bw / Math.max(1, bh) > 2.8;
+      const smallSpeck = area <= maxSpeckArea && bw <= w * 0.045 && bh <= h * 0.045;
       if (!tallStreak && !flatStreak && !smallSpeck) continue;
+
+      if (tallStreak || flatStreak) {
+        whitenComponent(pixels);
+        continue;
+      }
 
       const x0 = Math.max(0, minX - pad);
       const x1 = Math.min(w - 1, maxX + pad);
@@ -657,6 +667,65 @@ export function cleanPaperEdges(canvas: HTMLCanvasElement): HTMLCanvasElement {
   for (let x = 0; x < w; x++) {
     sweep(0, 1, maxDepthY, (d) => (d * w + x) * 4);
     sweep(0, 1, maxDepthY, (d) => ((h - 1 - d) * w + x) * 4);
+  }
+
+  // Deterministic edge-artifact pass: after the normal sweep, thin black
+  // streaks can still remain just inside the page margin. Detect narrow dark
+  // column/row clusters in the outer bands and bleach only those dark pixels.
+  const dark = (i: number) => lumAt(i) < 210;
+  const edgeBandX = Math.round(w * 0.28);
+  const edgeBandY = Math.round(h * 0.2);
+  const colDark = new Uint32Array(w);
+  const rowDark = new Uint32Array(h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      if (dark(i)) {
+        colDark[x]++;
+        rowDark[y]++;
+      }
+    }
+  }
+  const bleachDarkColumn = (x0: number, x1: number) => {
+    for (let y = 0; y < h; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const i = (y * w + x) * 4;
+        if (dark(i)) whitenPx(i);
+      }
+    }
+  };
+  const bleachDarkRow = (y0: number, y1: number) => {
+    for (let y = y0; y <= y1; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        if (dark(i)) whitenPx(i);
+      }
+    }
+  };
+
+  for (let x = 0; x < w; x++) {
+    if (x >= edgeBandX && x < w - edgeBandX) continue;
+    if (colDark[x] < h * 0.018) continue;
+    let x0 = x;
+    let x1 = x;
+    while (x0 > 0 && colDark[x0 - 1] >= h * 0.006) x0--;
+    while (x1 < w - 1 && colDark[x1 + 1] >= h * 0.006) x1++;
+    if (x1 - x0 + 1 <= Math.max(8, Math.round(w * 0.018))) {
+      bleachDarkColumn(x0, x1);
+    }
+    x = x1;
+  }
+  for (let y = 0; y < h; y++) {
+    if (y >= edgeBandY && y < h - edgeBandY) continue;
+    if (rowDark[y] < w * 0.018) continue;
+    let y0 = y;
+    let y1 = y;
+    while (y0 > 0 && rowDark[y0 - 1] >= w * 0.006) y0--;
+    while (y1 < h - 1 && rowDark[y1 + 1] >= w * 0.006) y1++;
+    if (y1 - y0 + 1 <= Math.max(8, Math.round(h * 0.012))) {
+      bleachDarkRow(y0, y1);
+    }
+    y = y1;
   }
 
   ctx.putImageData(img, 0, 0);
