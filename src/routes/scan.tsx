@@ -384,8 +384,9 @@ function ScanPage() {
 
     if (!detectCanvas.current) detectCanvas.current = document.createElement("canvas");
     const dc = detectCanvas.current;
-    const dw = 200;
+    const dw = 280;
     const dh = Math.round((vh / vw) * dw);
+
     if (dc.width !== dw || dc.height !== dh) {
       dc.width = dw;
       dc.height = dh;
