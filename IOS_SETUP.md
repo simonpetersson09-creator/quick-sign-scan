@@ -40,20 +40,31 @@ npx cap open ios
 I Xcode:
 1. Välj projektet i sidopanelen → **Signing & Capabilities** → välj ditt **Team** (Apple Developer-kontot)
 2. Sätt en unik **Bundle Identifier** (t.ex. `com.dittforetag.scansign`)
-3. Lägg till **Camera Usage Description** i `Info.plist`:
-   - Key: `NSCameraUsageDescription`
-   - Value: `Appen behöver tillgång till kameran för att skanna dokument`
+
+### Lägg till kamerabehörighet (OBLIGATORISKT — annars kraschar appen + App Store reject)
+
+Öppna `ios/App/App/Info.plist` (i Xcode eller valfri editor) och lägg till **innan** `</dict>` i slutet:
+
+```xml
+<key>NSCameraUsageDescription</key>
+<string>Appen behöver tillgång till kameran för att skanna dokument.</string>
+<key>NSPhotoLibraryUsageDescription</key>
+<string>Tillåt åtkomst för att välja dokumentbilder från fotobiblioteket.</string>
+```
 
 ## Steg 5: Testa på iPhone
 - Anslut iPhone via USB → välj enheten i Xcode → tryck **Play (▶)**
 - Första gången måste du godkänna utvecklarprofilen på iPhone (Inställningar → Allmänt → VPN och enhetshantering)
 
 ## Steg 6: Skicka till App Store
-1. I `capacitor.config.ts`: **ta bort `server.url`-blocket** så appen kör den inbyggda webbkoden istället för Lovable preview-URL:n
-2. `bun run build && npx cap sync ios`
-3. I Xcode: **Product → Archive** → **Distribute App** → **App Store Connect**
-4. Logga in på [App Store Connect](https://appstoreconnect.apple.com) och fyll i metadata (namn, ikoner, screenshots, beskrivning, integritetspolicy)
-5. Skicka in för granskning (tar normalt 1–3 dagar)
+1. **Bygg release** utan `CAP_DEV`-flaggan så `server.url` inte injiceras:
+   ```bash
+   bun run build && npx cap sync ios
+   ```
+   (För dev mot Lovable preview: `CAP_DEV=1 npx cap sync ios`.)
+2. I Xcode: **Product → Archive** → **Distribute App** → **App Store Connect**
+3. Logga in på [App Store Connect](https://appstoreconnect.apple.com) och fyll i metadata (namn, ikoner, screenshots, beskrivning, integritetspolicy, support-URL)
+4. Skicka in för granskning (tar normalt 1–3 dagar)
 
 ## Vad är förberett i Lovable
 - ✅ `capacitor.config.ts` med `appId`, `appName`, `webDir: dist`
