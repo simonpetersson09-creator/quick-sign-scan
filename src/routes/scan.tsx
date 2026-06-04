@@ -55,29 +55,34 @@ export const Route = createFileRoute("/scan")({
 
 // Stability requirements — the document must be locked in on all 4 corners
 // for a sustained period before the camera captures, so we never fire too early.
-const STABLE_DELTA = 0.018; // normalized 0..1 — max smoothed corner movement to count as stable
+// STABLE_DELTA är medvetet tillåtande: små handrörelser (några pixlar i 280px
+// detekteringsramen) ska inte bryta stabiliteten — skärpe- och ljusgrindarna
+// nedan ser till att kvaliteten ändå hålls hög.
+const STABLE_DELTA = 0.03; // normalized 0..1 — tål små handvibrationer
 const DETECT_FRAMES = 2; // show the detected frame quickly once all 4 corners exist
-const HOLD_FRAMES = 15; // ~0.5s — "Håll stilla" phase
-const READY_FRAMES = 35; // ~1.2s — "Dokument hittat" lock-in
-const STABLE_FRAMES = 60; // ~2.0s total before auto-capture
+const HOLD_FRAMES = 12; // ~0.4s — "Håll stilla" phase
+const READY_FRAMES = 28; // ~0.95s — "Dokument hittat" lock-in
+const STABLE_FRAMES = 48; // ~1.6s total before auto-capture
 // Adaptive smoothing — gentle pre-lock, very stable post-lock.
 // Once the quad is "locked", the overlay barely moves frame-to-frame (acts
 // like a KLT tracker visually) and outliers are rejected outright.
-const ALPHA_PRE_LOCK = 0.28;
-const ALPHA_POST_LOCK = 0.09;
-const OUTLIER_DELTA = 0.08; // raw frames further than this from smoothed are rejected
-const LOCK_BREAK_DELTA = 0.12; // sustained delta this large breaks the lock and re-detects
-// Sharpness gates — Laplacian variance computed on a 200px detect frame
-// (in-camera) and the warped doc (post-capture). Tuned conservatively so a
-// blurry doc never gets saved.
+const ALPHA_PRE_LOCK = 0.32;
+const ALPHA_POST_LOCK = 0.12;
+const OUTLIER_DELTA = 0.11; // raw frames further than this from smoothed are rejected
+const LOCK_BREAK_DELTA = 0.17; // sustained delta this large breaks the lock and re-detects
+// Sharpness gates — Laplacian variance computed on a 280px detect frame
+// (in-camera) and the warped doc (post-capture). Tuned conservatively så
+// en suddig sida aldrig sparas, oavsett hur snabbt användaren rör mobilen.
 const SHARPNESS_LIVE_MIN = 35;
 const SHARPNESS_CAPTURE_MIN = 80;
 const BLUR_HINT_FRAMES = 75; // ~2.5s of blur before suggesting "move back"
 // Lighting gate — mean luminance below this is "too dark to scan reliably"
 const BRIGHTNESS_MIN = 55;
-// A4 ratio gate at capture — reject quads whose proportions diverge sharply
-// from sqrt(2). Detection allows looser ratios; this is the final check.
-const A4_RATIO_TOLERANCE = 0.38;
+// A4 ratio gate at capture — ett A4 som fotograferas snett kan få en
+// projicerad proportion långt från sqrt(2). Vi accepterar generös perspektiv-
+// skevhet här eftersom warp-steget rätar upp dokumentet ändå; den verkliga
+// kvalitetskontrollen är skärpa + ljus + post-capture Laplacian.
+const A4_RATIO_TOLERANCE = 0.6;
 
 type StartCameraOptions = {
   restartStream?: boolean;

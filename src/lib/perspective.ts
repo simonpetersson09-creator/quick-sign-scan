@@ -1309,18 +1309,20 @@ function evaluateEdgeQuad(args: {
   const bboxArea = Math.max(1, (maxX - minX + 1) * (maxY - minY + 1));
   const polygonFill = bboxArea / Math.max(1, area);
 
-  // Very relaxed gates — accept a tilted A4 from a phone with shadows,
-  // uneven lighting and rough edges. Confidence ranks the survivors.
-  if (ratioError > 0.9) return null;
-  if (perspectiveError > 3.2) return null;
-  if (sideDeviation > 0.3) return null;
-  if (polygonFill < 0.42 || polygonFill > 2.6) return null;
+  // Very relaxed gates — accept en kraftigt vinklad A4 från en mobil med
+  // skuggor, ojämnt ljus och grova kanter. Confidence rangordnar överlevarna.
+  // Perspektivgrinden är medvetet generös: ett A4 fotograferat snett från
+  // sidan kan ge sidlängdskvoter på 2–4×.
+  if (ratioError > 1.1) return null;
+  if (perspectiveError > 4.5) return null;
+  if (sideDeviation > 0.34) return null;
+  if (polygonFill < 0.4 || polygonFill > 2.8) return null;
 
   const stats = polygonImageStats(ordered, lum, width, height);
   const edgeScore = quadEdgeSupport(ordered, edges, width, height);
-  const a4Score = clamp01(1 - ratioError / 0.9);
-  const straightScore = clamp01(1 - sideDeviation / 0.3);
-  const perspectiveScore = clamp01(1 - perspectiveError / 3.2);
+  const a4Score = clamp01(1 - ratioError / 1.1);
+  const straightScore = clamp01(1 - sideDeviation / 0.34);
+  const perspectiveScore = clamp01(1 - perspectiveError / 4.5);
   const brightnessScore = clamp01((stats.mean - 70) / 140);
   const textScore = clamp01(stats.darkRatio / 0.055);
   const areaScore =
