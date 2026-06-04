@@ -5,6 +5,47 @@ export interface Point {
   y: number;
 }
 
+export interface DocumentAlignmentDiagnostics {
+  input: { width: number; height: number };
+  orientationCandidates: Array<{
+    rotation: 0 | 90 | 180 | 270;
+    width: number;
+    height: number;
+    textAngle: number;
+    textScore: number;
+    uprightScore: number;
+    hasText: boolean;
+    score: number;
+  }>;
+  selectedOrientationRotation: 0 | 90 | 180 | 270;
+  documentAngleBeforeDeskew: number;
+  textSkewAngle: number;
+  textSkewScore: number;
+  textHasText: boolean;
+  verticalEdgeSkewAngle: number;
+  verticalEdgeConfidence: number;
+  leftEdgeAngle: number | null;
+  rightEdgeAngle: number | null;
+  appliedDeskewAngle: number;
+  appliedDeskewSource: "vertical-edges" | "text" | "none";
+  output: { width: number; height: number };
+}
+
+export interface QuadGeometryDiagnostics {
+  topAngle: number;
+  bottomAngle: number;
+  leftAngleFromVertical: number;
+  rightAngleFromVertical: number;
+  documentAngle: number;
+  topWidth: number;
+  bottomWidth: number;
+  leftHeight: number;
+  rightHeight: number;
+  width: number;
+  height: number;
+  aspect: number;
+}
+
 // Coefficients for a projective transform of the unit square -> arbitrary quad.
 // Quad corners in order: TL, TR, BR, BL (clockwise from top-left).
 //   x = (a*u + b*v + c) / (g*u + h*v + 1)
@@ -273,12 +314,16 @@ export function cleanPaperEdges(canvas: HTMLCanvasElement): HTMLCanvasElement {
   return canvas;
 }
 
-export function autoOrientAndDeskewDocument(canvas: HTMLCanvasElement): HTMLCanvasElement {
+export function autoOrientAndDeskewDocument(
+  canvas: HTMLCanvasElement,
+  onDiagnostics?: (diagnostics: DocumentAlignmentDiagnostics) => void,
+): HTMLCanvasElement {
   const sample = scaleCanvas(canvas, 420);
   const rotations = [0, 90, 180, 270] as const;
-  let bestRotation = canvas.height >= canvas.width ? 0 : 90;
+  let bestRotation: (typeof rotations)[number] = canvas.height >= canvas.width ? 0 : 90;
   let bestScore = -Infinity;
   let foundText = false;
+  const orientationCandidates: DocumentAlignmentDiagnostics["orientationCandidates"] = [];
 
   for (const rotation of rotations) {
     const rotatedSample = rotateCanvas(sample, rotation);
@@ -287,6 +332,16 @@ export function autoOrientAndDeskewDocument(canvas: HTMLCanvasElement): HTMLCanv
     const score = analysis.hasText
       ? analysis.score * analysis.uprightScore * portraitBias
       : portraitBias;
+    orientationCandidates.push({
+      rotation,
+      width: rotatedSample.width,
+      height: rotatedSample.height,
+      textAngle: analysis.angle,
+      textScore: analysis.score,
+      uprightScore: analysis.uprightScore,
+      hasText: analysis.hasText,
+      score,
+    });
     if (analysis.hasText) foundText = true;
     if (score > bestScore) {
       bestScore = score;
@@ -295,16 +350,73 @@ export function autoOrientAndDeskewDocument(canvas: HTMLCanvasElement): HTMLCanv
   }
 
   let oriented = rotateCanvas(canvas, bestRotation);
-  const skew = estimateTextSkew(oriented, 7, 0.35);
-  if ((foundText || skew.hasText) && Math.abs(skew.angle) > 0.25) {
-    oriented = rotateCanvas(oriented, skew.angle);
+  const skew = estimateTextSkew(oriented, 7, 0.25);
+  const edgeSkew = estimateVerticalPaperEdgeSkew(oriented);
+  const documentAngleBeforeDeskew = bestRotation + (edgeSkew.confidence > 0 ? edgeSkew.angle : 0);
+  let appliedDeskewAngle = 0;
+  let appliedDeskewSource: DocumentAlignmentDiagnostics["appliedDeskewSource"] = "none";
+
+  if (edgeSkew.confidence >= 0.55 && Math.abs(edgeSkew.angle) > 0.5) {
+    appliedDeskewAngle = edgeSkew.angle;
+    appliedDeskewSource = "vertical-edges";
+  } else if ((foundText || skew.hasText) && Math.abs(skew.angle) > 0.2) {
+    appliedDeskewAngle = skew.angle;
+    appliedDeskewSource = "text";
   }
 
-  // Viktigt: vi padda INTE upp till en fast A4-ruta här. Sidan behåller sin
-  // egna proportion från quaden, så preview = PDF och inga konstgjorda
-  // marginaler smyger in (vilket annars syns som asymmetriska kanter).
+  if (Math.abs(appliedDeskewAngle) > 0.001) {
+    oriented = rotateCanvas(oriented, appliedDeskewAngle);
+  }
+
   cleanPaperEdges(oriented);
-  return oriented;
+  const finalCanvas = renderToA4Portrait(oriented);
+  onDiagnostics?.({
+    input: { width: canvas.width, height: canvas.height },
+    orientationCandidates,
+    selectedOrientationRotation: bestRotation,
+    documentAngleBeforeDeskew,
+    textSkewAngle: skew.angle,
+    textSkewScore: skew.score,
+    textHasText: skew.hasText,
+    verticalEdgeSkewAngle: edgeSkew.angle,
+    verticalEdgeConfidence: edgeSkew.confidence,
+    leftEdgeAngle: edgeSkew.leftAngle,
+    rightEdgeAngle: edgeSkew.rightAngle,
+    appliedDeskewAngle,
+    appliedDeskewSource,
+    output: { width: finalCanvas.width, height: finalCanvas.height },
+  });
+  return finalCanvas;
+}
+
+export function measureQuadGeometry(quad: [Point, Point, Point, Point]): QuadGeometryDiagnostics {
+  const ordered = orderQuad(quad);
+  const topAngle = segmentAngle(ordered[0], ordered[1]);
+  const bottomAngle = segmentAngle(ordered[3], ordered[2]);
+  const leftRaw = segmentAngle(ordered[0], ordered[3]);
+  const rightRaw = segmentAngle(ordered[1], ordered[2]);
+  const leftAngleFromVertical = normalizeToHalfTurn(leftRaw - 90);
+  const rightAngleFromVertical = normalizeToHalfTurn(rightRaw - 90);
+  const topWidth = dist(ordered[0], ordered[1]);
+  const bottomWidth = dist(ordered[3], ordered[2]);
+  const leftHeight = dist(ordered[0], ordered[3]);
+  const rightHeight = dist(ordered[1], ordered[2]);
+  const width = (topWidth + bottomWidth) / 2;
+  const height = (leftHeight + rightHeight) / 2;
+  return {
+    topAngle,
+    bottomAngle,
+    leftAngleFromVertical,
+    rightAngleFromVertical,
+    documentAngle: averageAngles([topAngle, bottomAngle]),
+    topWidth,
+    bottomWidth,
+    leftHeight,
+    rightHeight,
+    width,
+    height,
+    aspect: height / Math.max(1, width),
+  };
 }
 
 function renderToA4Portrait(source: HTMLCanvasElement): HTMLCanvasElement {
@@ -456,6 +568,105 @@ function horizontalProjectionScore(
     score += smoothed * smoothed;
   }
   return score / Math.max(1, points.length);
+}
+
+function estimateVerticalPaperEdgeSkew(canvas: HTMLCanvasElement): {
+  angle: number;
+  confidence: number;
+  leftAngle: number | null;
+  rightAngle: number | null;
+} {
+  const sample = scaleCanvas(canvas, 520);
+  const w = sample.width;
+  const h = sample.height;
+  const ctx = sample.getContext("2d", { willReadFrequently: true });
+  if (!ctx || w < 80 || h < 80) {
+    return { angle: 0, confidence: 0, leftAngle: null, rightAngle: null };
+  }
+  const img = ctx.getImageData(0, 0, w, h);
+  const data = img.data;
+  const lum = new Uint8ClampedArray(w * h);
+  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+    lum[p] = (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) | 0;
+  }
+
+  const left = collectVerticalEdgePoints(lum, w, h, "left");
+  const right = collectVerticalEdgePoints(lum, w, h, "right");
+  const leftFit = fitVerticalLine(left);
+  const rightFit = fitVerticalLine(right);
+  const angles = [leftFit, rightFit]
+    .filter((fit): fit is { angle: number; confidence: number } => !!fit && fit.confidence > 0)
+    .map((fit) => fit.angle);
+  if (!angles.length) {
+    return {
+      angle: 0,
+      confidence: 0,
+      leftAngle: leftFit?.angle ?? null,
+      rightAngle: rightFit?.angle ?? null,
+    };
+  }
+
+  const confidence = Math.max(leftFit?.confidence ?? 0, rightFit?.confidence ?? 0);
+  return {
+    angle: averageAngles(angles),
+    confidence,
+    leftAngle: leftFit?.angle ?? null,
+    rightAngle: rightFit?.angle ?? null,
+  };
+}
+
+function collectVerticalEdgePoints(
+  lum: Uint8ClampedArray,
+  w: number,
+  h: number,
+  side: "left" | "right",
+): Point[] {
+  const points: Point[] = [];
+  const y0 = Math.round(h * 0.04);
+  const y1 = Math.round(h * 0.96);
+  const xStart = side === "left" ? 1 : Math.round(w * 0.62);
+  const xEnd = side === "left" ? Math.round(w * 0.38) : w - 2;
+  const minGradient = 12;
+  for (let y = y0; y < y1; y += 2) {
+    let bestX = -1;
+    let bestG = 0;
+    for (let x = xStart; x <= xEnd; x++) {
+      const g = Math.abs(lum[y * w + x + 1] - lum[y * w + x - 1]);
+      if (g > bestG) {
+        bestG = g;
+        bestX = x;
+      }
+    }
+    if (bestX >= 0 && bestG >= minGradient) points.push({ x: bestX, y });
+  }
+  return points;
+}
+
+function fitVerticalLine(points: Point[]): { angle: number; confidence: number } | null {
+  if (points.length < 24) return null;
+  let sx = 0;
+  let sy = 0;
+  let sxy = 0;
+  let syy = 0;
+  for (const p of points) {
+    sx += p.x;
+    sy += p.y;
+    sxy += p.x * p.y;
+    syy += p.y * p.y;
+  }
+  const n = points.length;
+  const denom = n * syy - sy * sy;
+  if (Math.abs(denom) < 1e-6) return null;
+  const slope = (n * sxy - sx * sy) / denom; // x = slope*y + intercept
+  const intercept = (sx - slope * sy) / n;
+  let err = 0;
+  for (const p of points) {
+    const predictedX = slope * p.y + intercept;
+    err += Math.abs(p.x - predictedX);
+  }
+  const meanErr = err / n;
+  const confidence = clamp01((n / 160) * (1 - meanErr / 18));
+  return { angle: (Math.atan(slope) * 180) / Math.PI, confidence };
 }
 
 function estimateUprightScore(points: Point[], w: number, h: number): number {
@@ -1379,6 +1590,28 @@ function pointSegmentDistance(p: Point, a: Point, b: Point): number {
 
 function cross(a: Point, b: Point, c: Point): number {
   return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+}
+
+function segmentAngle(a: Point, b: Point): number {
+  return normalizeToHalfTurn((Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI);
+}
+
+function normalizeToHalfTurn(angle: number): number {
+  let a = ((angle + 90) % 180) - 90;
+  if (a < -90) a += 180;
+  return a;
+}
+
+function averageAngles(angles: number[]): number {
+  if (!angles.length) return 0;
+  let sx = 0;
+  let sy = 0;
+  for (const angle of angles) {
+    const doubled = (angle * 2 * Math.PI) / 180;
+    sx += Math.cos(doubled);
+    sy += Math.sin(doubled);
+  }
+  return normalizeToHalfTurn((Math.atan2(sy, sx) * 90) / Math.PI);
 }
 
 function dist(a: Point, b: Point): number {
