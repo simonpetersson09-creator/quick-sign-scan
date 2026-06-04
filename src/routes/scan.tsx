@@ -718,33 +718,49 @@ function ScanPage() {
     finishPageCapture(dataUrl, nextPages.length);
   }
 
-  // After a successful capture, freeze detection and show the in-camera review
-  // overlay. The stream stays alive so the user can immediately scan another
-  // page without re-asking for camera permissions.
+  // After a successful capture: brief visual flash + thumbnail update, then
+  // automatically resume detection so the user can scan the next page without
+  // leaving the camera. The camera stream stays alive the entire time.
   function finishPageCapture(dataUrl: string, count: number) {
     setPageCount(count);
-    setJustCaptured(dataUrl);
-    // Pause RAF/detection until the user chooses next action.
-    capturedRef.current = true;
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-  }
+    setLastThumbnail(dataUrl);
+    // Visual confirmation flash
+    setFlashOn(true);
+    if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = window.setTimeout(() => setFlashOn(false), 220);
 
-  function scanAnotherPage() {
-    // Start a fresh camera session from this direct button click. This keeps
-    // mobile browser camera permissions in a user gesture and avoids stale
-    // video/detection state from the previous page.
-    setJustCaptured(null);
-    startCamera({ restartStream: true, skipPermissionPreflight: true });
+    // Reset detection state so auto-capture starts fresh for the next page.
+    stableCount.current = 0;
+    detectCount.current = 0;
+    missCount.current = 0;
+    smoothQuad.current = null;
+    lastRawQuad.current = null;
+    detectionMeta.current = null;
+    blurFramesRef.current = 0;
+    captureRetryRef.current = 0;
+    sharpnessRef.current = 0;
+    setProgress(0);
+    drawOverlay(null, false);
+
+    // Short cool-down so the user perceives the capture, then resume the
+    // detection loop on the same live stream.
+    window.setTimeout(() => {
+      if (cancelledRef.current) return;
+      capturedRef.current = false;
+      setStatus("searching");
+      loop();
+    }, 650);
   }
 
   function finishScanning() {
+    if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current);
     streamRef.current?.getTracks().forEach((tr) => tr.stop());
     navigate({ to: "/preview" });
   }
 
   function startOverScan() {
     scanStore.clear();
-    setJustCaptured(null);
+    setLastThumbnail(null);
     setPageCount(0);
     setStatus("searching");
     startCamera({ restartStream: true });
