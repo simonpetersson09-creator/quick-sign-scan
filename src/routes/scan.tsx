@@ -28,6 +28,7 @@ type Status =
   | "hold"
   | "focusing"
   | "moveBack"
+  | "lowLight"
   | "ready"
   | "capturing"
   | "error";
@@ -54,17 +55,29 @@ export const Route = createFileRoute("/scan")({
 
 // Stability requirements — the document must be locked in on all 4 corners
 // for a sustained period before the camera captures, so we never fire too early.
-const STABLE_DELTA = 0.02; // normalized 0..1 — max smoothed corner movement to count as stable
+const STABLE_DELTA = 0.018; // normalized 0..1 — max smoothed corner movement to count as stable
 const DETECT_FRAMES = 2; // show the detected frame quickly once all 4 corners exist
 const HOLD_FRAMES = 15; // ~0.5s — "Håll stilla" phase
 const READY_FRAMES = 35; // ~1.2s — "Dokument hittat" lock-in
 const STABLE_FRAMES = 60; // ~2.0s total before auto-capture
+// Adaptive smoothing — gentle pre-lock, very stable post-lock.
+// Once the quad is "locked", the overlay barely moves frame-to-frame (acts
+// like a KLT tracker visually) and outliers are rejected outright.
+const ALPHA_PRE_LOCK = 0.28;
+const ALPHA_POST_LOCK = 0.09;
+const OUTLIER_DELTA = 0.08; // raw frames further than this from smoothed are rejected
+const LOCK_BREAK_DELTA = 0.12; // sustained delta this large breaks the lock and re-detects
 // Sharpness gates — Laplacian variance computed on a 200px detect frame
 // (in-camera) and the warped doc (post-capture). Tuned conservatively so a
 // blurry doc never gets saved.
 const SHARPNESS_LIVE_MIN = 35;
 const SHARPNESS_CAPTURE_MIN = 80;
 const BLUR_HINT_FRAMES = 75; // ~2.5s of blur before suggesting "move back"
+// Lighting gate — mean luminance below this is "too dark to scan reliably"
+const BRIGHTNESS_MIN = 55;
+// A4 ratio gate at capture — reject quads whose proportions diverge sharply
+// from sqrt(2). Detection allows looser ratios; this is the final check.
+const A4_RATIO_TOLERANCE = 0.28;
 
 type StartCameraOptions = {
   restartStream?: boolean;
@@ -93,6 +106,10 @@ function ScanPage() {
   const sharpnessRef = useRef(0);
   const blurFramesRef = useRef(0);
   const captureRetryRef = useRef(0);
+  const lockedRef = useRef(false);
+  const lockBreakFramesRef = useRef(0);
+  const brightnessRef = useRef(255);
+  const lowLightFramesRef = useRef(0);
 
   const [status, setStatus] = useState<Status>("starting");
   const [progress, setProgress] = useState(0); // 0..1 — visual lock-in progress
@@ -131,6 +148,10 @@ function ScanPage() {
       sharpnessRef.current = 0;
       blurFramesRef.current = 0;
       captureRetryRef.current = 0;
+      lockedRef.current = false;
+      lockBreakFramesRef.current = 0;
+      brightnessRef.current = 255;
+      lowLightFramesRef.current = 0;
       stableCount.current = 0;
       detectCount.current = 0;
       missCount.current = 0;
@@ -139,7 +160,7 @@ function ScanPage() {
       detectionMeta.current = null;
       setProgress(0);
       setCameraReady(false);
-      drawOverlay(null, false);
+      drawOverlay(null, "search");
       setStatus("starting");
       setError(null);
       setErrorType(null);
@@ -373,6 +394,23 @@ function ScanPage() {
     ctx.drawImage(video, 0, 0, dw, dh);
     const { data } = ctx.getImageData(0, 0, dw, dh);
 
+    // Cheap mean luminance over a center sample — drives the low-light gate.
+    let lumSum = 0;
+    let lumCount = 0;
+    const sampleStep = 8;
+    for (let y = Math.floor(dh * 0.15); y < dh * 0.85; y += sampleStep) {
+      for (let x = Math.floor(dw * 0.15); x < dw * 0.85; x += sampleStep) {
+        const i = (y * dw + x) * 4;
+        lumSum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        lumCount++;
+      }
+    }
+    const meanLum = lumCount ? lumSum / lumCount : 255;
+    brightnessRef.current = meanLum;
+    const isBrightEnough = meanLum >= BRIGHTNESS_MIN;
+    if (!isBrightEnough) lowLightFramesRef.current++;
+    else lowLightFramesRef.current = Math.max(0, lowLightFramesRef.current - 2);
+
     const detection = detectDocumentQuad(data, dw, dh);
     const corners = detection?.corners ?? null;
 
@@ -381,13 +419,23 @@ function ScanPage() {
       detectCount.current = Math.max(0, detectCount.current - 1);
       detectionMeta.current = null;
       missCount.current++;
+      lockedRef.current = false;
+      lockBreakFramesRef.current = 0;
       if (detectCount.current === 0) {
         smoothQuad.current = null;
         lastRawQuad.current = null;
-        drawOverlay(null, false);
+        drawOverlay(null, "search");
         setProgress(0);
       }
-      setStatus((s) => (s === "starting" ? s : missCount.current > 45 ? "uncertain" : "searching"));
+      setStatus((s) =>
+        s === "starting"
+          ? s
+          : lowLightFramesRef.current > 30
+            ? "lowLight"
+            : missCount.current > 45
+              ? "uncertain"
+              : "searching",
+      );
       return;
     }
 
@@ -398,9 +446,35 @@ function ScanPage() {
     // Normalize to 0..1
     const norm = corners.map((p) => ({ x: p.x / dw, y: p.y / dh })) as [Point, Point, Point, Point];
 
-    // Stronger smoothing — slower lock-in, more reliable corners
+    // Outlier rejection — if a raw frame jumped wildly from the smoothed
+    // estimate, treat it as noise and skip the update. Prevents the polygon
+    // from twitching when one frame detects a wrong contour.
     const previousSmooth = smoothQuad.current;
-    const smoothed = emaQuad(smoothQuad.current, norm, 0.22);
+    let rawDeltaFromSmooth = 0;
+    if (previousSmooth) {
+      rawDeltaFromSmooth = maxCornerDelta(norm, previousSmooth);
+      if (rawDeltaFromSmooth > OUTLIER_DELTA && rawDeltaFromSmooth < LOCK_BREAK_DELTA) {
+        // mild outlier — keep current smooth, don't add to stability either
+        drawOverlay(previousSmooth, lockedRef.current ? "ready" : "hold");
+        return;
+      }
+      if (rawDeltaFromSmooth >= LOCK_BREAK_DELTA) {
+        // large movement — break the lock and re-track
+        lockBreakFramesRef.current++;
+        if (lockBreakFramesRef.current > 3) {
+          lockedRef.current = false;
+          lockBreakFramesRef.current = 0;
+          stableCount.current = 0;
+        }
+      } else {
+        lockBreakFramesRef.current = 0;
+      }
+    }
+
+    // Adaptive smoothing — gentler once locked, so the on-screen polygon
+    // barely moves frame-to-frame.
+    const alpha = lockedRef.current ? ALPHA_POST_LOCK : ALPHA_PRE_LOCK;
+    const smoothed = emaQuad(smoothQuad.current, norm, alpha);
     smoothQuad.current = smoothed;
 
     const last = lastRawQuad.current;
@@ -428,47 +502,55 @@ function ScanPage() {
     const isSharp = sharpness >= SHARPNESS_LIVE_MIN;
     if (!isSharp) {
       blurFramesRef.current++;
-      // Hold back stability progress while the camera is still refocusing.
       stableCount.current = Math.min(stableCount.current, READY_FRAMES - 1);
     } else {
       blurFramesRef.current = 0;
+    }
+    if (!isBrightEnough) {
+      stableCount.current = Math.min(stableCount.current, READY_FRAMES - 1);
+    }
+
+    // Engage lock once we've reached the READY threshold with good conditions.
+    if (stableCount.current >= READY_FRAMES && isSharp && isBrightEnough) {
+      lockedRef.current = true;
     }
 
     // Progress 0..1 — fills up as the document stays stable, hits 1.0 right before capture.
     const pct = Math.max(0, Math.min(1, stableCount.current / STABLE_FRAMES));
     setProgress(pct);
 
-    // Wait for enough consecutive detections before moving to "found" status.
-    // The frame itself is drawn as soon as a 4-corner quad exists, otherwise it
-    // feels like the scanner is doing nothing even when detection is active.
     if (detectCount.current < DETECT_FRAMES) {
-      drawOverlay(smoothed, true);
+      drawOverlay(smoothed, "search");
       setStatus("searching");
       return;
     }
 
-    if (stableCount.current < HOLD_FRAMES) {
-      drawOverlay(smoothed, true);
+    if (!isBrightEnough && lowLightFramesRef.current > 15) {
+      drawOverlay(smoothed, "hold");
+      setStatus("lowLight");
+    } else if (stableCount.current < HOLD_FRAMES) {
+      drawOverlay(smoothed, "hold");
       setStatus("align");
     } else if (!isSharp) {
-      drawOverlay(smoothed, true);
-      // After ~2.5s of unsharp frames, prompt the user to back off — usually
-      // the document is closer than the minimum focus distance.
+      drawOverlay(smoothed, "hold");
       setStatus(blurFramesRef.current > BLUR_HINT_FRAMES ? "moveBack" : "focusing");
     } else if (stableCount.current < READY_FRAMES) {
-      drawOverlay(smoothed, true);
+      drawOverlay(smoothed, "hold");
       setStatus("hold");
     } else if (stableCount.current < STABLE_FRAMES) {
-      drawOverlay(smoothed, true);
+      drawOverlay(smoothed, "ready");
       setStatus("ready");
     } else {
-      drawOverlay(smoothed, true);
+      drawOverlay(smoothed, "ready");
       setStatus("capturing");
       capture(smoothed);
     }
   }
 
-  function drawOverlay(quad: [Point, Point, Point, Point] | null, active: boolean) {
+  function drawOverlay(
+    quad: [Point, Point, Point, Point] | null,
+    phase: "search" | "hold" | "ready",
+  ) {
     const svg = svgRef.current;
     const poly = polyRef.current;
     if (!svg || !poly) return;
@@ -488,7 +570,6 @@ function ScanPage() {
       svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
     }
 
-    // Account for object-fit: cover scaling between video and container
     const video = videoRef.current!;
     const vw = video.videoWidth;
     const vh = video.videoHeight;
@@ -501,18 +582,32 @@ function ScanPage() {
     const pts = quad.map((p) => `${offX + p.x * dispW},${offY + p.y * dispH}`).join(" ");
     poly.setAttribute("points", pts);
     poly.style.opacity = "1";
-    poly.setAttribute("stroke", active ? "var(--success)" : "rgba(255,255,255,0.95)");
-    poly.setAttribute(
-      "fill",
-      active ? "color-mix(in oklab, var(--success) 18%, transparent)" : "rgba(255,255,255,0.06)",
-    );
+
+    // Color phases: white (searching) → yellow (held, focusing) → green (ready)
+    const stroke =
+      phase === "ready"
+        ? "var(--success)"
+        : phase === "hold"
+          ? "rgb(250,204,21)" // amber-400 — clear yellow signal
+          : "rgba(255,255,255,0.95)";
+    const fill =
+      phase === "ready"
+        ? "color-mix(in oklab, var(--success) 18%, transparent)"
+        : phase === "hold"
+          ? "color-mix(in oklab, rgb(250,204,21) 14%, transparent)"
+          : "rgba(255,255,255,0.06)";
+    poly.setAttribute("stroke", stroke);
+    poly.setAttribute("fill", fill);
 
     quad.forEach((p, i) => {
       const c = cornerRefs.current[i];
       if (!c) return;
       c.setAttribute("cx", String(offX + p.x * dispW));
       c.setAttribute("cy", String(offY + p.y * dispH));
-      c.setAttribute("fill", active ? "var(--success)" : "white");
+      c.setAttribute(
+        "fill",
+        phase === "ready" ? "var(--success)" : phase === "hold" ? "rgb(250,204,21)" : "white",
+      );
       c.style.opacity = "1";
     });
   }
@@ -522,7 +617,22 @@ function ScanPage() {
     const meta = detectionMeta.current;
     if (!meta || meta.confidence < MIN_DOCUMENT_CONFIDENCE) {
       stableCount.current = 0;
+      lockedRef.current = false;
       setStatus("uncertain");
+      return;
+    }
+    // Final A4 ratio gate — reject quads whose proportions diverge too far
+    // from sqrt(2). Manual capture from `manualCapture` bypasses this since
+    // user intent is explicit.
+    const ratio = meta.a4Ratio;
+    const a4Diff = Math.min(
+      Math.abs(ratio - Math.SQRT2),
+      Math.abs(ratio - 1 / Math.SQRT2),
+    );
+    if (a4Diff > A4_RATIO_TOLERANCE) {
+      stableCount.current = 0;
+      lockedRef.current = false;
+      setStatus("align");
       return;
     }
     const video = videoRef.current;
@@ -739,8 +849,11 @@ function ScanPage() {
     blurFramesRef.current = 0;
     captureRetryRef.current = 0;
     sharpnessRef.current = 0;
+    lockedRef.current = false;
+    lockBreakFramesRef.current = 0;
+    lowLightFramesRef.current = 0;
     setProgress(0);
-    drawOverlay(null, false);
+    drawOverlay(null, "search");
 
     // Short cool-down so the user perceives the capture, then resume the
     // detection loop on the same live stream.
@@ -781,6 +894,7 @@ function ScanPage() {
     hold: t("statusHold"),
     focusing: t("statusFocusing"),
     moveBack: t("statusMoveBack"),
+    lowLight: t("statusLowLight"),
     ready: t("statusReady"),
     capturing: t("statusCapturing"),
     error: t("statusError"),
