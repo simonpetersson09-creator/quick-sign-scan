@@ -70,19 +70,49 @@ function PlacePage() {
     };
   }
 
-  function placeAtClient(clientX: number, clientY: number) {
+  const [isDraggingSig, setIsDraggingSig] = useState(false);
+  const sigDrag = useRef<{ id: number | null }>({ id: null });
+
+  function clientToNorm(clientX: number, clientY: number) {
     const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    // Convert screen point → doc-normalized coords, accounting for zoom+pan.
+    if (!rect) return null;
     const cx = rect.width / 2;
     const cy = rect.height / 2;
     const localX = (clientX - rect.left - cx - pan.x) / zoom + cx;
     const localY = (clientY - rect.top - cy - pan.y) / zoom + cy;
     const x = Math.max(0.03, Math.min(0.97, localX / rect.width));
     const y = Math.max(0.03, Math.min(0.97, localY / rect.height));
-    setSigPos({ x, y });
-    scanStore.set({ signaturePosition: { x, y } });
+    return { x, y };
   }
+
+  function placeAtClient(clientX: number, clientY: number) {
+    const p = clientToNorm(clientX, clientY);
+    if (!p) return;
+    setSigPos(p);
+    scanStore.set({ signaturePosition: p });
+  }
+
+  function onSigDown(e: React.PointerEvent<HTMLDivElement>) {
+    e.stopPropagation();
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    sigDrag.current.id = e.pointerId;
+    setIsDraggingSig(true);
+  }
+  function onSigMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (sigDrag.current.id !== e.pointerId) return;
+    e.stopPropagation();
+    const p = clientToNorm(e.clientX, e.clientY);
+    if (!p) return;
+    setSigPos(p);
+  }
+  function onSigUp(e: React.PointerEvent<HTMLDivElement>) {
+    if (sigDrag.current.id !== e.pointerId) return;
+    e.stopPropagation();
+    sigDrag.current.id = null;
+    setIsDraggingSig(false);
+    scanStore.set({ signaturePosition: sigPos });
+  }
+
 
   function onDown(e: React.PointerEvent<HTMLDivElement>) {
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
