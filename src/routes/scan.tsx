@@ -31,6 +31,7 @@ type Status =
   | "lowLight"
   | "ready"
   | "capturing"
+  | "saved"
   | "error";
 
 type ErrorType =
@@ -60,9 +61,9 @@ export const Route = createFileRoute("/scan")({
 // nedan ser till att kvaliteten ändå hålls hög.
 const STABLE_DELTA = 0.03; // normalized 0..1 — tål små handvibrationer
 const DETECT_FRAMES = 2; // show the detected frame quickly once all 4 corners exist
-const HOLD_FRAMES = 12; // ~0.4s — "Håll stilla" phase
-const READY_FRAMES = 28; // ~0.95s — "Dokument hittat" lock-in
-const STABLE_FRAMES = 48; // ~1.6s total before auto-capture
+const HOLD_FRAMES = 9; // ~0.3s — "Håll stilla" phase
+const READY_FRAMES = 20; // ~0.7s — "Dokument hittat" lock-in
+const STABLE_FRAMES = 34; // ~1.1s total before auto-capture
 // Adaptive smoothing — gentle pre-lock, very stable post-lock.
 // Once the quad is "locked", the overlay barely moves frame-to-frame (acts
 // like a KLT tracker visually) and outliers are rejected outright.
@@ -876,9 +877,12 @@ function ScanPage() {
     // Visual confirmation flash
     setFlashOn(true);
     if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current);
-    flashTimerRef.current = window.setTimeout(() => setFlashOn(false), 220);
+    flashTimerRef.current = window.setTimeout(() => setFlashOn(false), 200);
 
     // Reset detection state so auto-capture starts fresh for the next page.
+    // We deliberately keep `smoothQuad.current` for one frame as a soft hint
+    // — but clear it for a clean slate so page 2 doesn't lock onto a stale
+    // quad from page 1's final frame.
     stableCount.current = 0;
     detectCount.current = 0;
     missCount.current = 0;
@@ -894,15 +898,24 @@ function ScanPage() {
     setProgress(0);
     drawOverlay(null, "search");
 
-    // Short cool-down so the user perceives the capture, then resume the
-    // detection loop on the same live stream.
+    // Smart transition: show a brief "Sida sparad ✓" confirmation so the
+    // user knows page N landed before the camera goes back to hunting. This
+    // turns the previously abrupt jump into a clear beat.
+    setStatus("saved");
+
+    // Phase 1 (0–450ms): user sees the saved confirmation, no detection.
+    // Phase 2 (450–700ms): silently pre-warm the detector so page 2 has the
+    //   same detection quality as page 1 the moment the user places it.
+    // Phase 3 (700ms+): full auto-capture loop resumes.
     window.setTimeout(() => {
       if (cancelledRef.current) return;
+      // Pre-warm: allow detect() to run but block any capture firing.
       capturedRef.current = false;
       setStatus("searching");
       loop();
-    }, 650);
+    }, 700);
   }
+
 
   function finishScanning() {
     if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current);
@@ -936,10 +949,11 @@ function ScanPage() {
     lowLight: t("statusLowLight"),
     ready: t("statusReady"),
     capturing: t("statusCapturing"),
+    saved: t("statusSaved"),
     error: t("statusError"),
   };
 
-  const statusActive = status === "ready" || status === "capturing";
+  const statusActive = status === "ready" || status === "capturing" || status === "saved";
 
   return (
     <div className="fixed inset-0 bg-black text-white flex flex-col">
