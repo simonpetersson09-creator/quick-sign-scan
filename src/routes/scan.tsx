@@ -96,6 +96,8 @@ function ScanPage() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const polyRef = useRef<SVGPolygonElement | null>(null);
+  const glowRef = useRef<SVGPolygonElement | null>(null);
+  const tracePolyRef = useRef<SVGPolygonElement | null>(null);
   const cornerRefs = useRef<SVGCircleElement[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
