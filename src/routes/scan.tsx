@@ -829,13 +829,43 @@ function ScanPage() {
     // navigate them onward — otherwise capturedRef is locked, the stream
     // is dead, and the only escape is the back button → tillbaka till start.
     try {
-      let warped = warpQuadToRect(video, vw, vh, srcQuad, outW, outH);
+      // Burst capture: grab 3 frames over ~150ms and pick the sharpest.
+      // Defeats micro-blur from hand jitter / autofocus hunt right at the
+      // moment of capture. Sharpness is scored on a small downsample for speed;
+      // only the best frame is kept at full resolution.
+      let bestFrame: HTMLCanvasElement | null = null;
+      let bestScore = -1;
+      const scoreCanvas = document.createElement("canvas");
+      const SCORE_W = 320;
+      const scoreH = Math.max(1, Math.round((vh / vw) * SCORE_W));
+      scoreCanvas.width = SCORE_W;
+      scoreCanvas.height = scoreH;
+      const scoreCtx = scoreCanvas.getContext("2d", { willReadFrequently: true })!;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        if (attempt > 0) {
+          await new Promise((r) => setTimeout(r, 50));
+        }
+        scoreCtx.drawImage(video, 0, 0, SCORE_W, scoreH);
+        const score = canvasLaplacianVariance(scoreCanvas);
+        if (score > bestScore) {
+          bestScore = score;
+          const frame = document.createElement("canvas");
+          frame.width = vw;
+          frame.height = vh;
+          frame.getContext("2d")!.drawImage(video, 0, 0, vw, vh);
+          bestFrame = frame;
+        }
+      }
+      logScanStage("burst-capture", { bestSharpness: bestScore });
+
+      let warped = warpQuadToRect(bestFrame ?? video, vw, vh, srcQuad, outW, outH);
       logScanCanvas("after-perspective-transform", warped, debugEnabled);
 
       // Paper enhancement: normalize lighting and stretch whites so the
       // document looks like a clean scanned A4 (white paper, dark ink).
       let alignmentDiagnostics: DocumentAlignmentDiagnostics | null = null;
       try {
+        removeShadows(warped);
         enhancePaper(warped);
         cleanPaperEdges(warped);
         warped = autoOrientAndDeskewDocument(warped, (diagnostics) => {
