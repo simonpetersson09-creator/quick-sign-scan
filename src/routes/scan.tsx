@@ -77,7 +77,7 @@ const BLUR_HINT_FRAMES = 75; // ~2.5s of blur before suggesting "move back"
 const BRIGHTNESS_MIN = 55;
 // A4 ratio gate at capture — reject quads whose proportions diverge sharply
 // from sqrt(2). Detection allows looser ratios; this is the final check.
-const A4_RATIO_TOLERANCE = 0.28;
+const A4_RATIO_TOLERANCE = 0.38;
 
 type StartCameraOptions = {
   restartStream?: boolean;
