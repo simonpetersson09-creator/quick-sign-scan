@@ -910,10 +910,9 @@ function ScanPage() {
     // Sortera alltid hörnen i exakt ordning TL, TR, BR, BL innan warp.
     const orderedNormQuad = orderQuad(normQuad);
 
-    // Expand the quad slightly outward from its centroid so we don't clip
-    // text right at the paper edge. Edge detection tends to land a few px
-    // inside the actual paper border; ~2.5% margin keeps content safe.
-    const EDGE_MARGIN = 0.025;
+    // Tiny safety pad outward from centroid so we don't clip text right at
+    // the paper edge — but small enough to avoid pulling background in.
+    const EDGE_MARGIN = 0.008;
     const cx = (orderedNormQuad[0].x + orderedNormQuad[1].x + orderedNormQuad[2].x + orderedNormQuad[3].x) / 4;
     const cy = (orderedNormQuad[0].y + orderedNormQuad[1].y + orderedNormQuad[2].y + orderedNormQuad[3].y) / 4;
     const expandedNormQuad = orderedNormQuad.map((p) => ({
