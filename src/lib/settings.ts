@@ -53,7 +53,10 @@ export function loadSettings(): AppSettings {
         /* ignore */
       }
     }
-    return { ...defaults, ...parsed };
+    const merged = { ...defaults, ...parsed };
+    if (LEGACY_SUBJECTS.has(merged.defaultSubject)) merged.defaultSubject = "";
+    if (LEGACY_MESSAGES.has(merged.defaultMessage)) merged.defaultMessage = "";
+    return merged;
   } catch {
     return defaults;
   }
