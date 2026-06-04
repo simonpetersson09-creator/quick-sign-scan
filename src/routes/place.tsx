@@ -4,7 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
 import { useT } from "@/lib/i18n";
-import { PenLine, Send, Minus, Plus, Maximize2, ChevronLeft, ChevronRight } from "lucide-react";
+import { PenLine, Send, Minus, Plus, Maximize2, ChevronLeft, ChevronRight, Move } from "lucide-react";
 
 export const Route = createFileRoute("/place")({
   head: () => ({ meta: [{ title: "Placera signatur" }] }),
