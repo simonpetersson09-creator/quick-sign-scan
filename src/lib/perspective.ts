@@ -1329,6 +1329,16 @@ export function detectDocumentQuad(
   const frameCx = width / 2;
   const frameCy = height / 2;
   const diag = Math.hypot(width, height);
+  // Optional previous-frame centroid for temporal stabilization — boosts
+  // candidates whose centroid is close to where the doc was last frame,
+  // so the polygon doesn't hop between competing objects.
+  let prevCx: number | null = null;
+  let prevCy: number | null = null;
+  if (options.prefer) {
+    const q = options.prefer;
+    prevCx = (q[0].x + q[1].x + q[2].x + q[3].x) / 4;
+    prevCy = (q[0].y + q[1].y + q[2].y + q[3].y) / 4;
+  }
   let best: DocumentDetection | null = null;
   let bestScore = 0;
   for (const det of outerDetections) {
@@ -1338,15 +1348,22 @@ export function detectDocumentQuad(
     const cx = (det.corners[0].x + det.corners[1].x + det.corners[2].x + det.corners[3].x) / 4;
     const cy = (det.corners[0].y + det.corners[1].y + det.corners[2].y + det.corners[3].y) / 4;
     const centerScore = clamp01(1 - (Math.hypot(cx - frameCx, cy - frameCy) / diag) * 2);
+    // Temporal bias — 0 when no previous quad, otherwise 1.0 when centroid
+    // overlaps the previous one and falls off over ~30% of the frame diag.
+    const tempScore =
+      prevCx !== null && prevCy !== null
+        ? clamp01(1 - (Math.hypot(cx - prevCx, cy - prevCy) / diag) / 0.3)
+        : 0;
     // Outer-prioritized confidence: area dominates, then A4 match, then
-    // edge support, then centeredness. Original confidence is folded in
-    // at a small weight so we still reward clean edges over noise.
+    // edge support, then centeredness, with a small temporal-stability
+    // bias to keep the frame locked on the same object across frames.
     const outerConfidence =
-      0.45 * areaScore +
+      0.4 * areaScore +
       0.2 * a4Score +
-      0.15 * det.debug.edgeScore +
+      0.13 * det.debug.edgeScore +
       0.1 * centerScore +
-      0.1 * det.confidence;
+      0.1 * det.confidence +
+      0.07 * tempScore;
     // Keep the original `confidence` field on the returned object so the
     // MIN_DOCUMENT_CONFIDENCE gate and downstream logging stay meaningful,
     // but pick the winner by outerConfidence.
