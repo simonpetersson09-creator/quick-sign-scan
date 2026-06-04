@@ -459,19 +459,13 @@ function ScanPage() {
       setDebugInfo((d) => ({ ...d, vw, vh, ready: true, lastCapture: Date.now() }));
     }
 
-    // Outset corners ~1.5% bort från centroid så att hela dokumentet kommer med
-    // — tidigare insat skar bort kanterna. Liten outset säkerställer att vi
-    // fångar hela arket utan att tappa text nära kanten.
-    const cx = (normQuad[0].x + normQuad[1].x + normQuad[2].x + normQuad[3].x) / 4;
-    const cy = (normQuad[0].y + normQuad[1].y + normQuad[2].y + normQuad[3].y) / 4;
-    const INSET = -0.015;
-    const inset = normQuad.map((p) => ({
-      x: Math.max(0, Math.min(1, p.x + (cx - p.x) * INSET)),
-      y: Math.max(0, Math.min(1, p.y + (cy - p.y) * INSET)),
-    })) as [Point, Point, Point, Point];
+    // Ingen inset eller outset — använd dom detekterade hörnen direkt så
+    // hela dokumentet kommer med utan att skära bort kanter eller fånga in
+    // bakgrund utanför pappret.
+    const inset = normQuad;
 
 
-    // Convert insatta hörn till källans pixelkoordinater
+    // Convert hörn till källans pixelkoordinater
     const srcQuad = inset.map((p) => ({
       x: p.x * vw,
       y: p.y * vh,
@@ -499,9 +493,49 @@ function ScanPage() {
         console.error("[scan] enhancePaper failed, using raw warp", e);
       }
 
-      // Ingen vit ram över resultatet — användaren vill se hela dokumentet
-      // ända ut till kanten. Tidigare målade vi en ~1.2% vit ram för att dölja
-      // bakgrundsläckage, men det dolde också riktiga dokumentkanter.
+      // Skanna kantpixlar och ersätt mörka/svarta band (ofta från bakgrund
+      // eller out-of-bounds warp) med vitt så hela arket ser vitt ut hela
+      // vägen ut till kanten. Vi går inåt rad/kolumn för rad/kolumn så
+      // länge medelluminansen är klart mörkare än papperets vita yta.
+      try {
+        const bctx = warped.getContext("2d");
+        if (bctx) {
+          const img = bctx.getImageData(0, 0, outW, outH);
+          const data = img.data;
+          const isDarkRow = (y: number) => {
+            let sum = 0;
+            for (let x = 0; x < outW; x++) {
+              const i = (y * outW + x) * 4;
+              sum += data[i] + data[i + 1] + data[i + 2];
+            }
+            return sum / (outW * 3) < 170; // < ~67% ljus
+          };
+          const isDarkCol = (x: number) => {
+            let sum = 0;
+            for (let y = 0; y < outH; y++) {
+              const i = (y * outW + x) * 4;
+              sum += data[i] + data[i + 1] + data[i + 2];
+            }
+            return sum / (outH * 3) < 170;
+          };
+          const maxBand = Math.round(outW * 0.06); // upp till 6% av sidan
+          let top = 0;
+          while (top < maxBand && isDarkRow(top)) top++;
+          let bottom = 0;
+          while (bottom < maxBand && isDarkRow(outH - 1 - bottom)) bottom++;
+          let left = 0;
+          while (left < maxBand && isDarkCol(left)) left++;
+          let right = 0;
+          while (right < maxBand && isDarkCol(outW - 1 - right)) right++;
+          bctx.fillStyle = "#ffffff";
+          if (top > 0) bctx.fillRect(0, 0, outW, top);
+          if (bottom > 0) bctx.fillRect(0, outH - bottom, outW, bottom);
+          if (left > 0) bctx.fillRect(0, 0, left, outH);
+          if (right > 0) bctx.fillRect(outW - right, 0, right, outH);
+        }
+      } catch (e) {
+        console.error("[scan] edge cleanup failed", e);
+      }
 
 
       const sourceCanvas = document.createElement("canvas");
@@ -627,9 +661,11 @@ function ScanPage() {
   }
 
   function startOverScan() {
-    streamRef.current?.getTracks().forEach((tr) => tr.stop());
     scanStore.clear();
-    navigate({ to: "/" });
+    setJustCaptured(null);
+    setPageCount(0);
+    setStatus("searching");
+    startCamera({ restartStream: true });
   }
 
   function cancelScan() {
