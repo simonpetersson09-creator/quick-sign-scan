@@ -206,34 +206,60 @@ function PlacePage() {
                 draggable={false}
               />
               <div
-                className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                className="absolute -translate-x-1/2 -translate-y-1/2"
                 style={{ left: `${sigPos.x * 100}%`, top: `${sigPos.y * 100}%` }}
               >
               <div
-                className="relative flex items-center"
-                style={{ width: `${140 / zoom}px`, gap: `${4 / zoom}px` }}
+                onPointerDown={onSigDown}
+                onPointerMove={onSigMove}
+                onPointerUp={onSigUp}
+                onPointerCancel={onSigUp}
+                role="button"
+                aria-label={t("signatureLabel")}
+                className={`relative flex items-center touch-none select-none rounded-lg transition-shadow ${
+                  isDraggingSig
+                    ? "cursor-grabbing shadow-[0_0_0_3px_hsl(var(--primary)/0.25)]"
+                    : "cursor-grab hover:shadow-[0_0_0_2px_hsl(var(--primary)/0.18)]"
+                }`}
+                style={{
+                  width: `${140 / zoom}px`,
+                  gap: `${4 / zoom}px`,
+                  padding: `${6 / zoom}px ${4 / zoom}px`,
+                }}
               >
                 <span
-                  className="absolute left-1/2 -translate-x-1/2 font-semibold tracking-wide uppercase text-primary/80 whitespace-nowrap"
+                  className="absolute left-1/2 -translate-x-1/2 font-semibold tracking-wide uppercase text-primary/80 whitespace-nowrap pointer-events-none"
                   style={{
                     fontSize: `${9 / zoom}px`,
-                    bottom: `calc(100% + ${3 / zoom}px)`,
+                    bottom: `calc(100% - ${2 / zoom}px)`,
                   }}
                 >
                   {t("signatureLabel")}
                 </span>
                 <PenLine
-                  className="text-primary shrink-0"
+                  className="text-primary shrink-0 pointer-events-none"
                   style={{ width: `${14 / zoom}px`, height: `${14 / zoom}px` }}
                 />
                 <div
-                  className="flex-1 bg-primary rounded-full"
+                  className="flex-1 bg-primary rounded-full pointer-events-none"
                   style={{ height: `${Math.max(1, 1.5 / zoom)}px` }}
                 />
+                <div
+                  className="absolute -translate-y-1/2 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[var(--shadow-soft)] pointer-events-none"
+                  style={{
+                    top: "50%",
+                    right: `${-10 / zoom}px`,
+                    width: `${18 / zoom}px`,
+                    height: `${18 / zoom}px`,
+                  }}
+                >
+                  <Move style={{ width: `${10 / zoom}px`, height: `${10 / zoom}px` }} />
+                </div>
               </div>
 
 
             </div>
+
             </div>
           </div>
         </div>
