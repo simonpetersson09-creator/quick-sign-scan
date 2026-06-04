@@ -200,6 +200,29 @@ function ScanPage() {
           return;
         }
         streamRef.current = stream;
+        // Try to lock the rear camera into continuous autofocus and request
+        // the highest resolution the device will give us. These constraints
+        // are non-standard but honored by mobile Safari/Chrome — failing here
+        // is fine, we fall back to the default focus behavior.
+        try {
+          const track = stream.getVideoTracks()[0];
+          const caps = (track.getCapabilities?.() ?? {}) as Record<string, unknown>;
+          const advanced: MediaTrackConstraintSet[] = [];
+          if (Array.isArray(caps.focusMode) && (caps.focusMode as string[]).includes("continuous")) {
+            advanced.push({ focusMode: "continuous" } as MediaTrackConstraintSet);
+          }
+          if (Array.isArray(caps.exposureMode) && (caps.exposureMode as string[]).includes("continuous")) {
+            advanced.push({ exposureMode: "continuous" } as MediaTrackConstraintSet);
+          }
+          if (Array.isArray(caps.whiteBalanceMode) && (caps.whiteBalanceMode as string[]).includes("continuous")) {
+            advanced.push({ whiteBalanceMode: "continuous" } as MediaTrackConstraintSet);
+          }
+          if (advanced.length) {
+            await track.applyConstraints({ advanced }).catch(() => {});
+          }
+        } catch {
+          // ignore — camera will still work with defaults
+        }
         const videoEl = videoRef.current;
         if (videoEl) {
           videoEl.srcObject = stream;
