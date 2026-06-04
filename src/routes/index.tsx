@@ -3,6 +3,7 @@ import { useRef } from "react";
 import { ScanLine, PenLine, Mail, CheckCircle2, Settings as SettingsIcon, ArrowDown, Globe, FileUp } from "lucide-react";
 import { useLang } from "@/lib/i18n";
 import { scanStore } from "@/lib/scanStore";
+import { pdfFileToImages } from "@/lib/pdfToImages";
 
 export const Route = createFileRoute("/")({
   head: () => ({
