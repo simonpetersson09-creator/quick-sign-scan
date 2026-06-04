@@ -1326,18 +1326,30 @@ function evaluateEdgeQuad(args: {
   const textScore = clamp01(stats.darkRatio / 0.055);
   const areaScore =
     areaRatio <= 0.7 ? clamp01((areaRatio - 0.02) / 0.18) : clamp01((0.98 - areaRatio) / 0.2);
+  const contrastScore = clamp01((stats.mean - stats.exteriorMean) / 60);
+  const purityScore = clamp01(stats.brightRatio / 0.85);
   const confidence =
-    0.38 * edgeScore + // höjd vikt — kanttäckning är viktigast mot bakgrund
-    0.18 * straightScore +
-    0.10 * a4Score +
-    0.10 * brightnessScore +
-    0.06 * textScore +
-    0.10 * perspectiveScore +
-    0.08 * areaScore;
+    0.32 * edgeScore + // kanttäckning är viktigast mot bakgrund
+    0.16 * straightScore +
+    0.08 * a4Score +
+    0.08 * brightnessScore +
+    0.05 * textScore +
+    0.08 * perspectiveScore +
+    0.07 * areaScore +
+    0.08 * contrastScore +
+    0.08 * purityScore;
 
   // Hårdare kanttäckningsgrind: utan riktiga kanter under polygonens sidor
   // är det en bakgrundsfyrhörning och inte ett dokument.
   if (edgeScore < 0.18) return null;
+
+  // Hårdare "är detta verkligen papper?"-grindar. Förhindrar att ramen sväljer
+  // tangentbord, sladdar eller andra mörka prylar bredvid A4:et: interiören
+  // måste vara ljus, övervägande vit, och tydligt ljusare än omgivningen.
+  if (stats.mean < 135) return null;
+  if (stats.brightRatio < 0.55) return null;
+  if (stats.darkRatio > 0.32) return null;
+  if (stats.mean - stats.exteriorMean < 12) return null;
 
   return {
     corners: ordered,
