@@ -669,6 +669,65 @@ export function cleanPaperEdges(canvas: HTMLCanvasElement): HTMLCanvasElement {
     sweep(0, 1, maxDepthY, (d) => ((h - 1 - d) * w + x) * 4);
   }
 
+  // Deterministic edge-artifact pass: after the normal sweep, thin black
+  // streaks can still remain just inside the page margin. Detect narrow dark
+  // column/row clusters in the outer bands and bleach only those dark pixels.
+  const dark = (i: number) => lumAt(i) < 210;
+  const edgeBandX = Math.round(w * 0.28);
+  const edgeBandY = Math.round(h * 0.2);
+  const colDark = new Uint32Array(w);
+  const rowDark = new Uint32Array(h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      if (dark(i)) {
+        colDark[x]++;
+        rowDark[y]++;
+      }
+    }
+  }
+  const bleachDarkColumn = (x0: number, x1: number) => {
+    for (let y = 0; y < h; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const i = (y * w + x) * 4;
+        if (dark(i)) whitenPx(i);
+      }
+    }
+  };
+  const bleachDarkRow = (y0: number, y1: number) => {
+    for (let y = y0; y <= y1; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        if (dark(i)) whitenPx(i);
+      }
+    }
+  };
+
+  for (let x = 0; x < w; x++) {
+    if (x >= edgeBandX && x < w - edgeBandX) continue;
+    if (colDark[x] < h * 0.018) continue;
+    let x0 = x;
+    let x1 = x;
+    while (x0 > 0 && colDark[x0 - 1] >= h * 0.006) x0--;
+    while (x1 < w - 1 && colDark[x1 + 1] >= h * 0.006) x1++;
+    if (x1 - x0 + 1 <= Math.max(8, Math.round(w * 0.018))) {
+      bleachDarkColumn(x0, x1);
+    }
+    x = x1;
+  }
+  for (let y = 0; y < h; y++) {
+    if (y >= edgeBandY && y < h - edgeBandY) continue;
+    if (rowDark[y] < w * 0.018) continue;
+    let y0 = y;
+    let y1 = y;
+    while (y0 > 0 && rowDark[y0 - 1] >= w * 0.006) y0--;
+    while (y1 < h - 1 && rowDark[y1 + 1] >= w * 0.006) y1++;
+    if (y1 - y0 + 1 <= Math.max(8, Math.round(h * 0.012))) {
+      bleachDarkRow(y0, y1);
+    }
+    y = y1;
+  }
+
   ctx.putImageData(img, 0, 0);
   return canvas;
 }
