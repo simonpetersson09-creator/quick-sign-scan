@@ -1,10 +1,23 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
 import { useT } from "@/lib/i18n";
-import { ArrowRight, Plus, RotateCcw, Trash2, ScanLine, ChevronLeft, ChevronRight } from "lucide-react";
+import { applyFilter, type FilterMode } from "@/lib/imageFilters";
+import {
+  ArrowRight,
+  Plus,
+  RotateCcw,
+  Trash2,
+  ScanLine,
+  ChevronLeft,
+  ChevronRight,
+  Palette,
+  Contrast,
+  Circle,
+  Loader2,
+} from "lucide-react";
 
 export const Route = createFileRoute("/preview")({
   head: () => ({ meta: [{ title: "Förhandsgranska" }] }),
@@ -16,6 +29,11 @@ function PreviewPage() {
   const t = useT();
   const [pages, setPages] = useState<string[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [filterMode, setFilterMode] = useState<FilterMode>("color");
+  // Cache filtered results so flipping pages stays instant: key = `${index}|${mode}`
+  const filterCache = useRef<Map<string, string>>(new Map());
+  const [displayUrl, setDisplayUrl] = useState<string | null>(null);
+  const [filtering, setFiltering] = useState(false);
 
   useEffect(() => {
     const session = scanStore.get();
@@ -30,6 +48,52 @@ function PreviewPage() {
       : session.pages.length - 1;
     setActiveIndex(idx);
   }, [navigate]);
+
+  const originalImage = pages[activeIndex];
+
+  // Recompute display image when page or filter mode changes. Cached so the
+  // user can flip between pages in the same mode without re-running Sauvola.
+  useEffect(() => {
+    let cancelled = false;
+    if (!originalImage) {
+      setDisplayUrl(null);
+      return;
+    }
+    if (filterMode === "color") {
+      setDisplayUrl(originalImage);
+      setFiltering(false);
+      return;
+    }
+    const key = `${activeIndex}|${filterMode}`;
+    const cached = filterCache.current.get(key);
+    if (cached) {
+      setDisplayUrl(cached);
+      setFiltering(false);
+      return;
+    }
+    setFiltering(true);
+    applyFilter(originalImage, filterMode)
+      .then((url) => {
+        if (cancelled) return;
+        filterCache.current.set(key, url);
+        setDisplayUrl(url);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setDisplayUrl(originalImage);
+      })
+      .finally(() => {
+        if (!cancelled) setFiltering(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [originalImage, activeIndex, filterMode]);
+
+  // Invalidate cache when the underlying pages change (delete, reorder).
+  useEffect(() => {
+    filterCache.current.clear();
+  }, [pages]);
 
   function commitPages(next: string[], nextActive: number) {
     const safeActive = Math.max(0, Math.min(next.length - 1, nextActive));
@@ -52,7 +116,6 @@ function PreviewPage() {
     commitPages(next, nextActive);
   }
 
-
   function startOver() {
     scanStore.clear();
     navigate({ to: "/" });
@@ -62,9 +125,47 @@ function PreviewPage() {
     navigate({ to: "/scan" });
   }
 
-  function accept() {
+  async function accept() {
+    // If a filter is selected, bake it into all pages before continuing so
+    // the signing step and PDF use the filtered version.
+    if (filterMode !== "color") {
+      setFiltering(true);
+      try {
+        const filtered = await Promise.all(
+          pages.map(async (p, idx) => {
+            const key = `${idx}|${filterMode}`;
+            const cached = filterCache.current.get(key);
+            if (cached) return cached;
+            const url = await applyFilter(p, filterMode);
+            filterCache.current.set(key, url);
+            return url;
+          }),
+        );
+        scanStore.set({
+          pages: filtered,
+          imageDataUrl: filtered[activeIndex] ?? null,
+        });
+      } catch {
+        // Fallback — proceed with originals on failure.
+      } finally {
+        setFiltering(false);
+      }
+    }
     navigate({ to: "/place" });
   }
+
+  const filterButtons: Array<{
+    mode: FilterMode;
+    label: string;
+    Icon: typeof Palette;
+  }> = useMemo(
+    () => [
+      { mode: "color", label: t("filterColor"), Icon: Palette },
+      { mode: "gray", label: t("filterGray"), Icon: Circle },
+      { mode: "bw", label: t("filterBw"), Icon: Contrast },
+    ],
+    [t],
+  );
 
   if (!pages.length) {
     return (
@@ -90,7 +191,7 @@ function PreviewPage() {
       </AppShell>
     );
   }
-  const image = pages[activeIndex];
+
 
   return (
     <AppShell title={t("previewTitle")} back="/scan">
@@ -120,10 +221,15 @@ function PreviewPage() {
             style={{ width: "min(78vw, 340px)", aspectRatio: "1 / 1.414" }}
           >
             <img
-              src={image}
+              src={displayUrl ?? originalImage}
               alt={t("scannedAlt")}
               className="w-full h-full object-contain bg-white shadow-sm"
             />
+            {filtering && (
+              <div className="absolute inset-3 flex items-center justify-center bg-white/60 backdrop-blur-sm rounded-xl">
+                <Loader2 className="h-6 w-6 animate-spin text-foreground/70" />
+              </div>
+            )}
             {pages.length > 1 && (
               <span className="absolute top-2 right-2 inline-flex items-center rounded-full bg-black/65 px-2.5 py-1 text-[11px] font-semibold tabular-nums text-white shadow-sm">
                 {activeIndex + 1} / {pages.length}
@@ -156,11 +262,32 @@ function PreviewPage() {
         </div>
       </div>
 
+      <div className="mt-4 flex items-center justify-center gap-2">
+        {filterButtons.map(({ mode, label, Icon }) => {
+          const active = filterMode === mode;
+          return (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setFilterMode(mode)}
+              aria-pressed={active}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-medium border transition ${
+                active
+                  ? "bg-foreground text-background border-foreground"
+                  : "bg-card text-foreground/80 border-border hover:bg-secondary"
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {label}
+            </button>
+          );
+        })}
+      </div>
 
       <div className="flex-1" />
 
       <div className="flex flex-col gap-3 pt-5">
-        <PrimaryButton onClick={accept}>
+        <PrimaryButton onClick={accept} disabled={filtering}>
           <span className="inline-flex items-center justify-center gap-2">
             {t("useDocument")} <ArrowRight className="h-5 w-5" />
           </span>
