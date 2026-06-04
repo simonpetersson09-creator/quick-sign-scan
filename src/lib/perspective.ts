@@ -512,7 +512,7 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
   //     delete connected dark components that are isolated from other ink,
   //     so normal text, dots over letters, stamps and dense form content stay.
   {
-    const darkThreshold = 165;
+    const darkThreshold = 205;
     const finalLum = new Uint8ClampedArray(n);
     for (let i = 0, j = 0; i < d.length; i += 4, j++) {
       finalLum[j] = (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) | 0;
@@ -521,7 +521,9 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
     const visited = new Uint8Array(n);
     const stack = new Int32Array(n);
     const pad = Math.max(14, Math.round(Math.max(w, h) * 0.018));
-    const maxSpeckArea = Math.max(36, Math.round(n * 0.00002));
+    const maxSpeckArea = Math.max(48, Math.round(n * 0.000035));
+    const marginX = Math.round(w * 0.24);
+    const marginY = Math.round(h * 0.18);
     const whitenComponent = (pixels: number[]) => {
       for (const j of pixels) {
         const i = j * 4;
@@ -568,10 +570,18 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
       const area = pixels.length;
       const bw = maxX - minX + 1;
       const bh = maxY - minY + 1;
-      const tallStreak = bh > h * 0.06 && bw <= w * 0.035 && bh / Math.max(1, bw) > 5;
-      const flatStreak = bw > w * 0.06 && bh <= h * 0.025 && bw / Math.max(1, bh) > 5;
-      const smallSpeck = area <= maxSpeckArea && bw <= w * 0.035 && bh <= h * 0.035;
+      const inEdgeBand = minX < marginX || maxX >= w - marginX || minY < marginY || maxY >= h - marginY;
+      const tallStreak =
+        inEdgeBand && bh > h * 0.035 && bw <= w * 0.05 && bh / Math.max(1, bw) > 2.8;
+      const flatStreak =
+        inEdgeBand && bw > w * 0.045 && bh <= h * 0.04 && bw / Math.max(1, bh) > 2.8;
+      const smallSpeck = area <= maxSpeckArea && bw <= w * 0.045 && bh <= h * 0.045;
       if (!tallStreak && !flatStreak && !smallSpeck) continue;
+
+      if (tallStreak || flatStreak) {
+        whitenComponent(pixels);
+        continue;
+      }
 
       const x0 = Math.max(0, minX - pad);
       const x1 = Math.min(w - 1, maxX + pad);
