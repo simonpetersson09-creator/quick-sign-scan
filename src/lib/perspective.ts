@@ -354,7 +354,7 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
   }
   cum = 0;
   let white = 255;
-  const whiteTarget = n * 0.6;
+  const whiteTarget = n * 0.72;
   for (let v = 0; v < 256; v++) {
     cum += hist[v];
     if (cum >= whiteTarget) {
