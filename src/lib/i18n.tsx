@@ -204,6 +204,8 @@ const en: Dict = {
   statusCapturing: "Scanning and straightening…",
   statusError: "Error",
   scanHint: "Place the A4 document on a flat, contrasting surface. The photo is taken automatically when the corners are stable.",
+  scanHintMulti: "Keep scanning more pages — tap Done when finished.",
+  doneButton: "Done",
   pageCaptured: "Page saved",
   scanAnotherPage: "Scan another page",
   finishScanning: "Done — continue",
