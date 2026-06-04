@@ -641,6 +641,12 @@ function ScanPage() {
     navigate({ to: "/preview" });
   }
 
+  function startOverScan() {
+    streamRef.current?.getTracks().forEach((tr) => tr.stop());
+    scanStore.clear();
+    navigate({ to: "/" });
+  }
+
   function cancelScan() {
     streamRef.current?.getTracks().forEach((tr) => tr.stop());
     navigate({ to: scanStore.get().pages.length > 0 ? "/preview" : "/" });
