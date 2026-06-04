@@ -1,11 +1,16 @@
 // Convert a PDF File into an array of PNG data URLs (one per page).
-import * as pdfjsLib from "pdfjs-dist";
-// @ts-ignore - worker as URL
-import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+// Dynamically imported so pdfjs-dist (which references browser-only globals
+// like DOMMatrix) never runs during SSR.
 
 export async function pdfFileToImages(file: File, scale = 2): Promise<string[]> {
+  if (typeof window === "undefined") {
+    throw new Error("pdfFileToImages can only run in the browser");
+  }
+  const pdfjsLib = await import("pdfjs-dist");
+  // @ts-ignore - worker as URL
+  const pdfWorker = (await import("pdfjs-dist/build/pdf.worker.min.mjs?url")).default;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
   const pages: string[] = [];
