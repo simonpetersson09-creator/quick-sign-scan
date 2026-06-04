@@ -679,12 +679,31 @@ export function cleanPaperEdges(canvas: HTMLCanvasElement): HTMLCanvasElement {
   const edgeBandY = Math.round(h * 0.2);
   const colDark = new Uint32Array(w);
   const rowDark = new Uint32Array(h);
+  const colRun = new Uint32Array(w);
+  const rowRun = new Uint32Array(h);
   for (let y = 0; y < h; y++) {
+    let runX = 0;
     for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 4;
       if (dark(i)) {
         colDark[x]++;
         rowDark[y]++;
+        runX++;
+        if (runX > rowRun[y]) rowRun[y] = runX;
+      } else {
+        runX = 0;
+      }
+    }
+  }
+  for (let x = 0; x < w; x++) {
+    let runY = 0;
+    for (let y = 0; y < h; y++) {
+      const i = (y * w + x) * 4;
+      if (dark(i)) {
+        runY++;
+        if (runY > colRun[x]) colRun[x] = runY;
+      } else {
+        runY = 0;
       }
     }
   }
@@ -722,6 +741,7 @@ export function cleanPaperEdges(canvas: HTMLCanvasElement): HTMLCanvasElement {
   for (let x = 0; x < w; x++) {
     if (x >= edgeBandX && x < w - edgeBandX) continue;
     if (colDark[x] < h * 0.018) continue;
+    if (colRun[x] < h * 0.014) continue;
     let x0 = x;
     let x1 = x;
     while (x0 > 0 && colDark[x0 - 1] >= h * 0.006) x0--;
@@ -734,6 +754,7 @@ export function cleanPaperEdges(canvas: HTMLCanvasElement): HTMLCanvasElement {
   for (let y = 0; y < h; y++) {
     if (y >= edgeBandY && y < h - edgeBandY) continue;
     if (rowDark[y] < w * 0.018) continue;
+    if (rowRun[y] < w * 0.014) continue;
     let y0 = y;
     let y1 = y;
     while (y0 > 0 && rowDark[y0 - 1] >= w * 0.006) y0--;
