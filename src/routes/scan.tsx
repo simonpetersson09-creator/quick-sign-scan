@@ -462,14 +462,11 @@ function ScanPage() {
       setDebugInfo((d) => ({ ...d, vw, vh, ready: true, lastCapture: Date.now() }));
     }
 
-    // Ingen inset eller outset — använd dom detekterade hörnen direkt så
-    // hela dokumentet kommer med utan att skära bort kanter eller fånga in
-    // bakgrund utanför pappret.
-    const inset = normQuad;
+    // Sortera alltid hörnen i exakt ordning TL, TR, BR, BL innan warp.
+    const orderedNormQuad = orderQuad(normQuad);
 
-
-    // Convert hörn till källans pixelkoordinater
-    const srcQuad = inset.map((p) => ({
+    // Convert hörn till källans pixelkoordinater i samma ordning.
+    const srcQuad = orderedNormQuad.map((p) => ({
       x: p.x * vw,
       y: p.y * vh,
     })) as [Point, Point, Point, Point];
