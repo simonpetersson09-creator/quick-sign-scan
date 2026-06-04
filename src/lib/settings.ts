@@ -20,10 +20,18 @@ const KEY = "docscan.settings.v1";
 
 const defaults: AppSettings = {
   defaultRecipient: "",
-  defaultSubject: "Dokument",
-  defaultMessage: "Hej,\n\nBifogar dokumentet.\n\nVänliga hälsningar",
+  defaultSubject: "",
+  defaultMessage: "",
   recipients: [],
 };
+
+// Legacy hard-coded Swedish defaults that previous versions persisted into
+// localStorage. Treat them as "unset" so the current i18n fallback wins and
+// the form shows text in the active language.
+const LEGACY_SUBJECTS = new Set(["Dokument"]);
+const LEGACY_MESSAGES = new Set([
+  "Hej,\n\nBifogar dokumentet.\n\nVänliga hälsningar",
+]);
 
 export function loadSettings(): AppSettings {
   if (typeof window === "undefined") return defaults;
