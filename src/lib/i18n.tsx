@@ -35,6 +35,8 @@ const sv: Dict = {
   statusCapturing: "Skannar och rätar upp…",
   statusError: "Fel",
   scanHint: "Lägg A4-dokumentet på en jämn, kontrasterande yta. Bilden tas automatiskt när hörnen är stabila.",
+  scanHintMulti: "Fortsätt skanna fler sidor — tryck Klar när du är färdig.",
+  doneButton: "Klar",
   pageCaptured: "Sida sparad",
   scanAnotherPage: "Skanna en sida till",
   finishScanning: "Klar — fortsätt",
