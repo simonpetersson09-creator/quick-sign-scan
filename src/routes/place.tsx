@@ -180,29 +180,28 @@ function PlacePage() {
                 style={{ left: `${sigPos.x * 100}%`, top: `${sigPos.y * 100}%` }}
               >
               <div
-                className="flex flex-col items-stretch justify-center"
-                style={{
-                  width: `${140 / zoom}px`,
-                  height: `${40 / zoom}px`,
-                }}
+                className="relative flex items-center"
+                style={{ width: `${140 / zoom}px`, gap: `${4 / zoom}px` }}
               >
                 <span
-                  className="font-semibold tracking-wide uppercase text-primary/80 text-center"
-                  style={{ fontSize: `${9 / zoom}px`, marginBottom: `${4 / zoom}px` }}
+                  className="absolute left-1/2 -translate-x-1/2 font-semibold tracking-wide uppercase text-primary/80 whitespace-nowrap"
+                  style={{
+                    fontSize: `${9 / zoom}px`,
+                    bottom: `calc(100% + ${3 / zoom}px)`,
+                  }}
                 >
                   {t("signatureLabel")}
                 </span>
-                <div className="flex items-center" style={{ gap: `${4 / zoom}px` }}>
-                  <PenLine
-                    className="text-primary shrink-0"
-                    style={{ width: `${14 / zoom}px`, height: `${14 / zoom}px` }}
-                  />
-                  <div
-                    className="flex-1 bg-primary"
-                    style={{ height: `${Math.max(1, 1.5 / zoom)}px` }}
-                  />
-                </div>
+                <PenLine
+                  className="text-primary shrink-0"
+                  style={{ width: `${14 / zoom}px`, height: `${14 / zoom}px` }}
+                />
+                <div
+                  className="flex-1 bg-primary rounded-full"
+                  style={{ height: `${Math.max(1, 1.5 / zoom)}px` }}
+                />
               </div>
+
 
             </div>
             </div>
