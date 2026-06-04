@@ -100,7 +100,11 @@ function ScanPage() {
   const [errorType, setErrorType] = useState<ErrorType | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [pageCount, setPageCount] = useState(() => scanStore.get().pages.length);
-  const [justCaptured, setJustCaptured] = useState<string | null>(null);
+  const [lastThumbnail, setLastThumbnail] = useState<string | null>(
+    () => scanStore.get().imageDataUrl ?? null,
+  );
+  const [flashOn, setFlashOn] = useState(false);
+  const flashTimerRef = useRef<number | null>(null);
   const [debugInfo, setDebugInfo] = useState<{
     vw: number;
     vh: number;
