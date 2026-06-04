@@ -342,6 +342,8 @@ const en: Dict = {
   err_unauthorized: "The email service is not configured correctly. Contact the administrator.",
   err_unknown: 'Could not send the email. Try again, or tap "Download PDF" and send it manually.',
   defaultSubjectFallback: "Scanned document",
+  defaultSubjectInitial: "Document",
+  defaultMessageInitial: "Hello,\n\nPlease find the document attached.\n\nKind regards",
   largePdfWarning: "Warning: the PDF is {mb} MB. Large attachments may be blocked by the recipient's server – if sending fails, use \"Download PDF\" and send manually.",
 
   // settings
