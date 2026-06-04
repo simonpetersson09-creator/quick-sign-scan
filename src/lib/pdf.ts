@@ -24,6 +24,8 @@ export async function buildPdf(
   pages.forEach((imageDataUrl, idx) => {
     if (idx > 0) pdf.addPage("a4", "portrait");
     const imgFormat = detectImageFormat(imageDataUrl);
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(0, 0, pageW, pageH, "F");
     // eslint-disable-next-line no-console
     console.log("[scan:pdf-generation]", {
       pageIndex: idx,
