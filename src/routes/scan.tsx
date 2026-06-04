@@ -106,6 +106,10 @@ function ScanPage() {
   const sharpnessRef = useRef(0);
   const blurFramesRef = useRef(0);
   const captureRetryRef = useRef(0);
+  const lockedRef = useRef(false);
+  const lockBreakFramesRef = useRef(0);
+  const brightnessRef = useRef(255);
+  const lowLightFramesRef = useRef(0);
 
   const [status, setStatus] = useState<Status>("starting");
   const [progress, setProgress] = useState(0); // 0..1 — visual lock-in progress
