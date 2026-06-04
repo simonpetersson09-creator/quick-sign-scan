@@ -853,6 +853,59 @@ function ScanPage() {
                 className="w-full h-full object-contain bg-white"
               />
             </div>
+            {debugEnabled && scanStore.get().sourceDataUrl && scanStore.get().detection && (
+              <div className="w-full flex flex-col items-center gap-1">
+                <p className="text-[11px] uppercase tracking-wide text-white/60 font-semibold">
+                  Debug: källram + hörn
+                </p>
+                <div
+                  className="relative rounded-sm overflow-hidden border border-yellow-400/60 bg-black"
+                  style={{ width: "min(70vw, 280px)" }}
+                >
+                  <img
+                    src={scanStore.get().sourceDataUrl!}
+                    alt="source frame"
+                    className="block w-full h-auto"
+                  />
+                  <svg
+                    className="absolute inset-0 w-full h-full"
+                    viewBox="0 0 1 1"
+                    preserveAspectRatio="none"
+                  >
+                    <polygon
+                      points={scanStore
+                        .get()
+                        .detection!.corners.map((p) => `${p.x},${p.y}`)
+                        .join(" ")}
+                      fill="rgba(250,204,21,0.18)"
+                      stroke="rgb(250,204,21)"
+                      strokeWidth={0.006}
+                      vectorEffect="non-scaling-stroke"
+                    />
+                    {scanStore.get().detection!.corners.map((p, i) => (
+                      <g key={i}>
+                        <circle cx={p.x} cy={p.y} r={0.012} fill="rgb(250,204,21)" />
+                        <text
+                          x={p.x}
+                          y={p.y}
+                          fontSize={0.035}
+                          fill="black"
+                          textAnchor="middle"
+                          dominantBaseline="middle"
+                          fontWeight="bold"
+                        >
+                          {["TL", "TR", "BR", "BL"][i]}
+                        </text>
+                      </g>
+                    ))}
+                  </svg>
+                </div>
+                <p className="text-[10px] text-white/50 font-mono">
+                  conf: {scanStore.get().detection!.confidence.toFixed(2)} · a4:{" "}
+                  {scanStore.get().detection!.a4Ratio.toFixed(2)}
+                </p>
+              </div>
+            )}
             <div className="w-full flex flex-col gap-3 pt-2 pb-4">
               <button
                 onClick={scanAnotherPage}
