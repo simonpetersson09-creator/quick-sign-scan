@@ -732,8 +732,9 @@ function ScanPage() {
       sourceCanvas.height = vh;
       sourceCanvas.getContext("2d")!.drawImage(video, 0, 0, vw, vh);
 
-      const dataUrl = warped.toDataURL("image/jpeg", 0.92);
-      const sourceDataUrl = sourceCanvas.toDataURL("image/jpeg", 0.86);
+      const dataUrl = warped.toDataURL("image/jpeg", 0.95);
+      const sourceDataUrl = sourceCanvas.toDataURL("image/jpeg", 0.9);
+
       logScanCanvas("final-image-to-pdf", warped, debugEnabled);
       logScanStage("pdf-input", {
         sameDataUrlUsedForPreviewAndPdf: true,
