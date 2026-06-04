@@ -588,7 +588,13 @@ function ScanPage() {
     if (!isBrightEnough) lowLightFramesRef.current++;
     else lowLightFramesRef.current = Math.max(0, lowLightFramesRef.current - 2);
 
-    const detection = detectDocumentQuad(data, dw, dh);
+    // Bias detection toward the previously-locked quad (in pixel coords) so
+    // the frame doesn't hop between competing objects between rendered frames.
+    const prevSmooth = smoothQuad.current;
+    const preferQuad = prevSmooth
+      ? (prevSmooth.map((p) => ({ x: p.x * dw, y: p.y * dh })) as [Point, Point, Point, Point])
+      : undefined;
+    const detection = detectDocumentQuad(data, dw, dh, { prefer: preferQuad });
     const corners = detection?.corners ?? null;
 
     if (!corners) {
