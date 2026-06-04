@@ -459,15 +459,15 @@ function ScanPage() {
       setDebugInfo((d) => ({ ...d, vw, vh, ready: true, lastCapture: Date.now() }));
     }
 
-    // Inset corners ~3.2% toward centroid as a safety margin so background,
-    // bordskanter eller skuggor utanför pappret aldrig läcker in i resultatet.
-    // Större inset = mer kantmarginal bortskuren, men säkrare enhetlig vit yta.
+    // Outset corners ~1.5% bort från centroid så att hela dokumentet kommer med
+    // — tidigare insat skar bort kanterna. Liten outset säkerställer att vi
+    // fångar hela arket utan att tappa text nära kanten.
     const cx = (normQuad[0].x + normQuad[1].x + normQuad[2].x + normQuad[3].x) / 4;
     const cy = (normQuad[0].y + normQuad[1].y + normQuad[2].y + normQuad[3].y) / 4;
-    const INSET = 0.032;
+    const INSET = -0.015;
     const inset = normQuad.map((p) => ({
-      x: p.x + (cx - p.x) * INSET,
-      y: p.y + (cy - p.y) * INSET,
+      x: Math.max(0, Math.min(1, p.x + (cx - p.x) * INSET)),
+      y: Math.max(0, Math.min(1, p.y + (cy - p.y) * INSET)),
     })) as [Point, Point, Point, Point];
 
 
@@ -499,24 +499,9 @@ function ScanPage() {
         console.error("[scan] enhancePaper failed, using raw warp", e);
       }
 
-      // Paint a thin white border over the warped result. Even with the
-      // inset above, slight perspective/detection error can leave a sliver
-      // of the table/background along the edges. A guaranteed white frame
-      // makes the output look like a uniform scanned sheet.
-      try {
-        const bctx = warped.getContext("2d");
-        if (bctx) {
-          const bw = Math.max(6, Math.round(outW * 0.012));
-          const bh = Math.max(6, Math.round(outH * 0.012));
-          bctx.fillStyle = "#ffffff";
-          bctx.fillRect(0, 0, outW, bh);
-          bctx.fillRect(0, outH - bh, outW, bh);
-          bctx.fillRect(0, 0, bw, outH);
-          bctx.fillRect(outW - bw, 0, bw, outH);
-        }
-      } catch (e) {
-        console.error("[scan] border paint failed", e);
-      }
+      // Ingen vit ram över resultatet — användaren vill se hela dokumentet
+      // ända ut till kanten. Tidigare målade vi en ~1.2% vit ram för att dölja
+      // bakgrundsläckage, men det dolde också riktiga dokumentkanter.
 
 
       const sourceCanvas = document.createElement("canvas");
@@ -848,7 +833,7 @@ function ScanPage() {
               </p>
             </div>
             <div
-              className="rounded-xl overflow-hidden border border-white/15 bg-white shadow-xl"
+              className="rounded-sm overflow-hidden border border-white/15 bg-white shadow-xl"
               style={{ width: "min(60vw, 240px)", aspectRatio: "1 / 1.414" }}
             >
               <img
