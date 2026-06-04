@@ -759,7 +759,8 @@ export interface DocumentDetection {
 }
 
 const A4_RATIO = Math.SQRT2;
-export const MIN_DOCUMENT_CONFIDENCE = 0.16;
+export const MIN_DOCUMENT_CONFIDENCE = 0.1;
+
 
 // Detect the document from its contour: isolate candidate paper, extract the
 // outer boundary, reduce the convex contour to four real corners, then reject
