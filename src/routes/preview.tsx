@@ -154,6 +154,19 @@ function PreviewPage() {
     navigate({ to: "/place" });
   }
 
+  const filterButtons: Array<{
+    mode: FilterMode;
+    label: string;
+    Icon: typeof Palette;
+  }> = useMemo(
+    () => [
+      { mode: "color", label: t("filterColor"), Icon: Palette },
+      { mode: "gray", label: t("filterGray"), Icon: Circle },
+      { mode: "bw", label: t("filterBw"), Icon: Contrast },
+    ],
+    [t],
+  );
+
   if (!pages.length) {
     return (
       <AppShell title={t("previewTitle")} back="/scan">
@@ -179,18 +192,6 @@ function PreviewPage() {
     );
   }
 
-  const filterButtons: Array<{
-    mode: FilterMode;
-    label: string;
-    Icon: typeof Palette;
-  }> = useMemo(
-    () => [
-      { mode: "color", label: t("filterColor"), Icon: Palette },
-      { mode: "gray", label: t("filterGray"), Icon: Circle },
-      { mode: "bw", label: t("filterBw"), Icon: Contrast },
-    ],
-    [t],
-  );
 
   return (
     <AppShell title={t("previewTitle")} back="/scan">
