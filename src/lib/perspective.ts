@@ -1278,15 +1278,26 @@ function evaluateEdgeQuad(args: {
   hull: Point[];
   lum: Uint8ClampedArray;
   edges: Uint8Array;
+  gradMag: Float32Array;
   width: number;
   height: number;
   frameArea: number;
   edgeThreshold: number;
   candidateCount: number;
 }): DocumentDetection | null {
-  const { hull, lum, edges, width, height, frameArea, edgeThreshold, candidateCount } = args;
+  const { hull, lum, edges, gradMag, width, height, frameArea, edgeThreshold, candidateCount } =
+    args;
   if (!isConvexQuad(args.quad)) return null;
-  const ordered = orderQuad(args.quad);
+  let ordered = orderQuad(args.quad);
+
+  // EDGE SNAP — pull each side of the polygon onto the strongest local
+  // gradient. This is the single most important step for the "frame floats
+  // a few cm outside the document" problem: contour extraction lives on a
+  // dilated/eroded mask that is inherently a couple of pixels off the true
+  // paper boundary, but the gradient peak sits on the real edge.
+  const snap = refineQuadToEdges(ordered, gradMag, edgeThreshold, width, height);
+  if (snap) ordered = snap.quad;
+
   const minX = Math.min(...ordered.map((p) => p.x));
   const minY = Math.min(...ordered.map((p) => p.y));
   const maxX = Math.max(...ordered.map((p) => p.x));
@@ -1326,12 +1337,9 @@ function evaluateEdgeQuad(args: {
   const bboxArea = Math.max(1, (maxX - minX + 1) * (maxY - minY + 1));
   const polygonFill = bboxArea / Math.max(1, area);
 
-  // Tillåt kraftig perspektivvinkel, men kräv att fyrhörningen verkligen
-  // ligger på dokumentets kanter — annars riskerar vi att ramen sväljer
-  // bakgrund när telefonen vinklas åt sidan.
   if (ratioError > 1.1) return null;
   if (perspectiveError > 4.5) return null;
-  if (sideDeviation > 0.22) return null; // strikt: polygonen måste följa konturen
+  if (sideDeviation > 0.22) return null;
   if (polygonFill < 0.45 || polygonFill > 2.4) return null;
 
   const stats = polygonImageStats(ordered, lum, width, height);
@@ -1345,28 +1353,31 @@ function evaluateEdgeQuad(args: {
     areaRatio <= 0.7 ? clamp01((areaRatio - 0.02) / 0.18) : clamp01((0.98 - areaRatio) / 0.2);
   const contrastScore = clamp01((stats.mean - stats.exteriorMean) / 60);
   const purityScore = clamp01(stats.brightRatio / 0.85);
+  const edgeTightness = snap ? snap.tightness : 0;
+  const meanEdgeOffset = snap ? snap.meanOffset : 999;
+  const tightScore = edgeTightness;
+
   const confidence =
-    0.32 * edgeScore + // kanttäckning är viktigast mot bakgrund
-    0.16 * straightScore +
-    0.08 * a4Score +
-    0.08 * brightnessScore +
-    0.05 * textScore +
-    0.08 * perspectiveScore +
-    0.07 * areaScore +
-    0.08 * contrastScore +
-    0.08 * purityScore;
+    0.22 * edgeScore +
+    0.12 * straightScore +
+    0.06 * a4Score +
+    0.06 * brightnessScore +
+    0.04 * textScore +
+    0.06 * perspectiveScore +
+    0.05 * areaScore +
+    0.07 * contrastScore +
+    0.07 * purityScore +
+    // Heaviest single weight: did the polygon actually snap to real edges?
+    0.25 * tightScore;
 
-  // Hårdare kanttäckningsgrind: utan riktiga kanter under polygonens sidor
-  // är det en bakgrundsfyrhörning och inte ett dokument.
   if (edgeScore < 0.18) return null;
-
-  // Hårdare "är detta verkligen papper?"-grindar. Förhindrar att ramen sväljer
-  // tangentbord, sladdar eller andra mörka prylar bredvid A4:et: interiören
-  // måste vara ljus, övervägande vit, och tydligt ljusare än omgivningen.
   if (stats.mean < 135) return null;
   if (stats.brightRatio < 0.55) return null;
   if (stats.darkRatio > 0.32) return null;
   if (stats.mean - stats.exteriorMean < 12) return null;
+  // At least half the sampled side-points must snap onto a real gradient —
+  // otherwise the polygon is sitting on noise, not on the document edge.
+  if (edgeTightness < 0.45) return null;
 
   return {
     corners: ordered,
@@ -1384,7 +1395,227 @@ function evaluateEdgeQuad(args: {
       sideDeviation,
       perspectiveError,
       polygonFill,
+      edgeTightness,
+      meanEdgeOffset,
     },
+  };
+}
+
+// Sobel gradient magnitude (3x3). Returns one float per pixel, with border
+// pixels left at 0. Used by the snap refiner so each side of the candidate
+// polygon can be pulled onto the strongest perpendicular edge.
+function sobelMagnitude(
+  lum: Uint8ClampedArray,
+  width: number,
+  height: number,
+): Float32Array {
+  const out = new Float32Array(width * height);
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const i = y * width + x;
+      const gx =
+        -lum[i - width - 1] -
+        2 * lum[i - 1] -
+        lum[i + width - 1] +
+        lum[i - width + 1] +
+        2 * lum[i + 1] +
+        lum[i + width + 1];
+      const gy =
+        -lum[i - width - 1] -
+        2 * lum[i - width] -
+        lum[i - width + 1] +
+        lum[i + width - 1] +
+        2 * lum[i + width] +
+        lum[i + width + 1];
+      out[i] = Math.hypot(gx, gy);
+    }
+  }
+  return out;
+}
+
+// Snap each polygon side onto the strongest perpendicular gradient peak in
+// a small search window. Returns the refined quad, the fraction of sampled
+// side-points that found a strong gradient (tightness), and the mean
+// remaining perpendicular offset to the gradient peak (in source pixels).
+function refineQuadToEdges(
+  quad: [Point, Point, Point, Point],
+  gradMag: Float32Array,
+  edgeThreshold: number,
+  width: number,
+  height: number,
+): { quad: [Point, Point, Point, Point]; tightness: number; meanOffset: number } | null {
+  const minDim = Math.min(width, height);
+  // Search ±~4% of the short side perpendicular to each side. Big enough to
+  // cover the dilation slack from contour extraction; small enough not to
+  // jump onto neighbouring keyboards or table-edge lines.
+  const searchRadius = Math.max(6, Math.round(minDim * 0.04));
+  const SAMPLES_PER_SIDE = 28;
+  const minPeak = edgeThreshold * 0.65;
+
+  // For each side, collect [t in 0..1, perpendicular offset, peak] hits.
+  type Sample = { t: number; offset: number; peak: number };
+  const allOffsets: number[] = [];
+  let totalSamples = 0;
+  let totalHits = 0;
+  // Refined sides expressed as new endpoints. Initially identical to input.
+  const refined: [Point, Point, Point, Point] = [
+    { ...quad[0] },
+    { ...quad[1] },
+    { ...quad[2] },
+    { ...quad[3] },
+  ];
+
+  // Process each side independently, then rebuild corners as intersections
+  // of adjacent refined sides at the end.
+  const refinedLines: Array<{ a: Point; b: Point } | null> = [null, null, null, null];
+
+  for (let side = 0; side < 4; side++) {
+    const a = quad[side];
+    const b = quad[(side + 1) % 4];
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const tx = dx / len;
+    const ty = dy / len;
+    // Perpendicular pointing OUTWARD from the quad centroid. We bias outward
+    // because the contour-extracted polygon tends to be slightly inside, but
+    // we still search both directions.
+    const cx = (quad[0].x + quad[1].x + quad[2].x + quad[3].x) / 4;
+    const cy = (quad[0].y + quad[1].y + quad[2].y + quad[3].y) / 4;
+    const midX = (a.x + b.x) / 2;
+    const midY = (a.y + b.y) / 2;
+    let nx = -ty;
+    let ny = tx;
+    if ((midX - cx) * nx + (midY - cy) * ny < 0) {
+      nx = -nx;
+      ny = -ny;
+    }
+
+    const samples: Sample[] = [];
+    for (let s = 1; s < SAMPLES_PER_SIDE - 1; s++) {
+      const t = s / (SAMPLES_PER_SIDE - 1);
+      const px = a.x + dx * t;
+      const py = a.y + dy * t;
+      totalSamples++;
+
+      let bestOffset = 0;
+      let bestPeak = 0;
+      for (let r = -searchRadius; r <= searchRadius; r++) {
+        const sx = Math.round(px + nx * r);
+        const sy = Math.round(py + ny * r);
+        if (sx < 1 || sy < 1 || sx >= width - 1 || sy >= height - 1) continue;
+        const m = gradMag[sy * width + sx];
+        if (m > bestPeak) {
+          bestPeak = m;
+          bestOffset = r;
+        }
+      }
+      if (bestPeak >= minPeak) {
+        samples.push({ t, offset: bestOffset, peak: bestPeak });
+        allOffsets.push(Math.abs(bestOffset));
+        totalHits++;
+      }
+    }
+
+    // Need enough samples to fit a stable line. Otherwise keep original side.
+    if (samples.length >= 8) {
+      // Weighted least-squares fit of offset vs t (so the snapped side is
+      // still a straight line — robust against a stray hit on a keyboard
+      // key that would otherwise yank one end of the side outward).
+      let sw = 0;
+      let swt = 0;
+      let swo = 0;
+      let swtt = 0;
+      let swto = 0;
+      for (const s of samples) {
+        const w = s.peak;
+        sw += w;
+        swt += w * s.t;
+        swo += w * s.offset;
+        swtt += w * s.t * s.t;
+        swto += w * s.t * s.offset;
+      }
+      const denom = sw * swtt - swt * swt;
+      let slope = 0;
+      let intercept = swo / Math.max(1, sw);
+      if (Math.abs(denom) > 1e-6) {
+        slope = (sw * swto - swt * swo) / denom;
+        intercept = (swo - slope * swt) / sw;
+      }
+      // Drop outliers (>1.6× MAD) and refit once for stability.
+      const residuals = samples
+        .map((s) => Math.abs(s.offset - (slope * s.t + intercept)))
+        .sort((x, y) => x - y);
+      const mad = residuals[Math.floor(residuals.length / 2)] || 1;
+      const kept = samples.filter(
+        (s) => Math.abs(s.offset - (slope * s.t + intercept)) <= Math.max(2, mad * 1.6),
+      );
+      if (kept.length >= 8) {
+        sw = 0;
+        swt = 0;
+        swo = 0;
+        swtt = 0;
+        swto = 0;
+        for (const s of kept) {
+          const w = s.peak;
+          sw += w;
+          swt += w * s.t;
+          swo += w * s.offset;
+          swtt += w * s.t * s.t;
+          swto += w * s.t * s.offset;
+        }
+        const d2 = sw * swtt - swt * swt;
+        if (Math.abs(d2) > 1e-6) {
+          slope = (sw * swto - swt * swo) / d2;
+          intercept = (swo - slope * swt) / sw;
+        }
+      }
+      // Endpoints t=0 and t=1 along the refined line.
+      const off0 = intercept;
+      const off1 = slope + intercept;
+      refinedLines[side] = {
+        a: { x: a.x + nx * off0, y: a.y + ny * off0 },
+        b: { x: b.x + nx * off1, y: b.y + ny * off1 },
+      };
+    } else {
+      refinedLines[side] = { a: { ...a }, b: { ...b } };
+    }
+  }
+
+  // Rebuild the 4 corners as intersections of adjacent refined sides.
+  for (let i = 0; i < 4; i++) {
+    const prev = refinedLines[(i + 3) % 4]!;
+    const next = refinedLines[i]!;
+    const p = lineIntersection(prev.a, prev.b, next.a, next.b);
+    if (p) refined[i] = clampPoint(p, width, height);
+  }
+
+  const finalQuad = orderQuad(refined);
+  const tightness = totalSamples > 0 ? totalHits / totalSamples : 0;
+  const meanOffset =
+    allOffsets.length > 0 ? allOffsets.reduce((a, b) => a + b, 0) / allOffsets.length : 999;
+  return { quad: finalQuad, tightness, meanOffset };
+}
+
+function lineIntersection(p1: Point, p2: Point, p3: Point, p4: Point): Point | null {
+  const x1 = p1.x,
+    y1 = p1.y,
+    x2 = p2.x,
+    y2 = p2.y,
+    x3 = p3.x,
+    y3 = p3.y,
+    x4 = p4.x,
+    y4 = p4.y;
+  const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+  if (Math.abs(denom) < 1e-6) return null;
+  const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+  return { x: x1 + t * (x2 - x1), y: y1 + t * (y2 - y1) };
+}
+
+function clampPoint(p: Point, width: number, height: number): Point {
+  return {
+    x: Math.max(0, Math.min(width - 1, p.x)),
+    y: Math.max(0, Math.min(height - 1, p.y)),
   };
 }
 
