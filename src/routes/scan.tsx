@@ -295,6 +295,10 @@ function ScanPage() {
           if (advanced.length) {
             await track.applyConstraints({ advanced }).catch(() => {});
           }
+          trackCapsRef.current = caps;
+          setTorchAvailable(Boolean((caps as { torch?: boolean }).torch));
+          setTorchOn(false);
+          exposureLockedRef.current = false;
         } catch {
           // ignore — camera will still work with defaults
         }
