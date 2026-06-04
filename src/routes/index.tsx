@@ -1,9 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useRef } from "react";
-import { ScanLine, PenLine, Mail, CheckCircle2, Settings as SettingsIcon, ArrowDown, Globe, FileUp } from "lucide-react";
+import { useRef, useState } from "react";
+import { ScanLine, PenLine, Mail, CheckCircle2, Settings as SettingsIcon, ArrowDown, Globe, FileUp, Loader2 } from "lucide-react";
 import { useLang } from "@/lib/i18n";
 import { scanStore } from "@/lib/scanStore";
 import { pdfFileToImages } from "@/lib/pdfToImages";
+
+const MAX_PDF_PAGES = 20;
 
 export const Route = createFileRoute("/")({
   head: () => ({
