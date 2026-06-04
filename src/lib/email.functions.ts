@@ -177,17 +177,29 @@ export const sendScanEmail = createServerFn({ method: "POST" })
     try {
       req = getRequest();
       const origin = req?.headers.get("origin") ?? req?.headers.get("referer") ?? "";
-      const host = req?.headers.get("host") ?? "";
+      const hostHeader =
+        req?.headers.get("x-forwarded-host") ?? req?.headers.get("host") ?? "";
+      let requestHost = "";
+      try {
+        if (req?.url) requestHost = new URL(req.url).host;
+      } catch {
+        requestHost = "";
+      }
       let ok = false;
-      if (origin && host) {
+      if (origin) {
         try {
-          ok = new URL(origin).host === host;
+          const originHost = new URL(origin).host;
+          ok =
+            (!!hostHeader && originHost === hostHeader) ||
+            (!!requestHost && originHost === requestHost);
         } catch {
           ok = false;
         }
       }
       if (!ok) {
-        console.error(`[sendScanEmail] ${ts} ${requestId} status=forbidden reason=cross_origin`);
+        console.error(
+          `[sendScanEmail] ${ts} ${requestId} status=forbidden reason=cross_origin origin=${origin} host=${hostHeader} reqHost=${requestHost}`,
+        );
         return fail("unauthorized");
       }
     } catch (e) {
@@ -196,6 +208,7 @@ export const sendScanEmail = createServerFn({ method: "POST" })
       );
       return fail("unauthorized");
     }
+
 
     const ip = extractIp(req);
     const ipHash = await hashIp(ip);
