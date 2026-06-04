@@ -110,3 +110,8 @@
     padding-right: max(env(safe-area-inset-right), 1rem);
   }
 }
+
+@keyframes scan-trace {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: -100; }
+}
