@@ -641,6 +641,12 @@ function ScanPage() {
     navigate({ to: "/preview" });
   }
 
+  function startOverScan() {
+    streamRef.current?.getTracks().forEach((tr) => tr.stop());
+    scanStore.clear();
+    navigate({ to: "/" });
+  }
+
   function cancelScan() {
     streamRef.current?.getTracks().forEach((tr) => tr.stop());
     navigate({ to: scanStore.get().pages.length > 0 ? "/preview" : "/" });
@@ -864,6 +870,12 @@ function ScanPage() {
                 className="w-full rounded-xl bg-white text-black py-3.5 px-4 font-semibold text-[15px] tracking-tight flex items-center justify-center gap-2 active:scale-[0.98] transition"
               >
                 {t("finishScanning")} <ArrowRight className="h-5 w-5" />
+              </button>
+              <button
+                onClick={startOverScan}
+                className="w-full rounded-xl bg-transparent border border-white/15 text-white/70 py-3 px-4 font-medium text-[14px] tracking-tight active:scale-[0.98] transition"
+              >
+                {t("startOver")}
               </button>
             </div>
           </div>
