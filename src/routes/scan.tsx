@@ -515,13 +515,23 @@ function ScanPage() {
 
     // Measure sharpness within the detected quad. If the doc is too blurry
     // we must not auto-capture — wait for continuous autofocus to settle.
-    let xs = smoothed.map((p) => p.x * dw);
-    let ys = smoothed.map((p) => p.y * dh);
+    // We shrink the bbox toward the centroid by 18% so the Laplacian sees
+    // mostly paper interior (text strokes), not the background bleeding
+    // in from the corners of an angled A4 — which used to make the score
+    // jumpy and inflate the "moveBack" hint.
+    const xs = smoothed.map((p) => p.x * dw);
+    const ys = smoothed.map((p) => p.y * dh);
+    const minSx = Math.min(...xs);
+    const maxSx = Math.max(...xs);
+    const minSy = Math.min(...ys);
+    const maxSy = Math.max(...ys);
+    const padX = (maxSx - minSx) * 0.09;
+    const padY = (maxSy - minSy) * 0.09;
     const sharpness = laplacianVariance(data, dw, dh, {
-      x0: Math.min(...xs),
-      y0: Math.min(...ys),
-      x1: Math.max(...xs),
-      y1: Math.max(...ys),
+      x0: minSx + padX,
+      y0: minSy + padY,
+      x1: maxSx - padX,
+      y1: maxSy - padY,
     });
     sharpnessRef.current = sharpness;
     const isSharp = sharpness >= SHARPNESS_LIVE_MIN;
