@@ -1230,19 +1230,32 @@ export const MIN_EDGE_TIGHTNESS_FOR_CAPTURE = 0.55;
 // Detect the document from its contour: isolate candidate paper, extract the
 // outer boundary, reduce the convex contour to four real corners, then reject
 // shapes with curved sides, non-A4 proportions, or extreme perspective.
+export interface DetectOptions {
+  /** Previous detection corners (in source pixel coords) — used to
+   *  temporally bias scoring so the frame doesn't jump between objects. */
+  prefer?: [Point, Point, Point, Point];
+}
+
 export function detectDocumentQuad(
   data: Uint8ClampedArray,
   width: number,
   height: number,
+  options: DetectOptions = {},
 ): DocumentDetection | null {
   const total = width * height;
-  const lum = new Uint8ClampedArray(total);
-  const hist = new Uint32Array(256);
+  const rawLum = new Uint8ClampedArray(total);
+  const rawHist = new Uint32Array(256);
   for (let i = 0, j = 0; i < data.length; i += 4, j++) {
     const l = (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) | 0;
-    lum[j] = l;
-    hist[l]++;
+    rawLum[j] = l;
+    rawHist[l]++;
   }
+
+  // Adaptive contrast normalization — percentile stretch so dim scenes
+  // gain enough local contrast for Canny + brightness masking. Critical
+  // for detecting white A4 on a dark wooden desk under weak room light.
+  // We compute the 2nd/98th percentiles and linearly remap to [0..255].
+  const { lum, hist } = stretchContrast(rawLum, rawHist, total);
 
   const blurred = gaussianBlur(lum, width, height);
   const { edges, highThreshold } = cannyEdges(blurred, width, height);
@@ -1252,7 +1265,10 @@ export function detectDocumentQuad(
   const gradMag = sobelMagnitude(blurred, width, height);
   const connectedEdges = closeEdgeGaps(edges, width, height);
   const components = edgeComponents(connectedEdges, width, height);
-  const brightThreshold = Math.max(95, Math.min(225, otsuThreshold(hist, total) + 12));
+  // Lowered floor (95 → 70) so darker grayish-white paper still segments
+  // from a dark background. Otsu still picks the actual threshold when
+  // contrast is healthy; the floor only matters in low light.
+  const brightThreshold = Math.max(70, Math.min(225, otsuThreshold(hist, total) + 8));
   const paperMask = buildBrightPaperMask(lum, width, height, brightThreshold);
   components.push(...edgeComponents(maskBoundary(paperMask, width, height), width, height));
   const allDetections: DocumentDetection[] = [];
