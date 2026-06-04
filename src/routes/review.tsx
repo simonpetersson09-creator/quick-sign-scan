@@ -122,6 +122,27 @@ function ReviewPage() {
     setPan({ x: 0, y: 0 });
   }, [pageIdx]);
 
+  // Rebuild PDF when signature position changes (after drag release).
+  useEffect(() => {
+    if (!pages.length || !sigDataUrl || !sigPos) return;
+    let cancelled = false;
+    const handle = setTimeout(async () => {
+      const url = await buildPdf(pages, { dataUrl: sigDataUrl, x: sigPos.x, y: sigPos.y });
+      if (cancelled) return;
+      setPdfUrl(url);
+      scanStore.set({ pdfDataUrl: url, signaturePosition: sigPos });
+      try {
+        setSizeBytes(dataUrlToBlob(url).size);
+      } catch {
+        /* noop */
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [sigPos, sigDataUrl, pages]);
+
   function clampPan(nx: number, ny: number, z: number) {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return { x: nx, y: ny };
@@ -150,7 +171,45 @@ function ReviewPage() {
     panY: number;
   } | null>(null);
 
+  // Signature drag handling
+  const sigDrag = useRef<{ id: number | null }>({ id: null });
+  const [isDraggingSig, setIsDraggingSig] = useState(false);
+
+  function clientToNorm(clientX: number, clientY: number) {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return null;
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+    const localX = (clientX - rect.left - cx - pan.x) / zoom + cx;
+    const localY = (clientY - rect.top - cy - pan.y) / zoom + cy;
+    return {
+      x: Math.max(0.03, Math.min(0.97, localX / rect.width)),
+      y: Math.max(0.03, Math.min(0.97, localY / rect.height)),
+    };
+  }
+
+  function onSigDown(e: React.PointerEvent<HTMLDivElement>) {
+    e.stopPropagation();
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    sigDrag.current.id = e.pointerId;
+    setIsDraggingSig(true);
+  }
+  function onSigMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (sigDrag.current.id !== e.pointerId) return;
+    e.stopPropagation();
+    const p = clientToNorm(e.clientX, e.clientY);
+    if (p) setSigPos(p);
+  }
+  function onSigUp(e: React.PointerEvent<HTMLDivElement>) {
+    if (sigDrag.current.id !== e.pointerId) return;
+    e.stopPropagation();
+    sigDrag.current.id = null;
+    setIsDraggingSig(false);
+    if (sigPos) scanStore.set({ signaturePosition: sigPos });
+  }
+
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (sigDrag.current.id !== null) return;
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.current.size === 2) {
@@ -260,18 +319,32 @@ function ReviewPage() {
                 />
               )}
               {isLastPage && sigDataUrl && sigPos && (
-                <img
-                  src={sigDataUrl}
-                  alt=""
-                  className="absolute pointer-events-none"
+                <div
+                  onPointerDown={onSigDown}
+                  onPointerMove={onSigMove}
+                  onPointerUp={onSigUp}
+                  onPointerCancel={onSigUp}
+                  role="button"
+                  aria-label="Flytta signatur"
+                  className={`absolute touch-none select-none rounded-md transition ${
+                    isDraggingSig
+                      ? "cursor-grabbing ring-2 ring-primary/60"
+                      : "cursor-grab ring-1 ring-primary/30 hover:ring-2 hover:ring-primary/50"
+                  }`}
                   style={{
                     left: `${sigPos.x * 100}%`,
                     top: `${sigPos.y * 100}%`,
                     width: "28%",
                     transform: "translate(-50%, -50%)",
                   }}
-                  draggable={false}
-                />
+                >
+                  <img
+                    src={sigDataUrl}
+                    alt=""
+                    className="block w-full h-auto pointer-events-none"
+                    draggable={false}
+                  />
+                </div>
               )}
             </div>
           </div>
