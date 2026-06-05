@@ -233,6 +233,7 @@ function SendPage() {
       }
 
       if (result.ok) {
+        if (!isPremium) usage.incrementSent();
         setDone(true);
         setTimeout(() => {
           scanStore.clear("email sent");
@@ -259,6 +260,21 @@ function SendPage() {
           </div>
           <h2 className="text-xl font-semibold mt-5">{t("done")}</h2>
           <p className="text-muted-foreground mt-2 text-sm">{t("doneCleared")}</p>
+        </div>
+      </AppShell>
+    );
+  }
+
+  return (
+  if (blocked) {
+    return (
+      <AppShell title={t("sendTitle")} back="/review" className="h-dvh overflow-hidden">
+        <div className="flex-1 flex flex-col items-center justify-center py-6">
+          <Paywall
+            status={premium}
+            freeRemaining={remaining}
+            freeLimit={limit}
+          />
         </div>
       </AppShell>
     );
