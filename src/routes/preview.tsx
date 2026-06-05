@@ -30,15 +30,15 @@ function PreviewPage() {
   // Initialize synchronously from the in-memory store so we don't flash the
   // empty state when pages are already present (e.g. just-finished scan).
   const [pages, setPages] = useState<string[]>(() => {
-    const s = scanStore.get();
-    return s.pages;
+    return scanStore.getPages();
   });
   const [activeIndex, setActiveIndex] = useState<number>(() => {
     const s = scanStore.get();
-    if (!s.pages.length) return 0;
+    const list = scanStore.getPages();
+    if (!list.length) return 0;
     return s.imageDataUrl
-      ? Math.max(0, s.pages.indexOf(s.imageDataUrl))
-      : s.pages.length - 1;
+      ? Math.max(0, list.indexOf(s.imageDataUrl))
+      : list.length - 1;
   });
   const [filterMode, setFilterMode] = useState<FilterMode>("color");
   // Cache filtered results so flipping pages stays instant: key = `${index}|${mode}`
@@ -51,16 +51,17 @@ function PreviewPage() {
   useEffect(() => {
     const sync = () => {
       const session = scanStore.get();
-      setPages(session.pages);
-      if (!session.pages.length) {
+      const list = scanStore.getPages();
+      setPages(list);
+      if (!list.length) {
         setActiveIndex(0);
         return;
       }
       const idx = session.imageDataUrl
-        ? Math.max(0, session.pages.indexOf(session.imageDataUrl))
-        : session.pages.length - 1;
+        ? Math.max(0, list.indexOf(session.imageDataUrl))
+        : list.length - 1;
       setActiveIndex((prev) =>
-        prev >= 0 && prev < session.pages.length ? prev : idx,
+        prev >= 0 && prev < list.length ? prev : idx,
       );
     };
     sync();

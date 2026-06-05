@@ -170,10 +170,11 @@ function ScanPage() {
   const [error, setError] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<ErrorType | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
-  const [pageCount, setPageCount] = useState(() => scanStore.get().pages.length);
-  const [lastThumbnail, setLastThumbnail] = useState<string | null>(
-    () => scanStore.get().imageDataUrl ?? null,
-  );
+  const [pageCount, setPageCount] = useState(() => scanStore.getPages().length);
+  const [lastThumbnail, setLastThumbnail] = useState<string | null>(() => {
+    const pages = scanStore.getPages();
+    return scanStore.get().imageDataUrl ?? pages[pages.length - 1] ?? null;
+  });
   const [savedOverlay, setSavedOverlay] = useState<{
     dataUrl: string;
     visible: boolean;
@@ -1048,12 +1049,8 @@ function ScanPage() {
         imageHeight: warped.height,
         dataUrlBytes: dataUrl.length,
       });
-      const existing = scanStore.get().pages;
-      const nextPages = [...existing, dataUrl];
-      scanStore.set({
-        imageDataUrl: dataUrl,
+      const session = scanStore.addPage(dataUrl, {
         sourceDataUrl,
-        pages: nextPages,
         detection: {
           corners: orderedNormQuad,
           a4Ratio: meta.a4Ratio,
@@ -1061,7 +1058,7 @@ function ScanPage() {
           debug: meta.debug,
         },
       });
-      finishPageCapture(dataUrl, nextPages.length);
+      finishPageCapture(dataUrl, scanStore.getPages().length || session.pages.length);
     } catch (e) {
       console.error("[scan] capture warp failed, falling back to raw frame", e);
       // Reset the lock so captureRawFrame can take over.
@@ -1112,12 +1109,8 @@ function ScanPage() {
       { x: 1, y: 1 },
       { x: 0, y: 1 },
     ];
-    const existing = scanStore.get().pages;
-    const nextPages = [...existing, dataUrl];
-    scanStore.set({
-      imageDataUrl: dataUrl,
+    const session = scanStore.addPage(dataUrl, {
       sourceDataUrl: dataUrl,
-      pages: nextPages,
       detection: {
         corners: fullQuad,
         a4Ratio: 1,
@@ -1137,7 +1130,7 @@ function ScanPage() {
         },
       },
     });
-    finishPageCapture(dataUrl, nextPages.length);
+    finishPageCapture(dataUrl, scanStore.getPages().length || session.pages.length);
   }
 
   // After a successful capture: show the cropped A4 page full-screen with a
@@ -1203,6 +1196,14 @@ function ScanPage() {
     if (savedTimer2Ref.current) window.clearTimeout(savedTimer2Ref.current);
     if (savedTimer3Ref.current) window.clearTimeout(savedTimer3Ref.current);
     streamRef.current?.getTracks().forEach((tr) => tr.stop());
+    const pages = scanStore.getPages();
+    if (!pages.length) {
+      setPageCount(0);
+      setLastThumbnail(null);
+      setStatus("searching");
+      return;
+    }
+    scanStore.set({ pages, imageDataUrl: pages[pages.length - 1] });
     navigate({ to: "/preview" });
   }
 
