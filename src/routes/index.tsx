@@ -10,8 +10,8 @@ const MAX_PDF_PAGES = 20;
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Sign & Go" },
-      { name: "description", content: "Sign & Go: skanna, signera, skicka." },
+      { title: "SSPP Sign & Go" },
+      { name: "description", content: "SSPP Sign & Go: skanna, signera, skicka." },
     ],
   }),
   component: Home,
@@ -37,7 +37,7 @@ function Home() {
       <div className="flex-1 flex flex-col items-center justify-center gap-8">
         {/* Title */}
         <h1 className="text-[32px] leading-none font-semibold tracking-tight text-center">
-          Sign <span className="text-muted-foreground/50 font-light">&</span> Go
+          SSPP Sign <span className="text-muted-foreground/50 font-light">&</span> Go
         </h1>
 
         {/* Flow */}
