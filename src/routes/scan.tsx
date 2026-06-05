@@ -1131,7 +1131,7 @@ function ScanPage() {
     canvas.width = vw;
     canvas.height = vh;
     canvas.getContext("2d")!.drawImage(video, 0, 0, vw, vh);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
     // Use full-frame "quad" so downstream code has valid corners.
     const fullQuad: [Point, Point, Point, Point] = [
       { x: 0, y: 0 },
