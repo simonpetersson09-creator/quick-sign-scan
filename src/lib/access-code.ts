@@ -19,6 +19,10 @@ const STORAGE_KEY = "app_access_code";
 const BUILD_TIME_CODE: string | undefined = import.meta.env
   .VITE_APP_ACCESS_CODE as string | undefined;
 
+function isDev(): boolean {
+  return typeof import.meta.env !== "undefined" && !!import.meta.env.DEV;
+}
+
 export function isCapacitor(): boolean {
   if (typeof window === "undefined") return false;
   return window.location.protocol === "capacitor:";
@@ -53,6 +57,8 @@ export function clearAccessCode() {
 }
 
 export function hasUsableAccessCode(): boolean {
+  // Dev / preview build — no gate so development stays friction-free.
+  if (isDev()) return true;
   // Capacitor build always carries a baked-in code; the gate should never show.
   if (isCapacitor()) return true;
   if (BUILD_TIME_CODE && BUILD_TIME_CODE.length > 0) return true;

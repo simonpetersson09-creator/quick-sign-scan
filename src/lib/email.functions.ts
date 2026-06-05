@@ -33,6 +33,9 @@ function timingSafeEqual(a: string, b: string): boolean {
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return diff === 0;
 }
+function isDev(): boolean {
+  return typeof import.meta.env !== "undefined" && !!import.meta.env.DEV;
+}
 
 export const SendErrorCodes = [
   "attachment_too_large",
@@ -244,19 +247,22 @@ export const sendScanEmail = createServerFn({ method: "POST" })
     // baked in at build time). Without a matching header the request is
     // rejected before doing any work — and the failure is still counted
     // toward the rate limiter below so repeated guessing gets throttled.
-    const expectedAccessCode = process.env.APP_ACCESS_CODE;
-    if (!expectedAccessCode) {
-      console.error(
-        `[sendScanEmail] ${ts} ${requestId} status=misconfigured reason=missing_app_access_code`,
-      );
-      return fail("unauthorized");
-    }
-    const providedAccessCode = req?.headers.get(ACCESS_HEADER) ?? "";
-    if (!timingSafeEqual(providedAccessCode, expectedAccessCode)) {
-      console.warn(
-        `[sendScanEmail] ${ts} ${requestId} status=forbidden reason=bad_access_code provided_len=${providedAccessCode.length}`,
-      );
-      return fail("unauthorized", 401);
+    // Dev / preview builds bypass this check so development stays friction-free.
+    if (!isDev()) {
+      const expectedAccessCode = process.env.APP_ACCESS_CODE;
+      if (!expectedAccessCode) {
+        console.error(
+          `[sendScanEmail] ${ts} ${requestId} status=misconfigured reason=missing_app_access_code`,
+        );
+        return fail("unauthorized");
+      }
+      const providedAccessCode = req?.headers.get(ACCESS_HEADER) ?? "";
+      if (!timingSafeEqual(providedAccessCode, expectedAccessCode)) {
+        console.warn(
+          `[sendScanEmail] ${ts} ${requestId} status=forbidden reason=bad_access_code provided_len=${providedAccessCode.length}`,
+        );
+        return fail("unauthorized", 401);
+      }
     }
 
     const ip = extractIp(req);
