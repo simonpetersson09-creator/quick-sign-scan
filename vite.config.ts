@@ -94,7 +94,7 @@ export default defineConfig({
     // Route Cloudflare Worker requests through src/server.ts so the native
     // CORS/preflight wrapper actually runs. Without this, TanStack's default
     // server-entry is used and OPTIONS /_serverFn/* returns 405.
-    server: { entry: "server" },
+    server: { entry: "./server.ts" },
     serverFns: {
       // Keep these IDs stable so an already-installed Capacitor build can call
       // the newly published backend without requiring a new TestFlight build.
