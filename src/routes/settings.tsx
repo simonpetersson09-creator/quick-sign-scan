@@ -56,7 +56,7 @@ function SettingsPage() {
   }
 
   return (
-    <AppShell title={t("settingsTitle")} back="/">
+    <AppShell title={t("settingsTitle")} back="/" className="h-dvh overflow-hidden">
       <div className="flex flex-col gap-5 mt-2">
 
         <Field label={t("defaultRecipientLabel")}>
