@@ -40,7 +40,7 @@ function Home() {
           <h1 className="text-[32px] leading-none font-semibold tracking-tight text-center">
             Sign <span className="text-muted-foreground/50 font-light">&</span> Go
           </h1>
-          <span className="text-[15px] text-muted-foreground/50 font-light tracking-tight self-end mt-0.5">
+          <span className="text-[13px] text-muted-foreground/50 font-light tracking-tight self-end mt-0.5">
             By SSPP
           </span>
         </div>
