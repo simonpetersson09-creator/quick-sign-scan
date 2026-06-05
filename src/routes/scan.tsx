@@ -170,9 +170,9 @@ function ScanPage() {
   const [error, setError] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<ErrorType | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
-  const [pageCount, setPageCount] = useState(() => scanStore.get().pages.length);
+  const [pageCount, setPageCount] = useState(() => scanStore.getPages().length);
   const [lastThumbnail, setLastThumbnail] = useState<string | null>(
-    () => scanStore.get().imageDataUrl ?? null,
+    () => scanStore.get().imageDataUrl ?? scanStore.getPages().at(-1) ?? null,
   );
   const [savedOverlay, setSavedOverlay] = useState<{
     dataUrl: string;
