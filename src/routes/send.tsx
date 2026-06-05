@@ -102,6 +102,7 @@ function SendPage() {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
+  const [softPromptRemaining, setSoftPromptRemaining] = useState<number | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
 
@@ -233,12 +234,23 @@ function SendPage() {
       }
 
       if (result.ok) {
-        if (!isPremium) usage.incrementSent();
+        let postSendRemaining: number | null = null;
+        if (!isPremium) {
+          const sentNow = usage.incrementSent();
+          postSendRemaining = Math.max(0, limit - sentNow);
+        }
         setDone(true);
-        setTimeout(() => {
+        // Soft prompt only when exactly 1 free doc remains after this send.
+        if (postSendRemaining === 1) {
+          setSoftPromptRemaining(1);
+          // Keep scan data — user will navigate manually from the prompt.
           scanStore.clear("email sent");
-          navigate({ to: "/" });
-        }, 2200);
+        } else {
+          setTimeout(() => {
+            scanStore.clear("email sent");
+            navigate({ to: "/" });
+          }, 2200);
+        }
       } else {
         console.error(`[send] failed code=${result.code} status=${result.status ?? "n/a"}`);
         setInfo(t(`err_${result.code}`) ?? t("err_unknown"));
