@@ -5,6 +5,76 @@
 //     error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { writeFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
+import type { Plugin } from "vite";
+
+/**
+ * TanStack Start's prerender step spins up a Vite preview server whose
+ * preview-server-plugin tries to import `dist/server/server.js`. Lovable's
+ * Nitro integration instead emits `dist/server/index.mjs`. The filename
+ * mismatch makes the prerender request return 500 ("Cannot find module
+ * .../dist/server/server.js"), which fails the entire publish build.
+ *
+ * This shim plugin runs at the end of the SSR build and writes a tiny
+ * `dist/server/server.js` that just re-exports Nitro's `index.mjs`. That's
+ * enough for the preview-server-plugin to load the worker handler and serve
+ * the prerender request.
+ */
+function nitroSsrShimPlugin(): Plugin {
+  return {
+    name: "lovable:nitro-ssr-shim",
+    apply: "build",
+    closeBundle: {
+      order: "post",
+      handler() {
+        try {
+          const serverDir = join(process.cwd(), "dist", "server");
+          const nitroEntry = join(serverDir, "index.mjs");
+          if (!existsSync(nitroEntry)) return;
+          const shimPath = join(serverDir, "server.js");
+          writeFileSync(
+            shimPath,
+            // Re-export Nitro's fetch handler, but:
+            //  1. Stub `env`/`ctx` so accesses like `env.ASSETS` don't throw
+            //     under Node — the prerender preview server invokes
+            //     `fetch(req)` with no Cloudflare bindings.
+            //  2. Re-wrap the incoming Request as a plain WHATWG Request so
+            //     Nitro's `augmentReq` can attach `.ip` and friends. srvx's
+            //     NodeRequest exposes `ip` as a read-only getter, which
+            //     otherwise throws "Cannot set property ip of #<Request>".
+            [
+              "import handler from './index.mjs';",
+              "const stubCtx = { waitUntil() {}, passThroughOnException() {} };",
+              "function toPlainRequest(request) {",
+              "  const init = {",
+              "    method: request.method,",
+              "    headers: request.headers,",
+              "    redirect: request.redirect,",
+              "  };",
+              "  if (request.method !== 'GET' && request.method !== 'HEAD') {",
+              "    init.body = request.body;",
+              "    init.duplex = 'half';",
+              "  }",
+              "  return new Request(request.url, init);",
+              "}",
+              "export default {",
+              "  fetch: (request, env, ctx) =>",
+              "    handler.fetch(toPlainRequest(request), env ?? {}, ctx ?? stubCtx),",
+              "};",
+              "",
+            ].join("\n"),
+            "utf8",
+          );
+
+
+        } catch {
+          /* ignore — the prerender will surface a clearer error if needed */
+        }
+      },
+    },
+  };
+}
 
 export default defineConfig({
   tanstackStart: {
@@ -14,13 +84,11 @@ export default defineConfig({
       // transition from camera → preview would force a reload and lose the scan.
       autoCodeSplitting: false,
     },
-    // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
-    server: { entry: "server" },
 
     // SPA mode → vid build prerendas en lättviktig shell-HTML (utan route-content)
     // som skrivs till dist/client/index.html. Capacitor (WKWebView) laddar den
     // lokalt; klient-routern hydratiserar och tar därefter över helt på enheten.
-    // Web-deployen (Cloudflare Worker) använder fortfarande SSR via src/server.ts.
+    // Web-deployen använder fortfarande SSR via Nitro/Cloudflare.
     spa: {
       enabled: true,
       prerender: {
@@ -29,5 +97,8 @@ export default defineConfig({
         outputPath: "/index",
       },
     },
+  },
+  vite: {
+    plugins: [nitroSsrShimPlugin()],
   },
 });
