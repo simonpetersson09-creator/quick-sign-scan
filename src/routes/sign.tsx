@@ -94,7 +94,7 @@ function SignPage() {
   return (
     <AppShell title={t("signTitle")} back="/place">
       <div className="mt-auto" />
-      <p className="text-sm text-muted-foreground mt-4">
+      <p className="text-sm text-muted-foreground mt-4 text-center">
         {t("signHint")}
       </p>
 
@@ -115,18 +115,16 @@ function SignPage() {
         <div className="absolute left-4 right-4 bottom-3 border-b border-dashed border-muted-foreground/40 pointer-events-none" />
       </div>
 
-      <div className="mt-2 flex justify-end">
-        <button
+      <div className="flex gap-3 pt-5">
+        <PrimaryButton
+          variant="secondary"
           onClick={clear}
           disabled={!hasInk}
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground disabled:opacity-40 px-2 py-1"
+          className="w-[30%] inline-flex items-center justify-center gap-1.5"
         >
           <RotateCcw className="h-4 w-4" /> {t("clear")}
-        </button>
-      </div>
-
-      <div className="flex flex-col gap-3 pt-5">
-        <PrimaryButton onClick={done} disabled={!hasInk}>
+        </PrimaryButton>
+        <PrimaryButton onClick={done} disabled={!hasInk} className="w-[70%]">
           {t("doneContinue")}
         </PrimaryButton>
       </div>
