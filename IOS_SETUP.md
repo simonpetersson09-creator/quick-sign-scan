@@ -79,3 +79,41 @@ I Xcode:
 - För **native kameraplugin** (bättre kvalitet, dokumentskanner-stil): `bun add @capacitor/camera` — kan ersätta `getUserMedia`-flödet senare
 - För **Face ID / Touch ID**: `bun add @capacitor-community/biometric-auth`
 - För att uppdatera appen efter ändringar i Lovable: `git pull && bun run build && npx cap sync ios` → Archive på nytt
+
+## Steg 7: In-App Purchase (Sign & Go Premium)
+
+Appen har en fri tier på 5 dokument per installation och ett årsabonnemang
+`com.sspp.signandgo.premium.yearly` (99 kr/år) via App Store.
+
+### 1. Skapa abonnemanget i App Store Connect
+- Logga in på App Store Connect → din app → **Features → In-App Purchases & Subscriptions**
+- Skapa en **Subscription Group** (t.ex. "Premium")
+- Lägg till en **Auto-Renewable Subscription**:
+  - **Product ID**: `com.sspp.signandgo.premium.yearly`
+  - **Duration**: 1 Year
+  - **Pris**: 99 kr (SEK) — välj rätt prisklass
+- Fyll i lokaliserade beskrivningar (svenska + engelska), screenshot för granskning
+- Lägg minst en testanvändare under **Users and Access → Sandbox Testers**
+
+### 2. Installera StoreKit-bryggan
+Paketet `cordova-plugin-purchase` är redan tillagt i `package.json`. På Macen efter `git pull`:
+
+```bash
+bun install
+bun run build
+npx cap sync ios
+```
+
+`cap sync` länkar in cordova-plugin-purchase i Xcode-projektet automatiskt.
+
+### 3. Aktivera In-App Purchase capability i Xcode
+- Öppna `ios/App/App.xcworkspace` (`npx cap open ios`)
+- Välj target **App** → **Signing & Capabilities** → **+ Capability** → **In-App Purchase**
+- Bygg och kör på en riktig enhet (IAP funkar inte i simulator)
+- Logga in på enheten med din Sandbox-testanvändare (Inställningar → App Store → Sandbox Account)
+
+### 4. Testa
+- Skicka 5 PDF:er → paywall ska visas
+- Tryck **Skaffa Premium** → sandbox-köp-dialog ska komma upp
+- Efter köp ska sändning fungera obegränsat och statusen i Inställningar visa "Premium aktivt"
+- Testa **Återställ köp** efter att ha avinstallerat/installerat om appen
