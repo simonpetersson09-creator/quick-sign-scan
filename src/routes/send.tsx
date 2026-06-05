@@ -47,6 +47,23 @@ function SendPage() {
   const [to, setTo] = useState("");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
+  const [loaded, setLoaded] = useState(false);
+
+  // Known localized defaults in every language — used to detect whether the
+  // current text is still a default (and therefore safe to swap when the
+  // user changes the app language) vs a user customization.
+  const KNOWN_DEFAULT_SUBJECTS = useMemo(
+    () => new Set(["Dokument", "Document", "Skannat dokument", "Scanned document"]),
+    [],
+  );
+  const KNOWN_DEFAULT_MESSAGES = useMemo(
+    () =>
+      new Set([
+        "Hej,\n\nBifogar dokumentet.\n\nVänliga hälsningar",
+        "Hello,\n\nPlease find the document attached.\n\nKind regards",
+      ]),
+    [],
+  );
 
   useEffect(() => {
     const s = loadSettings();
@@ -54,8 +71,26 @@ function SendPage() {
     setTo(s.defaultRecipient);
     setSubject(s.defaultSubject || t("defaultSubjectInitial"));
     setMessage(s.defaultMessage || t("defaultMessageInitial"));
+    setLoaded(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // When the language changes, swap the subject/message to the new language's
+  // defaults — but only if the user hasn't customized them.
+  useEffect(() => {
+    if (!loaded) return;
+    setSubject((prev) =>
+      prev === "" || KNOWN_DEFAULT_SUBJECTS.has(prev)
+        ? t("defaultSubjectInitial")
+        : prev,
+    );
+    setMessage((prev) =>
+      prev === "" || KNOWN_DEFAULT_MESSAGES.has(prev)
+        ? t("defaultMessageInitial")
+        : prev,
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang, loaded]);
   
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
