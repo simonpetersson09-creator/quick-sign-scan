@@ -9,7 +9,9 @@ const config: CapacitorConfig = {
   // Reverse-DNS bundle id. Kan INTE ändras efter första App Store-uppladdning.
   appId: 'com.sspp.signandgo',
   appName: 'Sign & Go',
-  webDir: 'dist',
+  // Vite/Nitro outputs the static client bundle into dist/client (index.html lives here
+  // thanks to the prerender of "/" configured in vite.config.ts).
+  webDir: 'dist/client',
   ...(isDev
     ? {
         server: {
