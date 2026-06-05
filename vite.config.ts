@@ -17,5 +17,9 @@ export default defineConfig({
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
     server: { entry: "server" },
+    // Prerender "/" so dist/client/index.html exists.
+    // Required for Capacitor (iOS), which loads a static index.html into WKWebView.
+    // The web/SSR build still uses the Nitro server bundle and serverFns as usual.
+    pages: [{ path: "/", prerender: { enabled: true } }],
   },
 });
