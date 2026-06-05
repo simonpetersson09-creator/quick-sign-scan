@@ -416,6 +416,38 @@ const en: Dict = {
   // quota
   scanTooLargeTitle: "The scan is too large to be stored on the device",
   scanTooLargeDesc: "It remains in memory, but don't reload the page before sending – the document will be lost.",
+
+  // premium / paywall
+  premium_paywall_title: "Sign & Go Premium",
+  premium_paywall_remaining: "You have {remaining} of {limit} free documents left. Upgrade for unlimited use.",
+  premium_paywall_limit_reached: "You've used your {limit} free documents. Upgrade to keep sending.",
+  premium_benefit_unlimited: "Send unlimited documents",
+  premium_benefit_no_ads: "No ads, ever",
+  premium_benefit_support: "Supports ongoing development",
+  premium_buy_cta: "Get Premium – 99 SEK/year",
+  premium_restore: "Restore purchase",
+  premium_only_ios: "Purchases are only available in the iOS app.",
+  premium_legal_footnote: "Subscription auto-renews yearly until canceled in the App Store. Managed by Apple.",
+  premium_purchase_failed: "The purchase couldn't be completed. Please try again.",
+  premium_restore_failed: "Couldn't restore the purchase. Please try again.",
+  premium_restore_none: "No active subscription was found on this Apple ID.",
+
+  // premium status (settings)
+  premium_status_title: "Subscription",
+  premium_status_active: "Premium active",
+  premium_status_inactive: "No subscription",
+  premium_status_loading: "Checking status…",
+  premium_status_unsupported: "Premium can only be purchased in the iOS app",
+  premium_status_expires: "Renews {date}",
+  premium_status_no_renew: "Ends {date}",
+  premium_free_remaining: "{remaining} of {limit} free documents left",
+  premium_unlimited: "Unlimited documents",
+  premium_upgrade_cta: "Upgrade to Premium",
+  premium_manage_apple: "Manage in App Store",
+
+  // home banner
+  home_free_remaining: "{remaining} free documents left",
+  home_premium_badge: "Premium",
 };
 
 const dicts: Record<Lang, Dict> = { sv, en };
