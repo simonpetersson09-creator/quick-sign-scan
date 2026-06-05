@@ -95,11 +95,10 @@ export const scanStore = {
   getPages: () => sessionPages(bag.state),
   addPage: (dataUrl: string, patch: Partial<ScanSession> = {}) => {
     if (!dataUrl) return bag.state;
-    const { pages: _pages, imageDataUrl: _imageDataUrl, ...rest } = patch;
     const nextPages = [...sessionPages(bag.state), dataUrl];
     bag.state = {
       ...bag.state,
-      ...rest,
+      ...patch,
       pages: nextPages,
       imageDataUrl: dataUrl,
     };
