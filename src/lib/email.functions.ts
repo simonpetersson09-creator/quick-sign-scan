@@ -33,6 +33,9 @@ function timingSafeEqual(a: string, b: string): boolean {
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return diff === 0;
 }
+function isDev(): boolean {
+  return typeof import.meta.env !== "undefined" && !!import.meta.env.DEV;
+}
 
 export const SendErrorCodes = [
   "attachment_too_large",
