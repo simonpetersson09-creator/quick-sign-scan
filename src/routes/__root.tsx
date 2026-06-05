@@ -9,7 +9,6 @@ import {
 } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
 import { LanguageProvider } from "@/lib/i18n";
-import { AccessCodeGate } from "@/components/AccessCodeGate";
 
 import appCss from "../styles.css?url";
 
@@ -112,8 +111,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:site", content: "@Lovable" },
       { name: "twitter:title", content: "SSPP Sign & Go" },
       { name: "twitter:description", content: "Scan, sign, and email documents instantly with Sign & Go." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/2aac0786-89ec-468c-9a3d-71ce841bc18f/id-preview-6c59cc44--69a35b64-3eb9-4e68-8e67-6b39a3a3ec0e.lovable.app-1780645899204.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/2aac0786-89ec-468c-9a3d-71ce841bc18f/id-preview-6c59cc44--69a35b64-3eb9-4e68-8e67-6b39a3a3ec0e.lovable.app-1780645899204.png" },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/eeba9910-f4a7-439f-8177-454c73a8ab7b/id-preview-809b2db2--69a35b64-3eb9-4e68-8e67-6b39a3a3ec0e.lovable.app-1780647878648.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/eeba9910-f4a7-439f-8177-454c73a8ab7b/id-preview-809b2db2--69a35b64-3eb9-4e68-8e67-6b39a3a3ec0e.lovable.app-1780647878648.png" },
     ],
     links: [
       {
@@ -148,10 +147,8 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <LanguageProvider>
-        <AccessCodeGate>
-          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-          <Outlet />
-        </AccessCodeGate>
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <Outlet />
         <Toaster />
       </LanguageProvider>
     </QueryClientProvider>
