@@ -194,23 +194,34 @@ const sv: Dict = {
   scanTooLargeTitle: "Skanningen är för stor för att sparas på enheten",
   scanTooLargeDesc: "Den ligger kvar i minnet, men ladda inte om sidan innan du skickat – då försvinner dokumentet.",
 
+  // welcome (first launch)
+  welcome_title: "Välkommen till Sign & Go",
+  welcome_body: "5 kostnadsfria dokument ingår. Därefter kostar Sign & Go Premium 99 kr/år.",
+  welcome_continue: "Fortsätt",
+
   // premium / paywall
   premium_paywall_title: "Sign & Go Premium",
-  premium_paywall_remaining: "Du har {remaining} av {limit} gratis dokument kvar. Uppgradera för obegränsad användning.",
-  premium_paywall_limit_reached: "Du har använt dina {limit} gratis dokument. Uppgradera för att fortsätta skicka.",
-  premium_benefit_unlimited: "Skicka obegränsat antal dokument",
-  premium_benefit_no_ads: "Ingen reklam, någonsin",
-  premium_benefit_support: "Stöttar fortsatt utveckling",
-  premium_buy_cta: "Skaffa Premium – 99 kr/år",
+  premium_paywall_used_all: "Du har använt dina {limit} kostnadsfria dokument.",
+  premium_paywall_remaining: "Du har {remaining} av {limit} gratis dokument kvar.",
+  premium_benefit_scan: "Obegränsad skanning",
+  premium_benefit_sign: "Obegränsad signering",
+  premium_benefit_send: "Obegränsade PDF-utskick",
+  premium_price_yearly: "99 kr/år",
+  premium_start_cta: "Starta Premium",
+  premium_apple_secure: "Hanteras säkert via Apple.",
   premium_restore: "Återställ köp",
   premium_only_ios: "Köp är endast tillgängligt i iOS-appen.",
-  premium_legal_footnote: "Abonnemanget förnyas automatiskt varje år tills det sägs upp i App Store. Hanteras av Apple.",
   premium_purchase_failed: "Köpet kunde inte slutföras. Försök igen.",
   premium_restore_failed: "Kunde inte återställa köpet. Försök igen.",
   premium_restore_none: "Inget aktivt abonnemang hittades på det här Apple-ID:t.",
 
+  // soft prompt after sending (when only 1 free doc remains)
+  soft_one_left_title: "Du har 1 gratis dokument kvar.",
+  soft_one_left_body: "Lås upp obegränsad användning för endast 99 kr/år.",
+  soft_continue: "Fortsätt",
+
   // premium status (settings)
-  premium_status_title: "Abonnemang",
+  premium_status_title: "Premium",
   premium_status_active: "Premium aktivt",
   premium_status_inactive: "Inget abonnemang",
   premium_status_loading: "Hämtar status…",
@@ -219,11 +230,10 @@ const sv: Dict = {
   premium_status_no_renew: "Slutar {date}",
   premium_free_remaining: "{remaining} av {limit} gratis dokument kvar",
   premium_unlimited: "Obegränsat antal dokument",
-  premium_upgrade_cta: "Uppgradera till Premium",
-  premium_manage_apple: "Hantera i App Store",
+  premium_manage_apple: "Hantera abonnemang",
 
   // home banner
-  home_free_remaining: "{remaining} gratis dokument kvar",
+  home_free_remaining: "{remaining} av 5 gratis dokument kvar",
   home_premium_badge: "Premium",
 };
 
