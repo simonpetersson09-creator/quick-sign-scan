@@ -79,7 +79,9 @@ function nitroSsrShimPlugin(): Plugin {
 function stableServerFunctionId({ filename, functionName }: { filename: string; functionName: string }) {
   const normalized = filename.replace(/\\/g, "/");
   if ((normalized === "src/lib/email.functions.ts" || normalized.endsWith("/src/lib/email.functions.ts")) && functionName === "sendScanEmail_createServerFn_handler") {
-    return "src_lib_email_functions_ts--sendScanEmail_createServerFn_handler";
+    // Keep the original production hash so already-installed TestFlight builds
+    // can keep calling the published backend without requiring a new iOS build.
+    return "f0a03244e848d5e4fe61397dc97c14ecd7666dd23a1ff675a353ae01048503d0";
   }
   if ((normalized === "src/lib/access.functions.ts" || normalized.endsWith("/src/lib/access.functions.ts")) && functionName === "verifyAccessCode_createServerFn_handler") {
     return "src_lib_access_functions_ts--verifyAccessCode_createServerFn_handler";

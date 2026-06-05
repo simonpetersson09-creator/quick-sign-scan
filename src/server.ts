@@ -7,6 +7,14 @@ type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
 };
 
+const NATIVE_ORIGINS = new Set([
+  "capacitor://localhost",
+  "ionic://localhost",
+  "http://localhost",
+  "https://localhost",
+]);
+const CORS_SERVER_PREFIXES = ["/_serverFn/", "/_server/"];
+
 let serverEntryPromise: Promise<ServerEntry> | undefined;
 
 async function getServerEntry(): Promise<ServerEntry> {
@@ -37,18 +45,64 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   });
 }
 
+function getAllowedNativeOrigin(request: Request): string | null {
+  const origin = request.headers.get("origin");
+  if (!origin) return null;
+  try {
+    const parsed = new URL(origin);
+    return NATIVE_ORIGINS.has(parsed.origin) ? parsed.origin : null;
+  } catch {
+    return null;
+  }
+}
+
+function isServerFunctionRequest(request: Request): boolean {
+  try {
+    const pathname = new URL(request.url).pathname;
+    return CORS_SERVER_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+  } catch {
+    return false;
+  }
+}
+
+function withNativeCors(response: Response, origin: string | null): Response {
+  if (!origin) return response;
+  const headers = new Headers(response.headers);
+  headers.set("access-control-allow-origin", origin);
+  headers.set("access-control-allow-methods", "GET, POST, OPTIONS");
+  headers.set(
+    "access-control-allow-headers",
+    "accept, content-type, x-app-access, x-tsr-serverfn, x-requested-with",
+  );
+  headers.set("access-control-max-age", "86400");
+  headers.append("vary", "Origin");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
+    const nativeOrigin = isServerFunctionRequest(request) ? getAllowedNativeOrigin(request) : null;
+    if (nativeOrigin && request.method === "OPTIONS") {
+      return withNativeCors(new Response(null, { status: 204 }), nativeOrigin);
+    }
+
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      return withNativeCors(await normalizeCatastrophicSsrResponse(response), nativeOrigin);
     } catch (error) {
       console.error(error);
-      return new Response(renderErrorPage(), {
-        status: 500,
-        headers: { "content-type": "text/html; charset=utf-8" },
-      });
+      return withNativeCors(
+        new Response(renderErrorPage(), {
+          status: 500,
+          headers: { "content-type": "text/html; charset=utf-8" },
+        }),
+        nativeOrigin,
+      );
     }
   },
 };
