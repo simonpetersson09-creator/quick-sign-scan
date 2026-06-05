@@ -36,11 +36,11 @@ function Home() {
       {/* Center everything vertically */}
       <div className="flex-1 flex flex-col items-center justify-center gap-8">
         {/* Title */}
-        <div className="flex items-baseline justify-center gap-2">
+        <div className="flex flex-col items-center">
           <h1 className="text-[32px] leading-none font-semibold tracking-tight text-center">
             Sign <span className="text-muted-foreground/50 font-light">&</span> Go
           </h1>
-          <span className="text-[13px] text-muted-foreground/70 font-medium tracking-tight">
+          <span className="text-[15px] text-muted-foreground/50 font-light tracking-tight self-end mt-0.5">
             By SSPP
           </span>
         </div>
