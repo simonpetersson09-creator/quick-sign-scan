@@ -6,7 +6,7 @@ import {
   subscribePremium,
   type PremiumStatus,
 } from "@/lib/premium";
-import { FREE_DOC_LIMIT, usage } from "@/lib/usage";
+import { FREE_DOC_LIMIT, initUsage, usage } from "@/lib/usage";
 
 export function usePremium() {
   const [status, setStatus] = useState<PremiumStatus>(() => getPremiumStatus());
