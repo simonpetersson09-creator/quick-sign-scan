@@ -57,11 +57,14 @@ I Xcode:
 - Första gången måste du godkänna utvecklarprofilen på iPhone (Inställningar → Allmänt → VPN och enhetshantering)
 
 ## Steg 6: Skicka till App Store
-1. **Bygg release** utan `CAP_DEV`-flaggan så `server.url` inte injiceras:
+1. **Bygg release** med access-koden inbakad så iOS-appen kan anropa serverfunktionerna utan att be användaren om kod:
    ```bash
+   VITE_APP_ACCESS_CODE=<samma kod som APP_ACCESS_CODE-secret i Lovable Cloud> \
    bun run build && npx cap sync ios
    ```
-   (För dev mot Lovable preview: `CAP_DEV=1 npx cap sync ios`.)
+   - `VITE_APP_ACCESS_CODE` får ALDRIG sättas när du bygger den publika webbversionen (då hamnar koden i den nedladdningsbara JS-bundlen på lovable.app). Den ska bara sättas lokalt när du gör Capacitor-bygget.
+   - Värdet måste matcha `APP_ACCESS_CODE`-secret som finns i Lovable Cloud. Vill du rotera koden: uppdatera secret → bygg om iOS-appen med det nya värdet → publicera ny TestFlight/App Store-version. Webbanvändare matar in den nya koden manuellt i gate-rutan vid nästa besök.
+   - För dev mot Lovable preview-server: `CAP_DEV=1 VITE_APP_ACCESS_CODE=<code> npx cap sync ios`.
 2. I Xcode: **Product → Archive** → **Distribute App** → **App Store Connect**
 3. Logga in på [App Store Connect](https://appstoreconnect.apple.com) och fyll i metadata (namn, ikoner, screenshots, beskrivning, integritetspolicy, support-URL)
 4. Skicka in för granskning (tar normalt 1–3 dagar)
