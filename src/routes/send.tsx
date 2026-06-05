@@ -15,6 +15,9 @@ import {
 } from "@/lib/email.functions";
 import { useT, useLang } from "@/lib/i18n";
 import { Check, Mail, FileText } from "lucide-react";
+import { Paywall } from "@/components/Paywall";
+import { usePremium, useUsage } from "@/hooks/usePremium";
+import { usage } from "@/lib/usage";
 
 function makeEmailSchema(t: (k: string) => string) {
   return z
@@ -36,6 +39,10 @@ function SendPage() {
   const t = useT();
   const { lang } = useLang();
   const sendEmailFn = useServerFn(sendScanEmail);
+  const premium = usePremium();
+  const { remaining, limit } = useUsage();
+  const isPremium = premium.state === "active";
+  const blocked = !isPremium && remaining <= 0;
   // Read settings on mount only — avoids SSR/hydration mismatch since
   // loadSettings() touches localStorage.
   const [settings, setSettings] = useState(() => ({
