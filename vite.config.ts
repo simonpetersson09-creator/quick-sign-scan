@@ -15,16 +15,18 @@ export default defineConfig({
       autoCodeSplitting: false,
     },
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
-    // nitro/vite builds from this
     server: { entry: "server" },
-  },
-  vite: {
-    // Emit a client manifest so the post-build script (scripts/generate-capacitor-shell.mjs)
-    // can generate dist/client/index.html for Capacitor (iOS WKWebView needs a static
-    // index.html — SSR isn't available inside the native bundle).
-    environments: {
-      client: {
-        build: { manifest: true },
+
+    // SPA mode → vid build prerendas en lättviktig shell-HTML (utan route-content)
+    // som skrivs till dist/client/index.html. Capacitor (WKWebView) laddar den
+    // lokalt; klient-routern hydratiserar och tar därefter över helt på enheten.
+    // Web-deployen (Cloudflare Worker) använder fortfarande SSR via src/server.ts.
+    spa: {
+      enabled: true,
+      prerender: {
+        // Skriv shellen som `index.html` istället för default `_shell.html`
+        // så att Capacitor kan ladda den direkt utan extra konfiguration.
+        outputPath: "/index",
       },
     },
   },
