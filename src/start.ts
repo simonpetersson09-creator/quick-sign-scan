@@ -33,6 +33,14 @@ function withNativeCors(response: Response, request: Request, origin: string): R
       "accept, content-type, x-app-access, x-tsr-serverfn, x-requested-with",
   );
   headers.set("access-control-max-age", "86400");
+  // TanStack Start serverFn client reads these custom response headers to
+  // deserialize framed/serialized responses. Without exposing them, the
+  // browser/WKWebView hides them in cross-origin responses and the client
+  // throws even when the server actually succeeded (e.g. email sent).
+  headers.set(
+    "access-control-expose-headers",
+    "x-tss-serialized, x-tss-raw, x-tss-context, content-type",
+  );
   headers.append("vary", "Origin");
   headers.append("vary", "Access-Control-Request-Headers");
   return new Response(response.body, {

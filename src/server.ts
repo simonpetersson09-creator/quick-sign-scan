@@ -78,6 +78,12 @@ function withNativeCors(response: Response, origin: string | null): Response {
     "accept, content-type, x-app-access, x-tsr-serverfn, x-requested-with",
   );
   headers.set("access-control-max-age", "86400");
+  // Expose TanStack's serverFn response headers so the cross-origin
+  // Capacitor client can deserialize the framed/serialized response.
+  headers.set(
+    "access-control-expose-headers",
+    "x-tss-serialized, x-tss-raw, x-tss-context, content-type",
+  );
   headers.append("vary", "Origin");
   return new Response(response.body, {
     status: response.status,
