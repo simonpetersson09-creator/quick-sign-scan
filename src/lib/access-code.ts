@@ -31,7 +31,25 @@ export function isCapacitor(): boolean {
 export function getAccessCode(): string | null {
   if (BUILD_TIME_CODE && BUILD_TIME_CODE.length > 0) return BUILD_TIME_CODE;
   if (typeof window === "undefined") return null;
+  // Allow the Capacitor shell (and shared links) to pass the code via
+  // `?code=...` or `#code=...`. The first time we see it, persist to
+  // localStorage and clean the URL so it doesn't linger in history.
   try {
+    const url = new URL(window.location.href);
+    const fromQuery = url.searchParams.get("code");
+    const hashParams = new URLSearchParams(url.hash.replace(/^#/, ""));
+    const fromHash = hashParams.get("code");
+    const fromUrl = fromQuery || fromHash;
+    if (fromUrl && fromUrl.length > 0) {
+      window.localStorage.setItem(STORAGE_KEY, fromUrl);
+      if (fromQuery) url.searchParams.delete("code");
+      if (fromHash) {
+        hashParams.delete("code");
+        url.hash = hashParams.toString();
+      }
+      window.history.replaceState({}, "", url.toString());
+      return fromUrl;
+    }
     return window.localStorage.getItem(STORAGE_KEY);
   } catch {
     return null;
