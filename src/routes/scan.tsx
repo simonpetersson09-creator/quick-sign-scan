@@ -20,8 +20,9 @@ import {
 } from "@/lib/perspective";
 import type { DocumentAlignmentDiagnostics } from "@/lib/perspective";
 import { useT } from "@/lib/i18n";
-import { Camera, CameraOff, X, RefreshCw, ArrowLeft, ArrowRight, Zap, ZapOff } from "lucide-react";
+import { Camera, CameraOff, X, RefreshCw, ArrowLeft, ArrowRight, Zap, ZapOff, Settings } from "lucide-react";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
+import { isNative, openNativeSettings } from "@/lib/native-init";
 
 function triggerCaptureHaptic() {
   Haptics.impact({ style: ImpactStyle.Medium }).catch(() => {
@@ -1649,15 +1650,30 @@ function ScanPage() {
                 </button>
               )}
               {errorType === "permission_denied" && (
-                <button
-                  onClick={() =>
-                    startCamera({ restartStream: true, skipPermissionPreflight: true })
-                  }
-                  className="w-full rounded-xl bg-white text-black py-3.5 px-4 font-semibold text-[15px] tracking-tight flex items-center justify-center gap-2 active:scale-[0.98] transition"
-                >
-                  <RefreshCw className="h-4 w-4" strokeWidth={2} />
-                  {t("retry")}
-                </button>
+                <>
+                  {isNative() && (
+                    <button
+                      onClick={() => openNativeSettings()}
+                      className="w-full rounded-xl bg-white text-black py-3.5 px-4 font-semibold text-[15px] tracking-tight flex items-center justify-center gap-2 active:scale-[0.98] transition"
+                    >
+                      <Settings className="h-4 w-4" strokeWidth={2} />
+                      {t("openSettings")}
+                    </button>
+                  )}
+                  <button
+                    onClick={() =>
+                      startCamera({ restartStream: true, skipPermissionPreflight: true })
+                    }
+                    className={`w-full rounded-xl py-3.5 px-4 font-semibold text-[15px] tracking-tight flex items-center justify-center gap-2 active:scale-[0.98] transition ${
+                      isNative()
+                        ? "bg-white/10 text-white"
+                        : "bg-white text-black"
+                    }`}
+                  >
+                    <RefreshCw className="h-4 w-4" strokeWidth={2} />
+                    {t("retry")}
+                  </button>
+                </>
               )}
               {errorType !== "permission_denied" && errorType !== "iframe_blocked" && (
                 <button

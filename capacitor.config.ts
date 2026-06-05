@@ -18,6 +18,21 @@ const config: CapacitorConfig = {
     // Tillåt mixed content är inte nödvändigt — alla externa anrop är https.
     limitsNavigationsToAppBoundDomains: false,
   },
+  plugins: {
+    StatusBar: {
+      // Matchar appens varma bakgrundsfärg (--background ≈ #d4ccbe) så
+      // statusfältet smälter in istället för att bli svart eller vitt.
+      style: 'LIGHT',
+      backgroundColor: '#d4ccbe',
+      overlaysWebView: true,
+    },
+    Keyboard: {
+      // Native-resize gör att WebView krymper när tangentbordet är uppe,
+      // så fokuserade inputs inte hamnar bakom det.
+      resize: 'native',
+      resizeOnFullScreen: true,
+    },
+  },
 };
 
 export default config;

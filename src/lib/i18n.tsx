@@ -11,6 +11,7 @@ const sv: Dict = {
   retry: "Försök igen",
   backHome: "Tillbaka till start",
   clear: "Rensa",
+  openSettings: "Öppna inställningar",
 
   // index
   appTagline: "Inga utskrifter. Ingen lagring. Bara signering.",
@@ -201,6 +202,7 @@ const en: Dict = {
   retry: "Try again",
   backHome: "Back to home",
   clear: "Clear",
+  openSettings: "Open Settings",
 
   // index
   appTagline: "No printing. No storage. Just signing.",

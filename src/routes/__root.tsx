@@ -7,9 +7,11 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { LanguageProvider } from "@/lib/i18n";
 import { AccessCodeGate } from "@/components/AccessCodeGate";
+import { initNative } from "@/lib/native-init";
 
 import appCss from "../styles.css?url";
 
@@ -147,6 +149,10 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  useEffect(() => {
+    initNative();
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
