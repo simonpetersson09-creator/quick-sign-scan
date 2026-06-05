@@ -1,9 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
-import { ScanLine, PenLine, Mail, CheckCircle2, Settings as SettingsIcon, ArrowDown, Globe, FileUp, Loader2 } from "lucide-react";
+import { ScanLine, PenLine, Mail, CheckCircle2, Settings as SettingsIcon, ArrowDown, Globe, FileUp, Loader2, Crown } from "lucide-react";
 import { useLang } from "@/lib/i18n";
 import { scanStore } from "@/lib/scanStore";
 import { pdfFileToImages } from "@/lib/pdfToImages";
+import { usePremium, useUsage } from "@/hooks/usePremium";
 
 const MAX_PDF_PAGES = 20;
 
@@ -23,6 +24,9 @@ function Home() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
+  const premium = usePremium();
+  const { remaining } = useUsage();
+  const isPremium = premium.state === "active";
 
   const steps = [
     { icon: ScanLine, label: t("step_scan") },
@@ -43,7 +47,21 @@ function Home() {
           <span className="text-[13px] text-muted-foreground/50 font-light tracking-tight self-end mt-0.5">
             By SSPP
           </span>
+          <Link
+            to="/settings"
+            className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-card border border-border text-[11px] font-medium text-foreground/75 shadow-[var(--shadow-soft)]"
+          >
+            {isPremium ? (
+              <>
+                <Crown className="h-3 w-3 text-primary" />
+                <span>{t("home_premium_badge")}</span>
+              </>
+            ) : (
+              <span>{t("home_free_remaining", { remaining: String(remaining) })}</span>
+            )}
+          </Link>
         </div>
+
 
         {/* Flow */}
         <div className="flex flex-col items-center">
