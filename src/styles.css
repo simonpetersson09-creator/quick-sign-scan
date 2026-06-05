@@ -118,12 +118,17 @@
       sans-serif;
   }
 
-  /* iOS safe area helpers */
+  /* iOS safe area helpers. Min-värden säkerställer trycklärbar yta även
+     på äldre iPhones (SE/8) utan home indicator där env() returnerar 0. */
   .pt-safe {
     padding-top: max(env(safe-area-inset-top), 1rem);
   }
   .pb-safe {
-    padding-bottom: max(env(safe-area-inset-bottom), 1rem);
+    padding-bottom: max(env(safe-area-inset-bottom), 1.25rem);
+  }
+  .px-safe {
+    padding-left: max(env(safe-area-inset-left), 1rem);
+    padding-right: max(env(safe-area-inset-right), 1rem);
   }
   .px-safe {
     padding-left: max(env(safe-area-inset-left), 1rem);
