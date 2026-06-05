@@ -52,10 +52,13 @@ export async function initNative() {
 export async function openNativeSettings() {
   if (!Capacitor?.isNativePlatform?.()) return false;
   try {
-    const { App } = await import("@capacitor/app");
-    // iOS app-settings deep link.
-    await App.openUrl({ url: "app-settings:" });
-    return true;
+    // iOS app-settings deep link — use the native bridge directly since
+    // @capacitor/app v8 dropped the typed openUrl helper.
+    if (typeof window !== "undefined") {
+      window.location.href = "app-settings:";
+      return true;
+    }
+    return false;
   } catch {
     return false;
   }
