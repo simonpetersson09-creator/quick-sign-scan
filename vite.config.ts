@@ -78,10 +78,10 @@ function nitroSsrShimPlugin(): Plugin {
 
 function stableServerFunctionId({ filename, functionName }: { filename: string; functionName: string }) {
   const normalized = filename.replace(/\\/g, "/");
-  if (normalized.endsWith("/src/lib/email.functions.ts") && functionName === "sendScanEmail_createServerFn_handler") {
+  if ((normalized === "src/lib/email.functions.ts" || normalized.endsWith("/src/lib/email.functions.ts")) && functionName === "sendScanEmail_createServerFn_handler") {
     return "src_lib_email_functions_ts--sendScanEmail_createServerFn_handler";
   }
-  if (normalized.endsWith("/src/lib/access.functions.ts") && functionName === "verifyAccessCode_createServerFn_handler") {
+  if ((normalized === "src/lib/access.functions.ts" || normalized.endsWith("/src/lib/access.functions.ts")) && functionName === "verifyAccessCode_createServerFn_handler") {
     return "src_lib_access_functions_ts--verifyAccessCode_createServerFn_handler";
   }
   return undefined;
