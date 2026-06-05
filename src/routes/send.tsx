@@ -223,7 +223,7 @@ function SendPage() {
   }
 
   return (
-    <AppShell title={t("sendTitle")} back="/review">
+    <AppShell title={t("sendTitle")} back="/review" className="h-dvh overflow-hidden">
       <div className="flex flex-col gap-4 mt-2">
         <Field label={t("fieldTo")}>
           <input
