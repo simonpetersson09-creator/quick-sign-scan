@@ -21,7 +21,12 @@ export function usePremium() {
 
 export function useUsage() {
   const [count, setCount] = useState<number>(() => usage.getSentCount());
-  useEffect(() => usage.subscribe(setCount), []);
+  useEffect(() => {
+    const unsub = usage.subscribe(setCount);
+    return () => {
+      unsub();
+    };
+  }, []);
   return {
     sent: count,
     remaining: Math.max(0, FREE_DOC_LIMIT - count),

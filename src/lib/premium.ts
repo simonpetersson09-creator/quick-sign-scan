@@ -140,11 +140,18 @@ export async function initPremium(): Promise<void> {
       },
     ]);
 
-    store.when()
-      .approved((t) => {
+    type Chain = {
+      approved: (cb: (t: CdvTx) => void) => Chain;
+      verified: (cb: (r: CdvReceipt) => void) => Chain;
+      unverified: (cb: (r: CdvReceipt) => void) => Chain;
+      finished: (cb: (t: CdvTx) => void) => Chain;
+    };
+    const chain = store.when() as unknown as Chain;
+    chain
+      .approved((t: CdvTx) => {
         void t.verify();
       })
-      .verified((r) => {
+      .verified((r: CdvReceipt) => {
         applyReceipt(r);
       })
       .unverified(() => {
