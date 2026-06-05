@@ -82,8 +82,30 @@ function wipe() {
   bag.state = createInitial();
 }
 
+function sessionPages(session: ScanSession) {
+  return session.pages.length > 0
+    ? session.pages.filter(Boolean)
+    : session.imageDataUrl
+      ? [session.imageDataUrl]
+      : [];
+}
+
 export const scanStore = {
   get: () => bag.state,
+  getPages: () => sessionPages(bag.state),
+  addPage: (dataUrl: string, patch: Partial<ScanSession> = {}) => {
+    if (!dataUrl) return bag.state;
+    const { pages: _pages, imageDataUrl: _imageDataUrl, ...rest } = patch;
+    const nextPages = [...sessionPages(bag.state), dataUrl];
+    bag.state = {
+      ...bag.state,
+      ...rest,
+      pages: nextPages,
+      imageDataUrl: dataUrl,
+    };
+    notify();
+    return bag.state;
+  },
   set: (patch: Partial<ScanSession>) => {
     bag.state = { ...bag.state, ...patch };
     notify();
