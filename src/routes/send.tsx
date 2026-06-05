@@ -66,8 +66,8 @@ function SendPage() {
   const trimmedTo = to.trim();
   const emailValid = emailSchema.safeParse(trimmedTo).success;
 
-  // Wipe in-memory scan data on unmount as a defense-in-depth measure —
-  // the scanStore also auto-wipes on pagehide/beforeunload.
+  // Scan data is intentionally not wiped on ordinary route unmounts; explicit
+  // completion/cancel actions clear it instead.
   useEffect(() => {
     return () => {
       // Don't wipe if user successfully sent (done effect already clears),

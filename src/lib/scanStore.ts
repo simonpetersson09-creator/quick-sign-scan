@@ -155,7 +155,7 @@ if (typeof window !== "undefined" && !bag.cleanupBound) {
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") {
       // Intentionally NOT wiping on hidden — user may switch apps briefly
-      // mid-flow. We only wipe on real unload/pagehide.
+      // mid-flow. We only wipe on real unload/refresh.
     }
   });
 }
