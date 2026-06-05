@@ -18,7 +18,9 @@ const config: CapacitorConfig = {
   backgroundColor: '#d4ccbe',
   ios: {
     backgroundColor: '#d4ccbe',
-    contentInset: 'always',
+    // Safe area hanteras i CSS med viewport-fit=cover + .pt-safe/.pb-safe.
+    // Native auto-inset skapar annars en separat bottenyta i scroll-vyn.
+    contentInset: 'never',
     // Tillåt mixed content är inte nödvändigt — alla externa anrop är https.
     limitsNavigationsToAppBoundDomains: false,
   },
