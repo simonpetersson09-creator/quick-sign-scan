@@ -213,7 +213,7 @@ function PreviewPage() {
 
   if (!pages.length) {
     return (
-      <AppShell title={t("previewTitle")} back="/scan">
+      <AppShell title={t("previewTitle")} back="/scan" className="h-dvh overflow-hidden">
         <div className="flex flex-1 flex-col items-center justify-center text-center pb-16">
           <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-secondary text-secondary-foreground">
             <ScanLine className="h-6 w-6" />
