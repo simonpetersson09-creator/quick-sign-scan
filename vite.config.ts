@@ -18,4 +18,14 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  vite: {
+    // Emit a client manifest so the post-build script (scripts/generate-capacitor-shell.mjs)
+    // can generate dist/client/index.html for Capacitor (iOS WKWebView needs a static
+    // index.html — SSR isn't available inside the native bundle).
+    environments: {
+      client: {
+        build: { manifest: true },
+      },
+    },
+  },
 });
