@@ -137,6 +137,7 @@ const sv: Dict = {
   retake: "Ta om bild",
   startOver: "Börja om",
   backToSign: "Tillbaka till signering",
+  dragSignatureHint: "Tryck och dra signaturen för att flytta den.",
 
   // send
   sendTitle: "Skicka via e-post",
@@ -326,6 +327,7 @@ const en: Dict = {
   retake: "Retake photo",
   startOver: "Start over",
   backToSign: "Back to signing",
+  dragSignatureHint: "Tap and drag the signature to move it.",
 
   // send
   sendTitle: "Send via email",

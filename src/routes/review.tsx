@@ -398,6 +398,11 @@ function ReviewPage() {
             </ZoomButton>
           </div>
         </div>
+        {signed && (
+          <p className="text-[11px] text-center text-muted-foreground">
+            {t("dragSignatureHint")}
+          </p>
+        )}
       </div>
 
       {/* Approval + actions */}
