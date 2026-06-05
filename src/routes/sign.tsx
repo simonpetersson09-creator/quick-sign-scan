@@ -92,7 +92,7 @@ function SignPage() {
   }
 
   return (
-    <AppShell title={t("signTitle")} back="/place">
+    <AppShell title={t("signTitle")} back="/place" className="h-dvh overflow-hidden">
       <div className="mt-auto" />
       <p className="text-sm text-muted-foreground mt-4 text-center">
         {t("signHint")}
