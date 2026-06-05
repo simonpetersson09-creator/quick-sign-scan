@@ -19,6 +19,10 @@ const STORAGE_KEY = "app_access_code";
 const BUILD_TIME_CODE: string | undefined = import.meta.env
   .VITE_APP_ACCESS_CODE as string | undefined;
 
+function isDev(): boolean {
+  return typeof import.meta.env !== "undefined" && !!import.meta.env.DEV;
+}
+
 export function isCapacitor(): boolean {
   if (typeof window === "undefined") return false;
   return window.location.protocol === "capacitor:";
