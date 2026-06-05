@@ -27,27 +27,45 @@ export const Route = createFileRoute("/preview")({
 function PreviewPage() {
   const navigate = useNavigate();
   const t = useT();
-  const [pages, setPages] = useState<string[]>([]);
-  const [activeIndex, setActiveIndex] = useState(0);
+  // Initialize synchronously from the in-memory store so we don't flash the
+  // empty state when pages are already present (e.g. just-finished scan).
+  const [pages, setPages] = useState<string[]>(() => scanStore.get().pages);
+  const [activeIndex, setActiveIndex] = useState<number>(() => {
+    const s = scanStore.get();
+    if (!s.pages.length) return 0;
+    return s.imageDataUrl
+      ? Math.max(0, s.pages.indexOf(s.imageDataUrl))
+      : s.pages.length - 1;
+  });
   const [filterMode, setFilterMode] = useState<FilterMode>("color");
   // Cache filtered results so flipping pages stays instant: key = `${index}|${mode}`
   const filterCache = useRef<Map<string, string>>(new Map());
   const [displayUrl, setDisplayUrl] = useState<string | null>(null);
   const [filtering, setFiltering] = useState(false);
 
+  // Subscribe to store updates so any late mutation (race with navigation,
+  // or external change) reflects here.
   useEffect(() => {
-    const session = scanStore.get();
-    if (!session.pages.length) {
-      setPages([]);
-      setActiveIndex(0);
-      return;
-    }
-    setPages(session.pages);
-    const idx = session.imageDataUrl
-      ? Math.max(0, session.pages.indexOf(session.imageDataUrl))
-      : session.pages.length - 1;
-    setActiveIndex(idx);
-  }, [navigate]);
+    const sync = () => {
+      const session = scanStore.get();
+      setPages(session.pages);
+      if (!session.pages.length) {
+        setActiveIndex(0);
+        return;
+      }
+      const idx = session.imageDataUrl
+        ? Math.max(0, session.pages.indexOf(session.imageDataUrl))
+        : session.pages.length - 1;
+      setActiveIndex((prev) =>
+        prev >= 0 && prev < session.pages.length ? prev : idx,
+      );
+    };
+    sync();
+    const unsub = scanStore.subscribe(sync);
+    return () => {
+      unsub();
+    };
+  }, []);
 
   const originalImage = pages[activeIndex];
 
