@@ -327,6 +327,7 @@ const en: Dict = {
   retake: "Retake photo",
   startOver: "Start over",
   backToSign: "Back to signing",
+  dragSignatureHint: "Tap and drag the signature to move it.",
 
   // send
   sendTitle: "Send via email",
