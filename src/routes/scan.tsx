@@ -961,9 +961,10 @@ function ScanPage() {
     // kamerans/canvasens proportion. Själva innehållet mappas fortfarande från
     // de fyra verkliga hörnen i srcQuad.
     const aspect = geometry.height >= geometry.width ? Math.SQRT2 : 1 / Math.SQRT2;
-    // 300 DPI A4 (210 mm × 297 mm) ≈ 2480 × 3508 px. Print-quality output
-    // for contracts, signatures and small text.
-    const outW = 2480;
+    // 200 DPI A4 (210 mm × 297 mm) ≈ 1654 × 2339 px. Document-scan quality:
+    // tydlig text och signaturer, men ~40 % av pixlarna jämfört med 300 DPI →
+    // dramatiskt mindre JPEG/PDF utan synlig läsbarhetsförsämring.
+    const outW = 1654;
     const outH = Math.round(outW * aspect);
 
 
@@ -1052,20 +1053,31 @@ function ScanPage() {
       }
       captureRetryRef.current = 0;
 
+      // Komprimera den slutgiltiga sidan som JPEG 82 %. PNG genererade tidigare
+      // 5–10 MB per sida för en 2480px-bild — JPEG @ 1654px landar typiskt
+      // på 150–350 kB med bibehållen läsbarhet för text och signaturer.
+      const JPEG_QUALITY = 0.82;
+      const dataUrl = warped.toDataURL("image/jpeg", JPEG_QUALITY);
+      // sourceDataUrl används inte för PDF — håll den liten så minnet inte
+      // sväller när användaren skannar många sidor.
       const sourceCanvas = document.createElement("canvas");
-      sourceCanvas.width = vw;
-      sourceCanvas.height = vh;
-      sourceCanvas.getContext("2d")!.drawImage(video, 0, 0, vw, vh);
-
-      const dataUrl = warped.toDataURL("image/png");
-      const sourceDataUrl = sourceCanvas.toDataURL("image/jpeg", 0.9);
+      const SRC_MAX = 800;
+      const srcScale = Math.min(1, SRC_MAX / Math.max(vw, vh));
+      sourceCanvas.width = Math.round(vw * srcScale);
+      sourceCanvas.height = Math.round(vh * srcScale);
+      sourceCanvas
+        .getContext("2d")!
+        .drawImage(video, 0, 0, sourceCanvas.width, sourceCanvas.height);
+      const sourceDataUrl = sourceCanvas.toDataURL("image/jpeg", 0.6);
 
       logScanCanvas("final-image-to-pdf", warped, debugEnabled);
       logScanStage("pdf-input", {
         sameDataUrlUsedForPreviewAndPdf: true,
         imageWidth: warped.width,
         imageHeight: warped.height,
-        dataUrlBytes: dataUrl.length,
+        format: "JPEG",
+        quality: JPEG_QUALITY,
+        approxKB: Math.round(dataUrl.length * 0.75 / 1024),
       });
       const session = scanStore.addPage(dataUrl, {
         sourceDataUrl,
@@ -1119,7 +1131,7 @@ function ScanPage() {
     canvas.width = vw;
     canvas.height = vh;
     canvas.getContext("2d")!.drawImage(video, 0, 0, vw, vh);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
     // Use full-frame "quad" so downstream code has valid corners.
     const fullQuad: [Point, Point, Point, Point] = [
       { x: 0, y: 0 },
