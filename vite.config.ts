@@ -35,9 +35,21 @@ function nitroSsrShimPlugin(): Plugin {
           const shimPath = join(serverDir, "server.js");
           writeFileSync(
             shimPath,
-            "export { default } from './index.mjs';\n",
+            // Re-export Nitro's fetch handler, but inject a stub `env` and
+            // `ctx` so accesses like `env.ASSETS` don't throw under Node
+            // (the prerender preview server invokes `fetch(req)` with no
+            // worker bindings).
+            [
+              "import handler from './index.mjs';",
+              "const stubCtx = { waitUntil() {}, passThroughOnException() {} };",
+              "export default {",
+              "  fetch: (request, env, ctx) => handler.fetch(request, env ?? {}, ctx ?? stubCtx),",
+              "};",
+              "",
+            ].join("\n"),
             "utf8",
           );
+
         } catch {
           /* ignore — the prerender will surface a clearer error if needed */
         }
