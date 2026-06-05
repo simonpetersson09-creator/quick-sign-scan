@@ -15,7 +15,7 @@ interface Props {
 export function AppShell({ title, back, children, rightSlot, className }: Props) {
   const t = useT();
   return (
-    <div className={cn("min-h-dvh flex flex-col bg-background", className)}>
+    <div className={cn("h-dvh overflow-hidden flex flex-col bg-background", className)}>
       {(title || back) && (
         <header className="pt-safe px-5 pb-3 relative flex items-center justify-center min-h-[44px]">
           {back && (
@@ -33,7 +33,7 @@ export function AppShell({ title, back, children, rightSlot, className }: Props)
           {rightSlot && <div className="absolute right-5">{rightSlot}</div>}
         </header>
       )}
-      <main className="flex-1 flex flex-col px-5 pb-safe">{children}</main>
+      <main className="min-h-0 flex-1 flex flex-col overflow-hidden px-5 pb-safe">{children}</main>
     </div>
   );
 }
