@@ -1,25 +1,26 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
-// Sätt CAP_DEV=1 i terminalen för att köra mot Lovable preview (hot reload):
-//   CAP_DEV=1 npx cap sync ios
-// Standard (utan flagga) bygger för release/App Store och kör inbyggd webbkod.
+// Capacitor laddar appen via WKWebView. Eftersom projektet är en TanStack Start
+// SSR-app fungerar det inte att paketera en statisk SPA-shell — vi pekar
+// istället WKWebView mot den publicerade webb-appen. Layout, routing,
+// CSS och safe areas fungerar då exakt som på webben.
+//
+// Med CAP_DEV=1 körs mot Lovable preview (hot reload), annars mot prod.
 const isDev = process.env.CAP_DEV === '1';
 
+const PROD_URL =
+  'https://quick-sign-scan.lovable.app?forceHideBadge=true';
+const DEV_URL =
+  'https://69a35b64-3eb9-4e68-8e67-6b39a3a3ec0e.lovableproject.com?forceHideBadge=true';
+
 const config: CapacitorConfig = {
-  // Reverse-DNS bundle id. Kan INTE ändras efter första App Store-uppladdning.
   appId: 'com.sspp.signandgo',
   appName: 'Sign & Go',
-  // Vite/Nitro outputs the static client bundle into dist/client (index.html lives here
-  // thanks to the prerender of "/" configured in vite.config.ts).
   webDir: 'dist/client',
-  ...(isDev
-    ? {
-        server: {
-          url: 'https://69a35b64-3eb9-4e68-8e67-6b39a3a3ec0e.lovableproject.com?forceHideBadge=true',
-          cleartext: true,
-        },
-      }
-    : {}),
+  server: {
+    url: isDev ? DEV_URL : PROD_URL,
+    cleartext: false,
+  },
   ios: {
     contentInset: 'always',
   },
