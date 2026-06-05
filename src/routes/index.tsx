@@ -38,6 +38,7 @@ function Home() {
 
   return (
     <div className="h-dvh overflow-hidden flex flex-col bg-background pt-safe pb-safe px-5">
+      <WelcomeCard />
       {/* Center everything vertically */}
       <div className="flex-1 flex flex-col items-center justify-center gap-8">
         {/* Title */}
