@@ -427,23 +427,34 @@ const en: Dict = {
   scanTooLargeTitle: "The scan is too large to be stored on the device",
   scanTooLargeDesc: "It remains in memory, but don't reload the page before sending – the document will be lost.",
 
+  // welcome (first launch)
+  welcome_title: "Welcome to Sign & Go",
+  welcome_body: "5 free documents included. After that, Sign & Go Premium costs 99 SEK/year.",
+  welcome_continue: "Continue",
+
   // premium / paywall
   premium_paywall_title: "Sign & Go Premium",
-  premium_paywall_remaining: "You have {remaining} of {limit} free documents left. Upgrade for unlimited use.",
-  premium_paywall_limit_reached: "You've used your {limit} free documents. Upgrade to keep sending.",
-  premium_benefit_unlimited: "Send unlimited documents",
-  premium_benefit_no_ads: "No ads, ever",
-  premium_benefit_support: "Supports ongoing development",
-  premium_buy_cta: "Get Premium – 99 SEK/year",
+  premium_paywall_used_all: "You've used your {limit} free documents.",
+  premium_paywall_remaining: "You have {remaining} of {limit} free documents left.",
+  premium_benefit_scan: "Unlimited scanning",
+  premium_benefit_sign: "Unlimited signing",
+  premium_benefit_send: "Unlimited PDF sending",
+  premium_price_yearly: "99 SEK/year",
+  premium_start_cta: "Start Premium",
+  premium_apple_secure: "Securely handled by Apple.",
   premium_restore: "Restore purchase",
   premium_only_ios: "Purchases are only available in the iOS app.",
-  premium_legal_footnote: "Subscription auto-renews yearly until canceled in the App Store. Managed by Apple.",
   premium_purchase_failed: "The purchase couldn't be completed. Please try again.",
   premium_restore_failed: "Couldn't restore the purchase. Please try again.",
   premium_restore_none: "No active subscription was found on this Apple ID.",
 
+  // soft prompt after sending
+  soft_one_left_title: "You have 1 free document left.",
+  soft_one_left_body: "Unlock unlimited use for just 99 SEK/year.",
+  soft_continue: "Continue",
+
   // premium status (settings)
-  premium_status_title: "Subscription",
+  premium_status_title: "Premium",
   premium_status_active: "Premium active",
   premium_status_inactive: "No subscription",
   premium_status_loading: "Checking status…",
@@ -452,11 +463,10 @@ const en: Dict = {
   premium_status_no_renew: "Ends {date}",
   premium_free_remaining: "{remaining} of {limit} free documents left",
   premium_unlimited: "Unlimited documents",
-  premium_upgrade_cta: "Upgrade to Premium",
-  premium_manage_apple: "Manage in App Store",
+  premium_manage_apple: "Manage subscription",
 
   // home banner
-  home_free_remaining: "{remaining} free documents left",
+  home_free_remaining: "{remaining} of 5 free documents left",
   home_premium_badge: "Premium",
 };
 
