@@ -1,10 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { X, Crown, RotateCcw, Loader2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { loadSettings, saveSettings, type AppSettings } from "@/lib/settings";
-import { useT } from "@/lib/i18n";
+import { useT, useLang } from "@/lib/i18n";
+import { usePremium, useUsage } from "@/hooks/usePremium";
+import { purchasePremium, restorePremium } from "@/lib/premium";
 
 
 export const Route = createFileRoute("/settings")({
