@@ -225,6 +225,7 @@ const sv: Dict = {
   // home banner
   home_free_remaining: "{remaining} gratis dokument kvar",
   home_premium_badge: "Premium",
+};
 
 const en: Dict = {
   // common
