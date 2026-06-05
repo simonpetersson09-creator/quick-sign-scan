@@ -13,7 +13,11 @@ const config: CapacitorConfig = {
   appId: 'com.sspp.signandgo',
   appName: 'Sign & Go',
   webDir: 'dist/client',
+  // Fyll även ytan bakom/i utkanten av WKWebView. Det tar bort svart bottenyta
+  // vid iOS home-indicator när CSS-vyn slutar före safe area.
+  backgroundColor: '#d4ccbe',
   ios: {
+    backgroundColor: '#d4ccbe',
     contentInset: 'always',
     // Tillåt mixed content är inte nödvändigt — alla externa anrop är https.
     limitsNavigationsToAppBoundDomains: false,
