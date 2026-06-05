@@ -210,7 +210,7 @@ function SendPage() {
 
   if (done) {
     return (
-      <AppShell>
+      <AppShell className="h-dvh overflow-hidden">
         <div className="flex-1 flex flex-col items-center justify-center text-center">
           <div className="h-16 w-16 rounded-full bg-success/15 flex items-center justify-center">
             <Check className="h-8 w-8 text-success" />
@@ -223,7 +223,7 @@ function SendPage() {
   }
 
   return (
-    <AppShell title={t("sendTitle")} back="/review">
+    <AppShell title={t("sendTitle")} back="/review" className="h-dvh overflow-hidden">
       <div className="flex flex-col gap-4 mt-2">
         <Field label={t("fieldTo")}>
           <input
