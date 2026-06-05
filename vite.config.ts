@@ -35,20 +35,38 @@ function nitroSsrShimPlugin(): Plugin {
           const shimPath = join(serverDir, "server.js");
           writeFileSync(
             shimPath,
-            // Re-export Nitro's fetch handler, but inject a stub `env` and
-            // `ctx` so accesses like `env.ASSETS` don't throw under Node
-            // (the prerender preview server invokes `fetch(req)` with no
-            // worker bindings).
+            // Re-export Nitro's fetch handler, but:
+            //  1. Stub `env`/`ctx` so accesses like `env.ASSETS` don't throw
+            //     under Node — the prerender preview server invokes
+            //     `fetch(req)` with no Cloudflare bindings.
+            //  2. Re-wrap the incoming Request as a plain WHATWG Request so
+            //     Nitro's `augmentReq` can attach `.ip` and friends. srvx's
+            //     NodeRequest exposes `ip` as a read-only getter, which
+            //     otherwise throws "Cannot set property ip of #<Request>".
             [
               "import handler from './index.mjs';",
               "const stubCtx = { waitUntil() {}, passThroughOnException() {} };",
+              "function toPlainRequest(request) {",
+              "  const init = {",
+              "    method: request.method,",
+              "    headers: request.headers,",
+              "    redirect: request.redirect,",
+              "  };",
+              "  if (request.method !== 'GET' && request.method !== 'HEAD') {",
+              "    init.body = request.body;",
+              "    init.duplex = 'half';",
+              "  }",
+              "  return new Request(request.url, init);",
+              "}",
               "export default {",
-              "  fetch: (request, env, ctx) => handler.fetch(request, env ?? {}, ctx ?? stubCtx),",
+              "  fetch: (request, env, ctx) =>",
+              "    handler.fetch(toPlainRequest(request), env ?? {}, ctx ?? stubCtx),",
               "};",
               "",
             ].join("\n"),
             "utf8",
           );
+
 
         } catch {
           /* ignore — the prerender will surface a clearer error if needed */
