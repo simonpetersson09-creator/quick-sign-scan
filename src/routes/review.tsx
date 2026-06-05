@@ -276,7 +276,7 @@ function ReviewPage() {
   return (
     <AppShell title={t("reviewTitle")} back="/sign">
       {/* Status row */}
-      <div className="mt-1 mb-3 flex flex-wrap items-center gap-2">
+      <div className="mt-1 mb-3 flex flex-wrap items-center justify-center gap-2">
         <StatusChip tone="success" label={t("documentReady")} />
         <StatusChip
           tone={signed ? "success" : "muted"}
