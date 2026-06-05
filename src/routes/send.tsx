@@ -265,7 +265,6 @@ function SendPage() {
     );
   }
 
-  return (
   if (blocked) {
     return (
       <AppShell title={t("sendTitle")} back="/review" className="h-dvh overflow-hidden">
