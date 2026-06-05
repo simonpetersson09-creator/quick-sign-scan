@@ -51,7 +51,7 @@ const nativeCorsMiddleware = createMiddleware().server(async ({ request, pathnam
 
   const result = await next();
   if (nativeOrigin) {
-    result.response = withNativeCors(result.response, request, nativeOrigin);
+    return { ...result, response: withNativeCors(result.response, request, nativeOrigin) };
   }
   return result;
 });
