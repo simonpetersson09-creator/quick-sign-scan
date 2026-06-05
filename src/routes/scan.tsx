@@ -222,6 +222,16 @@ function ScanPage() {
     setCameraReady(false);
   }, []);
 
+  const stopDetachedVideoStream = useCallback((stream: MediaStream, reason: string) => {
+    console.info("[scan] stopCamera called", {
+      reason,
+      detached: true,
+      pages: scanStore.getPages().length,
+      tracks: stream.getVideoTracks().length,
+    });
+    stream.getVideoTracks().forEach((track) => track.stop());
+  }, []);
+
   // Exposure lock: when the doc is "ready" lock exposure so brightness doesn't
   // shift in the milliseconds before capture. Release it as soon as we're no
   // longer ready so the next document gets a fresh metering.
@@ -385,7 +395,7 @@ function ScanPage() {
         // If the user navigated away while getUserMedia was pending, immediately
         // shut down the stream so the camera light never lingers.
         if (cancelledRef.current) {
-          stream.getTracks().forEach((tr) => tr.stop());
+          stopDetachedVideoStream(stream, "startCamera-cancelled-after-getUserMedia");
           return;
         }
         streamRef.current = stream;
@@ -446,14 +456,14 @@ function ScanPage() {
           // we still let detect() bail safely on its own readyState check.
           await Promise.race([waitReady, new Promise<void>((r) => setTimeout(r, 4000))]);
           if (cancelledRef.current) {
-            stream.getTracks().forEach((tr) => tr.stop());
+            stopDetachedVideoStream(stream, "startCamera-cancelled-after-video-ready");
             streamRef.current = null;
             return;
           }
           setCameraReady(videoEl.videoWidth > 0 && videoEl.videoHeight > 0);
         }
         if (cancelledRef.current) {
-          stream.getTracks().forEach((tr) => tr.stop());
+          stopDetachedVideoStream(stream, "startCamera-cancelled-before-loop");
           streamRef.current = null;
           return;
         }
@@ -499,7 +509,7 @@ function ScanPage() {
         setStatus("error");
       }
     },
-    [t, stopCamera],
+    [t, stopCamera, stopDetachedVideoStream],
   );
 
   useEffect(() => {
