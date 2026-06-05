@@ -113,7 +113,10 @@ function SendPage() {
     document.body.appendChild(a);
     a.click();
     a.remove();
-    setTimeout(() => URL.revokeObjectURL(fileUrl), 10000);
+    setTimeout(() => {
+      console.info("[send] revokeObjectURL called", { reason: "download pdf temp url" });
+      URL.revokeObjectURL(fileUrl);
+    }, 10000);
     return { blob, filename };
   }
 
@@ -173,7 +176,7 @@ function SendPage() {
       if (result.ok) {
         setDone(true);
         setTimeout(() => {
-          scanStore.clear();
+          scanStore.clear("email sent");
           navigate({ to: "/" });
         }, 2200);
       } else {

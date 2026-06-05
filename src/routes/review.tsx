@@ -438,7 +438,7 @@ function ReviewPage() {
           <PrimaryButton
             variant="secondary"
             onClick={() => {
-              scanStore.clear();
+              scanStore.clear("retake from review");
               navigate({ to: "/scan" });
             }}
             className="h-12 text-[15px]"
