@@ -22,6 +22,7 @@ export function usePremium() {
 export function useUsage() {
   const [count, setCount] = useState<number>(() => usage.getSentCount());
   useEffect(() => {
+    void initUsage().then(() => setCount(usage.getSentCount()));
     const unsub = usage.subscribe(setCount);
     return () => {
       unsub();
