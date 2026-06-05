@@ -13,11 +13,26 @@ const MAX_MESSAGE_LEN = 5000;
 const MAX_FILENAME_LEN = 120;
 const MAX_EMAIL_LEN = 254;
 
-// Rate limit caps (per hashed IP).
-const RL_SHORT_MAX = 5;
+// Rate limit caps (per hashed IP). Tightened now that every send must also
+// carry a valid shared `x-app-access` header — the header gates abuse from
+// random web traffic; these caps still guard against a single
+// authenticated client (or a leaked code) blasting the endpoint.
+const RL_SHORT_MAX = 10;
 const RL_SHORT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
-const RL_DAILY_MAX = 20;
+const RL_DAILY_MAX = 30;
 const RL_DAILY_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+// Header name and helper for constant-time comparison of the shared access
+// code. The code itself is read from `process.env.APP_ACCESS_CODE` and never
+// shipped to the browser; rotate by updating the secret and rebuilding the
+// Capacitor app with a new VITE_APP_ACCESS_CODE.
+const ACCESS_HEADER = "x-app-access";
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
 
 export const SendErrorCodes = [
   "attachment_too_large",
@@ -223,6 +238,26 @@ export const sendScanEmail = createServerFn({ method: "POST" })
       return fail("unauthorized");
     }
 
+    // Shared access code check. The header is attached automatically by the
+    // client-side fetch middleware (web reads it from localStorage after the
+    // user passed the access-code gate; Capacitor reads VITE_APP_ACCESS_CODE
+    // baked in at build time). Without a matching header the request is
+    // rejected before doing any work — and the failure is still counted
+    // toward the rate limiter below so repeated guessing gets throttled.
+    const expectedAccessCode = process.env.APP_ACCESS_CODE;
+    if (!expectedAccessCode) {
+      console.error(
+        `[sendScanEmail] ${ts} ${requestId} status=misconfigured reason=missing_app_access_code`,
+      );
+      return fail("unauthorized");
+    }
+    const providedAccessCode = req?.headers.get(ACCESS_HEADER) ?? "";
+    if (!timingSafeEqual(providedAccessCode, expectedAccessCode)) {
+      console.warn(
+        `[sendScanEmail] ${ts} ${requestId} status=forbidden reason=bad_access_code provided_len=${providedAccessCode.length}`,
+      );
+      return fail("unauthorized", 401);
+    }
 
     const ip = extractIp(req);
     const ipHash = await hashIp(ip);
