@@ -97,7 +97,7 @@ function SignPage() {
         {t("signHint")}
       </p>
 
-      <div className="mt-4 relative rounded-2xl bg-card border border-border shadow-[var(--shadow-soft)] overflow-hidden" style={{ aspectRatio: "16 / 9" }}>
+      <div className="mt-auto relative rounded-2xl bg-card border border-border shadow-[var(--shadow-soft)] overflow-hidden" style={{ aspectRatio: "16 / 9" }}>
         <canvas
           ref={canvasRef}
           onPointerDown={start}
@@ -123,8 +123,6 @@ function SignPage() {
           <RotateCcw className="h-4 w-4" /> {t("clear")}
         </button>
       </div>
-
-      <div className="flex-1" />
 
       <div className="flex flex-col gap-3 pt-5">
         <PrimaryButton onClick={done} disabled={!hasInk}>
