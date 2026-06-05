@@ -48,9 +48,12 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
 function getAllowedNativeOrigin(request: Request): string | null {
   const origin = request.headers.get("origin");
   if (!origin) return null;
+  if (NATIVE_ORIGINS.has(origin)) return origin;
   try {
     const parsed = new URL(origin);
-    return NATIVE_ORIGINS.has(parsed.origin) ? parsed.origin : null;
+    const normalized = `${parsed.protocol}//${parsed.host}`;
+    if (NATIVE_ORIGINS.has(normalized)) return origin;
+    return parsed.origin !== "null" && NATIVE_ORIGINS.has(parsed.origin) ? origin : null;
   } catch {
     return null;
   }
