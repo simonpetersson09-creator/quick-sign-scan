@@ -7,11 +7,9 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { LanguageProvider } from "@/lib/i18n";
 import { AccessCodeGate } from "@/components/AccessCodeGate";
-import { initNative } from "@/lib/native-init";
 
 import appCss from "../styles.css?url";
 
@@ -104,7 +102,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { name: "theme-color", content: "#d4ccbe" },
       { title: "SSPP Sign & Go" },
       { name: "description", content: "." },
       { name: "author", content: "Lovable" },
@@ -115,8 +112,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:site", content: "@Lovable" },
       { name: "twitter:title", content: "SSPP Sign & Go" },
       { name: "twitter:description", content: "." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/24094ed6-dec8-4346-aff1-efaed6c717c7/id-preview-b01af253--69a35b64-3eb9-4e68-8e67-6b39a3a3ec0e.lovable.app-1780659619381.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/24094ed6-dec8-4346-aff1-efaed6c717c7/id-preview-b01af253--69a35b64-3eb9-4e68-8e67-6b39a3a3ec0e.lovable.app-1780659619381.png" },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/3b1aecfe-c636-4774-849b-7691b1101adb/id-preview-e92d01e2--69a35b64-3eb9-4e68-8e67-6b39a3a3ec0e.lovable.app-1780659925127.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/3b1aecfe-c636-4774-849b-7691b1101adb/id-preview-e92d01e2--69a35b64-3eb9-4e68-8e67-6b39a3a3ec0e.lovable.app-1780659925127.png" },
     ],
     links: [
       {
@@ -133,14 +130,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="h-dvh overflow-hidden">
+    <html lang="en">
       <head>
         <HeadContent />
       </head>
-      <body className="h-dvh overflow-hidden fixed inset-0 w-full">
-        <div id="root" className="h-dvh overflow-hidden">
-          {children}
-        </div>
+      <body>
+        {children}
         <Scripts />
       </body>
     </html>
@@ -149,10 +144,6 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-
-  useEffect(() => {
-    initNative();
-  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
