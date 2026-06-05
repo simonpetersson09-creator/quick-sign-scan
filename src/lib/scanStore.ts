@@ -42,33 +42,50 @@ export interface ScanSession {
   signaturePosition: { x: number; y: number } | null; // normalized 0..1
 }
 
-const initial: ScanSession = {
-  imageDataUrl: null,
-  sourceDataUrl: null,
-  pages: [],
-  detection: null,
-  pdfDataUrl: null,
-  signatureDataUrl: null,
-  signaturePosition: null,
+function createInitial(): ScanSession {
+  return {
+    imageDataUrl: null,
+    sourceDataUrl: null,
+    pages: [],
+    detection: null,
+    pdfDataUrl: null,
+    signatureDataUrl: null,
+    signaturePosition: null,
+  };
+}
+
+type StoreBag = {
+  state: ScanSession;
+  listeners: Set<Listener>;
+  cleanupBound: boolean;
 };
 
-let state: ScanSession = { ...initial };
-const listeners = new Set<Listener>();
+const storeGlobal = globalThis as typeof globalThis & {
+  __SIGN_GO_SCAN_STORE__?: StoreBag;
+};
+
+const bag =
+  storeGlobal.__SIGN_GO_SCAN_STORE__ ??
+  (storeGlobal.__SIGN_GO_SCAN_STORE__ = {
+    state: createInitial(),
+    listeners: new Set<Listener>(),
+    cleanupBound: false,
+  });
 
 function notify() {
-  listeners.forEach((l) => l());
+  bag.listeners.forEach((l) => l());
 }
 
 function wipe() {
   // Overwrite references so large strings can be GC'd immediately and
   // never linger as stale closures.
-  state = { ...initial };
+  bag.state = createInitial();
 }
 
 export const scanStore = {
-  get: () => state,
+  get: () => bag.state,
   set: (patch: Partial<ScanSession>) => {
-    state = { ...state, ...patch };
+    bag.state = { ...bag.state, ...patch };
     notify();
   },
   clear: () => {
@@ -76,8 +93,8 @@ export const scanStore = {
     notify();
   },
   subscribe: (l: Listener) => {
-    listeners.add(l);
-    return () => listeners.delete(l);
+    bag.listeners.add(l);
+    return () => bag.listeners.delete(l);
   },
   // Kept for API compatibility with previous version. Always a no-op now
   // since nothing is ever persisted.
@@ -86,7 +103,8 @@ export const scanStore = {
 
 // Auto-cleanup: if the user closes the tab, navigates away, refreshes,
 // or the page is hidden/backgrounded, drop all scan data immediately.
-if (typeof window !== "undefined") {
+if (typeof window !== "undefined" && !bag.cleanupBound) {
+  bag.cleanupBound = true;
   const cleanup = () => wipe();
   window.addEventListener("pagehide", cleanup);
   window.addEventListener("beforeunload", cleanup);
