@@ -47,7 +47,21 @@ function Home() {
           <span className="text-[13px] text-muted-foreground/50 font-light tracking-tight self-end mt-0.5">
             By SSPP
           </span>
+          <Link
+            to="/settings"
+            className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-card border border-border text-[11px] font-medium text-foreground/75 shadow-[var(--shadow-soft)]"
+          >
+            {isPremium ? (
+              <>
+                <Crown className="h-3 w-3 text-primary" />
+                <span>{t("home_premium_badge")}</span>
+              </>
+            ) : (
+              <span>{t("home_free_remaining", { remaining: String(remaining) })}</span>
+            )}
+          </Link>
         </div>
+
 
         {/* Flow */}
         <div className="flex flex-col items-center">
