@@ -276,16 +276,14 @@ function PremiumSection() {
         </div>
       )}
 
-      {isActive && (
-        <a
-          href="https://apps.apple.com/account/subscriptions"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="self-start text-[12px] font-medium text-primary hover:underline mt-1"
-        >
-          {t("premium_manage_apple")}
-        </a>
-      )}
+      <a
+        href="https://apps.apple.com/account/subscriptions"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="self-start text-[12px] font-medium text-primary hover:underline mt-1"
+      >
+        {t("premium_manage_apple")}
+      </a>
 
       {info && <p className="text-[12px] text-destructive">{info}</p>}
     </section>

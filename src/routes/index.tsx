@@ -5,6 +5,7 @@ import { useLang } from "@/lib/i18n";
 import { scanStore } from "@/lib/scanStore";
 import { pdfFileToImages } from "@/lib/pdfToImages";
 import { usePremium, useUsage } from "@/hooks/usePremium";
+import { WelcomeCard } from "@/components/WelcomeCard";
 
 const MAX_PDF_PAGES = 20;
 
@@ -37,6 +38,7 @@ function Home() {
 
   return (
     <div className="h-dvh overflow-hidden flex flex-col bg-background pt-safe pb-safe px-5">
+      <WelcomeCard />
       {/* Center everything vertically */}
       <div className="flex-1 flex flex-col items-center justify-center gap-8">
         {/* Title */}

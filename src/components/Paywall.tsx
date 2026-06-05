@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Crown, RotateCcw, Loader2, Check } from "lucide-react";
+import { Crown, Loader2, Check } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import {
   purchasePremium,
@@ -20,6 +20,7 @@ export function Paywall({ status, freeRemaining, freeLimit, onClose }: Props) {
   const [info, setInfo] = useState<string | null>(null);
 
   const unsupported = status.state === "unsupported";
+  const usedAll = freeRemaining <= 0;
 
   async function buy() {
     setInfo(null);
@@ -42,39 +43,43 @@ export function Paywall({ status, freeRemaining, freeLimit, onClose }: Props) {
   }
 
   return (
-    <div className="flex flex-col items-center text-center gap-5 px-2">
+    <div className="flex flex-col items-center text-center gap-6 px-2 w-full max-w-[340px] mx-auto">
       <div className="h-14 w-14 rounded-full bg-primary/15 flex items-center justify-center">
         <Crown className="h-6 w-6 text-primary" strokeWidth={1.75} />
       </div>
 
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-2">
         <h2 className="text-xl font-semibold tracking-tight">
           {t("premium_paywall_title")}
         </h2>
-        <p className="text-sm text-muted-foreground max-w-[300px]">
-          {freeRemaining > 0
-            ? t("premium_paywall_remaining", {
+        <p className="text-[15px] text-foreground/80 leading-snug">
+          {usedAll
+            ? t("premium_paywall_used_all", { limit: String(freeLimit) })
+            : t("premium_paywall_remaining", {
                 remaining: String(freeRemaining),
                 limit: String(freeLimit),
-              })
-            : t("premium_paywall_limit_reached", { limit: String(freeLimit) })}
+              })}
         </p>
       </div>
 
-      <ul className="flex flex-col gap-2 text-sm text-foreground/85 self-stretch max-w-[320px] mx-auto">
+      <ul className="flex flex-col gap-2.5 text-[15px] text-foreground self-stretch">
         {[
-          t("premium_benefit_unlimited"),
-          t("premium_benefit_no_ads"),
-          t("premium_benefit_support"),
+          t("premium_benefit_scan"),
+          t("premium_benefit_sign"),
+          t("premium_benefit_send"),
         ].map((line) => (
-          <li key={line} className="flex items-start gap-2 text-left">
-            <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+          <li key={line} className="flex items-center gap-2.5 text-left">
+            <Check className="h-4 w-4 text-primary shrink-0" strokeWidth={2.5} />
             <span>{line}</span>
           </li>
         ))}
       </ul>
 
-      <div className="flex flex-col gap-2.5 self-stretch max-w-[320px] mx-auto pt-1">
+      <div className="text-[22px] font-semibold tracking-tight text-foreground">
+        {t("premium_price_yearly")}
+      </div>
+
+      <div className="flex flex-col gap-2 self-stretch">
         <button
           type="button"
           onClick={buy}
@@ -87,21 +92,20 @@ export function Paywall({ status, freeRemaining, freeLimit, onClose }: Props) {
             <Crown className="h-4 w-4" />
           )}
           <span className="text-[15px] font-semibold">
-            {t("premium_buy_cta")}
+            {t("premium_start_cta")}
           </span>
         </button>
+        <p className="text-[11px] text-muted-foreground mt-0.5">
+          {t("premium_apple_secure")}
+        </p>
         <button
           type="button"
           onClick={restore}
           disabled={busy !== null || unsupported}
-          className="rounded-xl bg-card text-foreground border border-border h-11 px-6 transition active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
+          className="mt-1 text-[13px] font-medium text-primary hover:underline disabled:opacity-60 inline-flex items-center justify-center gap-1.5"
         >
-          {busy === "restore" ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <RotateCcw className="h-4 w-4" />
-          )}
-          <span className="text-[14px] font-medium">{t("premium_restore")}</span>
+          {busy === "restore" && <Loader2 className="h-3 w-3 animate-spin" />}
+          {t("premium_restore")}
         </button>
         {unsupported && (
           <p className="text-[12px] text-muted-foreground mt-1">
@@ -111,9 +115,6 @@ export function Paywall({ status, freeRemaining, freeLimit, onClose }: Props) {
         {info && (
           <p className="text-[12px] text-destructive mt-1">{info}</p>
         )}
-        <p className="text-[11px] text-muted-foreground/80 mt-2">
-          {t("premium_legal_footnote")}
-        </p>
       </div>
     </div>
   );

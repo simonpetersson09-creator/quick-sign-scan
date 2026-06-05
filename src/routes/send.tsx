@@ -18,6 +18,7 @@ import { Check, Mail, FileText } from "lucide-react";
 import { Paywall } from "@/components/Paywall";
 import { usePremium, useUsage } from "@/hooks/usePremium";
 import { usage } from "@/lib/usage";
+import { purchasePremium } from "@/lib/premium";
 
 function makeEmailSchema(t: (k: string) => string) {
   return z
@@ -102,6 +103,7 @@ function SendPage() {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
+  const [softPromptRemaining, setSoftPromptRemaining] = useState<number | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
 
@@ -233,12 +235,23 @@ function SendPage() {
       }
 
       if (result.ok) {
-        if (!isPremium) usage.incrementSent();
+        let postSendRemaining: number | null = null;
+        if (!isPremium) {
+          const sentNow = usage.incrementSent();
+          postSendRemaining = Math.max(0, limit - sentNow);
+        }
         setDone(true);
-        setTimeout(() => {
+        // Soft prompt only when exactly 1 free doc remains after this send.
+        if (postSendRemaining === 1) {
+          setSoftPromptRemaining(1);
+          // Keep scan data — user will navigate manually from the prompt.
           scanStore.clear("email sent");
-          navigate({ to: "/" });
-        }, 2200);
+        } else {
+          setTimeout(() => {
+            scanStore.clear("email sent");
+            navigate({ to: "/" });
+          }, 2200);
+        }
       } else {
         console.error(`[send] failed code=${result.code} status=${result.status ?? "n/a"}`);
         setInfo(t(`err_${result.code}`) ?? t("err_unknown"));
@@ -254,12 +267,43 @@ function SendPage() {
   if (done) {
     return (
       <AppShell className="h-dvh overflow-hidden">
-        <div className="flex-1 flex flex-col items-center justify-center text-center">
+        <div className="flex-1 flex flex-col items-center justify-center text-center px-2">
           <div className="h-16 w-16 rounded-full bg-success/15 flex items-center justify-center">
             <Check className="h-8 w-8 text-success" />
           </div>
           <h2 className="text-xl font-semibold mt-5">{t("done")}</h2>
           <p className="text-muted-foreground mt-2 text-sm">{t("doneCleared")}</p>
+
+          {softPromptRemaining !== null && (
+            <div className="mt-8 w-full max-w-[320px] flex flex-col gap-4">
+              <div className="rounded-2xl bg-card border border-border p-5 text-center flex flex-col gap-1.5 shadow-[var(--shadow-soft)]">
+                <p className="text-[15px] font-semibold text-foreground">
+                  {t("soft_one_left_title")}
+                </p>
+                <p className="text-[13px] text-muted-foreground">
+                  {t("soft_one_left_body")}
+                </p>
+              </div>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    void purchasePremium();
+                  }}
+                  className="rounded-xl bg-primary text-primary-foreground h-11 px-6 shadow-[var(--shadow-card)] transition active:scale-[0.98] text-[15px] font-semibold"
+                >
+                  {t("premium_start_cta")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate({ to: "/" })}
+                  className="rounded-xl bg-card text-foreground border border-border h-11 px-6 transition active:scale-[0.98] text-[14px] font-medium"
+                >
+                  {t("soft_continue")}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </AppShell>
     );
