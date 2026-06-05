@@ -1053,20 +1053,31 @@ function ScanPage() {
       }
       captureRetryRef.current = 0;
 
+      // Komprimera den slutgiltiga sidan som JPEG 82 %. PNG genererade tidigare
+      // 5–10 MB per sida för en 2480px-bild — JPEG @ 1654px landar typiskt
+      // på 150–350 kB med bibehållen läsbarhet för text och signaturer.
+      const JPEG_QUALITY = 0.82;
+      const dataUrl = warped.toDataURL("image/jpeg", JPEG_QUALITY);
+      // sourceDataUrl används inte för PDF — håll den liten så minnet inte
+      // sväller när användaren skannar många sidor.
       const sourceCanvas = document.createElement("canvas");
-      sourceCanvas.width = vw;
-      sourceCanvas.height = vh;
-      sourceCanvas.getContext("2d")!.drawImage(video, 0, 0, vw, vh);
-
-      const dataUrl = warped.toDataURL("image/png");
-      const sourceDataUrl = sourceCanvas.toDataURL("image/jpeg", 0.9);
+      const SRC_MAX = 800;
+      const srcScale = Math.min(1, SRC_MAX / Math.max(vw, vh));
+      sourceCanvas.width = Math.round(vw * srcScale);
+      sourceCanvas.height = Math.round(vh * srcScale);
+      sourceCanvas
+        .getContext("2d")!
+        .drawImage(video, 0, 0, sourceCanvas.width, sourceCanvas.height);
+      const sourceDataUrl = sourceCanvas.toDataURL("image/jpeg", 0.6);
 
       logScanCanvas("final-image-to-pdf", warped, debugEnabled);
       logScanStage("pdf-input", {
         sameDataUrlUsedForPreviewAndPdf: true,
         imageWidth: warped.width,
         imageHeight: warped.height,
-        dataUrlBytes: dataUrl.length,
+        format: "JPEG",
+        quality: JPEG_QUALITY,
+        approxKB: Math.round(dataUrl.length * 0.75 / 1024),
       });
       const session = scanStore.addPage(dataUrl, {
         sourceDataUrl,
