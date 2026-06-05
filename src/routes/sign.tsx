@@ -93,11 +93,12 @@ function SignPage() {
 
   return (
     <AppShell title={t("signTitle")} back="/place">
-      <p className="text-sm text-muted-foreground mt-1">
+      <div className="mt-auto" />
+      <p className="text-sm text-muted-foreground mt-4">
         {t("signHint")}
       </p>
 
-      <div className="mt-auto relative rounded-2xl bg-card border border-border shadow-[var(--shadow-soft)] overflow-hidden" style={{ aspectRatio: "16 / 9" }}>
+      <div className="mt-2 relative rounded-2xl bg-card border border-border shadow-[var(--shadow-soft)] overflow-hidden" style={{ aspectRatio: "16 / 9" }}>
         <canvas
           ref={canvasRef}
           onPointerDown={start}
