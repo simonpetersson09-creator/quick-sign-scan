@@ -97,7 +97,7 @@ function SignPage() {
         {t("signHint")}
       </p>
 
-      <div className="mt-4 relative rounded-2xl bg-card border border-border shadow-[var(--shadow-soft)] overflow-hidden" style={{ aspectRatio: "16 / 9" }}>
+      <div className="mt-auto relative rounded-2xl bg-card border border-border shadow-[var(--shadow-soft)] overflow-hidden" style={{ aspectRatio: "16 / 9" }}>
         <canvas
           ref={canvasRef}
           onPointerDown={start}
