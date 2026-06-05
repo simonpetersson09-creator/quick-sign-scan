@@ -1203,6 +1203,11 @@ function ScanPage() {
     if (savedTimer2Ref.current) window.clearTimeout(savedTimer2Ref.current);
     if (savedTimer3Ref.current) window.clearTimeout(savedTimer3Ref.current);
     streamRef.current?.getTracks().forEach((tr) => tr.stop());
+    const snap = scanStore.get();
+    console.log("[scan] finishScanning → store snapshot", {
+      pages: snap.pages.length,
+      hasImage: !!snap.imageDataUrl,
+    });
     navigate({ to: "/preview" });
   }
 
