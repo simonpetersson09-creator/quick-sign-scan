@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// v1.0.1 — capacitor shell generator (sync marker)
 /**
  * Generates a static SPA shell at dist/client/index.html so the Capacitor (iOS)
  * build has something to load inside WKWebView.
