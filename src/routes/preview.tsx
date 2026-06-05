@@ -31,7 +31,6 @@ function PreviewPage() {
   // empty state when pages are already present (e.g. just-finished scan).
   const [pages, setPages] = useState<string[]>(() => {
     const s = scanStore.get();
-    console.log("[preview] mount → store has", s.pages.length, "pages");
     return s.pages;
   });
   const [activeIndex, setActiveIndex] = useState<number>(() => {
