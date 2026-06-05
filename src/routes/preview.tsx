@@ -46,6 +46,17 @@ function PreviewPage() {
   const [displayUrl, setDisplayUrl] = useState<string | null>(null);
   const [filtering, setFiltering] = useState(false);
 
+  useEffect(() => {
+    const list = scanStore.getPages();
+    const first = list[0];
+    console.info("[preview] mounted with pages count", {
+      pages: list.length,
+      firstPageExists: Boolean(first),
+      firstImageSrcValid: Boolean(first?.startsWith("data:image/") || first?.startsWith("blob:")),
+      imageDataUrlExists: Boolean(scanStore.get().imageDataUrl),
+    });
+  }, []);
+
   // Subscribe to store updates so any late mutation (race with navigation,
   // or external change) reflects here.
   useEffect(() => {
@@ -78,10 +89,21 @@ function PreviewPage() {
   useEffect(() => {
     let cancelled = false;
     if (!originalImage) {
+      console.info("[preview] image src valid", { valid: false, reason: "missing originalImage" });
       setDisplayUrl(null);
       return;
     }
+    console.info("[preview] first page exists", {
+      firstPageExists: Boolean(pages[0]),
+      currentPageExists: Boolean(originalImage),
+      pages: pages.length,
+    });
     if (filterMode === "color") {
+      console.info("[preview] image src valid", {
+        valid: originalImage.startsWith("data:image/") || originalImage.startsWith("blob:"),
+        source: originalImage.startsWith("blob:") ? "blob" : "dataUrl",
+        bytes: originalImage.length,
+      });
       setDisplayUrl(originalImage);
       setFiltering(false);
       return;
@@ -130,7 +152,7 @@ function PreviewPage() {
   function deletePage(i: number) {
     const next = pages.filter((_, idx) => idx !== i);
     if (next.length === 0) {
-      scanStore.clear();
+      scanStore.clear("delete last page in preview");
       navigate({ to: "/" });
       return;
     }
@@ -139,7 +161,7 @@ function PreviewPage() {
   }
 
   function startOver() {
-    scanStore.clear();
+    scanStore.clear("start over from preview");
     navigate({ to: "/" });
   }
 

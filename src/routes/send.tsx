@@ -66,8 +66,8 @@ function SendPage() {
   const trimmedTo = to.trim();
   const emailValid = emailSchema.safeParse(trimmedTo).success;
 
-  // Wipe in-memory scan data on unmount as a defense-in-depth measure —
-  // the scanStore also auto-wipes on pagehide/beforeunload.
+  // Scan data is intentionally not wiped on ordinary route unmounts; explicit
+  // completion/cancel actions clear it instead.
   useEffect(() => {
     return () => {
       // Don't wipe if user successfully sent (done effect already clears),
@@ -113,7 +113,10 @@ function SendPage() {
     document.body.appendChild(a);
     a.click();
     a.remove();
-    setTimeout(() => URL.revokeObjectURL(fileUrl), 10000);
+    setTimeout(() => {
+      console.info("[send] revokeObjectURL called", { reason: "download pdf temp url" });
+      URL.revokeObjectURL(fileUrl);
+    }, 10000);
     return { blob, filename };
   }
 
@@ -173,7 +176,7 @@ function SendPage() {
       if (result.ok) {
         setDone(true);
         setTimeout(() => {
-          scanStore.clear();
+          scanStore.clear("email sent");
           navigate({ to: "/" });
         }, 2200);
       } else {

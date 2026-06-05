@@ -115,7 +115,7 @@ function Home() {
                   setFileError(t("pdfTooManyPages", { max: String(MAX_PDF_PAGES) }));
                   return;
                 }
-                scanStore.clear();
+                scanStore.clear("new imported pdf");
                 scanStore.set({ pages, imageDataUrl: pages[0] });
                 navigate({ to: "/preview" });
                 return;
@@ -123,7 +123,7 @@ function Home() {
               const reader = new FileReader();
               reader.onload = () => {
                 const dataUrl = reader.result as string;
-                scanStore.clear();
+                scanStore.clear("new imported image");
                 scanStore.set({ pages: [dataUrl], imageDataUrl: dataUrl });
                 navigate({ to: "/preview" });
               };

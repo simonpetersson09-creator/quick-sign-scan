@@ -76,9 +76,20 @@ function notify() {
   bag.listeners.forEach((l) => l());
 }
 
-function wipe() {
+function debugScanStore(message: string, details: Record<string, unknown> = {}) {
+  if (typeof console !== "undefined") {
+    console.info(`[scanStore] ${message}`, details);
+  }
+}
+
+function wipe(reason: string) {
   // Overwrite references so large strings can be GC'd immediately and
   // never linger as stale closures.
+  debugScanStore("wipe state", {
+    reason,
+    pagesBefore: sessionPages(bag.state).length,
+    imageDataUrlExists: Boolean(bag.state.imageDataUrl),
+  });
   bag.state = createInitial();
 }
 
@@ -96,6 +107,12 @@ export const scanStore = {
   addPage: (dataUrl: string, patch: Partial<ScanSession> = {}) => {
     if (!dataUrl) return bag.state;
     const nextPages = [...sessionPages(bag.state), dataUrl];
+    debugScanStore("addPage", {
+      pagesBefore: nextPages.length - 1,
+      pagesAfter: nextPages.length,
+      dataUrlValid: dataUrl.startsWith("data:image/"),
+      dataUrlBytes: dataUrl.length,
+    });
     bag.state = {
       ...bag.state,
       ...patch,
@@ -109,8 +126,13 @@ export const scanStore = {
     bag.state = { ...bag.state, ...patch };
     notify();
   },
-  clear: () => {
-    wipe();
+  clear: (reason = "explicit") => {
+    debugScanStore("clear called", {
+      reason,
+      pagesBefore: sessionPages(bag.state).length,
+      imageDataUrlExists: Boolean(bag.state.imageDataUrl),
+    });
+    wipe(reason);
     notify();
   },
   subscribe: (l: Listener) => {
@@ -122,18 +144,18 @@ export const scanStore = {
   onQuotaExceeded: (_l: () => void) => () => {},
 };
 
-// Auto-cleanup: if the user closes the tab, navigates away, refreshes,
-// or the page is hidden/backgrounded, drop all scan data immediately.
+// Auto-cleanup only on real unload/refresh. Do not wipe on SPA route changes,
+// camera unmount, pagehide/BFCache, or temporary mobile backgrounding — preview
+// must be able to read the just-scanned pages from the same in-memory session.
 if (typeof window !== "undefined" && !bag.cleanupBound) {
   bag.cleanupBound = true;
-  const cleanup = () => wipe();
-  window.addEventListener("pagehide", cleanup);
+  const cleanup = () => wipe("beforeunload");
   window.addEventListener("beforeunload", cleanup);
   // Some mobile browsers only fire visibilitychange when backgrounded.
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") {
       // Intentionally NOT wiping on hidden — user may switch apps briefly
-      // mid-flow. We only wipe on real unload/pagehide.
+      // mid-flow. We only wipe on real unload/refresh.
     }
   });
 }

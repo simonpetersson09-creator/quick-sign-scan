@@ -208,6 +208,30 @@ function ScanPage() {
     }
   }, [torchOn]);
 
+  const stopCamera = useCallback((reason: string) => {
+    const pages = scanStore.getPages();
+    console.info("[scan] stopCamera called", {
+      reason,
+      pages: pages.length,
+      hasImageDataUrl: Boolean(scanStore.get().imageDataUrl),
+      tracks: streamRef.current?.getVideoTracks().length ?? 0,
+    });
+    streamRef.current?.getVideoTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setCameraReady(false);
+  }, []);
+
+  const stopDetachedVideoStream = useCallback((stream: MediaStream, reason: string) => {
+    console.info("[scan] stopCamera called", {
+      reason,
+      detached: true,
+      pages: scanStore.getPages().length,
+      tracks: stream.getVideoTracks().length,
+    });
+    stream.getVideoTracks().forEach((track) => track.stop());
+  }, []);
+
   // Exposure lock: when the doc is "ready" lock exposure so brightness doesn't
   // shift in the milliseconds before capture. Release it as soon as we're no
   // longer ready so the next document gets a fresh metering.
@@ -277,11 +301,7 @@ function ScanPage() {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
-      if (options.restartStream || streamRef.current) {
-        streamRef.current?.getTracks().forEach((tr) => tr.stop());
-        streamRef.current = null;
-        if (videoRef.current) videoRef.current.srcObject = null;
-      }
+      if (options.restartStream || streamRef.current) stopCamera("restart-before-startCamera");
       capturedRef.current = false;
       sharpnessRef.current = 0;
       blurFramesRef.current = 0;
@@ -375,7 +395,7 @@ function ScanPage() {
         // If the user navigated away while getUserMedia was pending, immediately
         // shut down the stream so the camera light never lingers.
         if (cancelledRef.current) {
-          stream.getTracks().forEach((tr) => tr.stop());
+          stopDetachedVideoStream(stream, "startCamera-cancelled-after-getUserMedia");
           return;
         }
         streamRef.current = stream;
@@ -436,14 +456,14 @@ function ScanPage() {
           // we still let detect() bail safely on its own readyState check.
           await Promise.race([waitReady, new Promise<void>((r) => setTimeout(r, 4000))]);
           if (cancelledRef.current) {
-            stream.getTracks().forEach((tr) => tr.stop());
+            stopDetachedVideoStream(stream, "startCamera-cancelled-after-video-ready");
             streamRef.current = null;
             return;
           }
           setCameraReady(videoEl.videoWidth > 0 && videoEl.videoHeight > 0);
         }
         if (cancelledRef.current) {
-          stream.getTracks().forEach((tr) => tr.stop());
+          stopDetachedVideoStream(stream, "startCamera-cancelled-before-loop");
           streamRef.current = null;
           return;
         }
@@ -489,7 +509,7 @@ function ScanPage() {
         setStatus("error");
       }
     },
-    [t],
+    [t, stopCamera, stopDetachedVideoStream],
   );
 
   useEffect(() => {
@@ -529,9 +549,7 @@ function ScanPage() {
       cancelledRef.current = true;
       capturedRef.current = true; // stop RAF loop
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      streamRef.current?.getTracks().forEach((tr) => tr.stop());
-      streamRef.current = null;
-      if (videoRef.current) videoRef.current.srcObject = null;
+      stopCamera("scan-unmount");
       window.removeEventListener("devicemotion", onMotion);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1195,20 +1213,26 @@ function ScanPage() {
     if (savedTimer1Ref.current) window.clearTimeout(savedTimer1Ref.current);
     if (savedTimer2Ref.current) window.clearTimeout(savedTimer2Ref.current);
     if (savedTimer3Ref.current) window.clearTimeout(savedTimer3Ref.current);
-    streamRef.current?.getTracks().forEach((tr) => tr.stop());
     const pages = scanStore.getPages();
+    console.info("[scan] scanStore.getPages before Done", {
+      pages: pages.length,
+      firstPageExists: Boolean(pages[0]),
+      lastPageExists: Boolean(pages[pages.length - 1]),
+      imageDataUrlExists: Boolean(scanStore.get().imageDataUrl),
+    });
     if (!pages.length) {
       setPageCount(0);
       setLastThumbnail(null);
       setStatus("searching");
       return;
     }
+    stopCamera("done-to-preview");
     scanStore.set({ pages, imageDataUrl: pages[pages.length - 1] });
     navigate({ to: "/preview" });
   }
 
   function startOverScan() {
-    scanStore.clear();
+    scanStore.clear("start over scan");
     setLastThumbnail(null);
     setPageCount(0);
     setStatus("searching");
@@ -1218,7 +1242,8 @@ function ScanPage() {
   void startOverScan;
 
   function cancelScan() {
-    streamRef.current?.getTracks().forEach((tr) => tr.stop());
+    stopCamera("cancel-scan");
+    scanStore.clear("cancel scan");
     navigate({ to: "/" });
   }
 
