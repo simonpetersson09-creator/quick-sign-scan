@@ -6,7 +6,7 @@ import {
   subscribePremium,
   type PremiumStatus,
 } from "@/lib/premium";
-import { FREE_DOC_LIMIT, usage } from "@/lib/usage";
+import { FREE_DOC_LIMIT, initUsage, usage } from "@/lib/usage";
 
 export function usePremium() {
   const [status, setStatus] = useState<PremiumStatus>(() => getPremiumStatus());
@@ -22,6 +22,7 @@ export function usePremium() {
 export function useUsage() {
   const [count, setCount] = useState<number>(() => usage.getSentCount());
   useEffect(() => {
+    void initUsage().then(() => setCount(usage.getSentCount()));
     const unsub = usage.subscribe(setCount);
     return () => {
       unsub();
