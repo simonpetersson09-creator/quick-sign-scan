@@ -1,9 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
-import { ScanLine, PenLine, Mail, CheckCircle2, Settings as SettingsIcon, ArrowDown, Globe, FileUp, Loader2 } from "lucide-react";
+import { ScanLine, PenLine, Mail, CheckCircle2, Settings as SettingsIcon, ArrowDown, Globe, FileUp, Loader2, Crown } from "lucide-react";
 import { useLang } from "@/lib/i18n";
 import { scanStore } from "@/lib/scanStore";
 import { pdfFileToImages } from "@/lib/pdfToImages";
+import { usePremium, useUsage } from "@/hooks/usePremium";
 
 const MAX_PDF_PAGES = 20;
 
@@ -23,6 +24,9 @@ function Home() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
+  const premium = usePremium();
+  const { remaining } = useUsage();
+  const isPremium = premium.state === "active";
 
   const steps = [
     { icon: ScanLine, label: t("step_scan") },
