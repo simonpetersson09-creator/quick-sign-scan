@@ -14,13 +14,11 @@ export default defineConfig({
       // transition from camera → preview would force a reload and lose the scan.
       autoCodeSplitting: false,
     },
-    // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
-    server: { entry: "server" },
 
     // SPA mode → vid build prerendas en lättviktig shell-HTML (utan route-content)
     // som skrivs till dist/client/index.html. Capacitor (WKWebView) laddar den
     // lokalt; klient-routern hydratiserar och tar därefter över helt på enheten.
-    // Web-deployen (Cloudflare Worker) använder fortfarande SSR via src/server.ts.
+    // Web-deployen använder fortfarande SSR via TanStack Starts default-entry.
     spa: {
       enabled: true,
       prerender: {
