@@ -186,12 +186,26 @@ export const sendScanEmail = createServerFn({ method: "POST" })
         requestHost = "";
       }
       let ok = false;
+      // Capacitor / native WebView origins. WKWebView serves the app from
+      // capacitor://localhost (iOS) or http(s)://localhost; these hit the
+      // deployed worker cross-origin by design, so allowlist them.
+      const NATIVE_ORIGINS = new Set([
+        "capacitor://localhost",
+        "ionic://localhost",
+        "http://localhost",
+        "https://localhost",
+      ]);
       if (origin) {
         try {
-          const originHost = new URL(origin).host;
-          ok =
-            (!!hostHeader && originHost === hostHeader) ||
-            (!!requestHost && originHost === requestHost);
+          const originUrl = new URL(origin);
+          if (NATIVE_ORIGINS.has(originUrl.origin)) {
+            ok = true;
+          } else {
+            const originHost = originUrl.host;
+            ok =
+              (!!hostHeader && originHost === hostHeader) ||
+              (!!requestHost && originHost === requestHost);
+          }
         } catch {
           ok = false;
         }

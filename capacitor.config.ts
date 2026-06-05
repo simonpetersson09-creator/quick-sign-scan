@@ -6,8 +6,9 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const isDev = process.env.CAP_DEV === '1';
 
 const config: CapacitorConfig = {
-  appId: 'app.lovable.69a35b643eb94e688e676b39a3a3ec0e',
-  appName: 'Scan & Sign',
+  // Reverse-DNS bundle id. Kan INTE ändras efter första App Store-uppladdning.
+  appId: 'com.sspp.signandgo',
+  appName: 'Sign & Go',
   webDir: 'dist',
   ...(isDev
     ? {
