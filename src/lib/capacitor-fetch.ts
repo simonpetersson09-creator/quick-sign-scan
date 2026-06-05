@@ -6,8 +6,9 @@
 // Web build is a complete no-op — `window.location.protocol` is `https:` (or
 // `http:` in local dev), never `capacitor:`, so the original fetch is used as-is.
 
-const NATIVE_API_BASE =
-  "https://project--69a35b64-3eb9-4e68-8e67-6b39a3a3ec0e.lovable.app";
+// Den publicerade worker-URL-en. `project--{id}.lovable.app` returnerar 403
+// för det här projektet, så vi pekar direkt på det publicerade hostnamnet.
+const NATIVE_API_BASE = "https://quick-sign-scan.lovable.app";
 
 // Only these path prefixes are rewritten. Static assets are bundled into the
 // app via `webDir: 'dist'`, so they MUST stay on capacitor://localhost.
