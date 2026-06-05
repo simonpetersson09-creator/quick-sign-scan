@@ -94,6 +94,8 @@
     margin: 0;
     padding: 0;
     overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: manipulation;
   }
 
   html,
@@ -104,6 +106,7 @@
     color: var(--color-foreground);
     -webkit-font-smoothing: antialiased;
     -webkit-tap-highlight-color: transparent;
+    -webkit-overflow-scrolling: auto;
     overscroll-behavior-y: none;
     font-family:
       ui-rounded,
