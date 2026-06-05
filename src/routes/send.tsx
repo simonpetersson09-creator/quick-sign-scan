@@ -13,8 +13,8 @@ import {
   type SendErrorCode,
   type SendScanEmailResult,
 } from "@/lib/email.functions";
-import { useT } from "@/lib/i18n";
-import { Check, Mail } from "lucide-react";
+import { useT, useLang } from "@/lib/i18n";
+import { Check, Mail, FileText } from "lucide-react";
 
 function makeEmailSchema(t: (k: string) => string) {
   return z
@@ -34,6 +34,7 @@ export const Route = createFileRoute("/send")({
 function SendPage() {
   const navigate = useNavigate();
   const t = useT();
+  const { lang } = useLang();
   const sendEmailFn = useServerFn(sendScanEmail);
   // Read settings on mount only — avoids SSR/hydration mismatch since
   // loadSettings() touches localStorage.
@@ -61,6 +62,22 @@ function SendPage() {
   const [done, setDone] = useState(false);
   const [info, setInfo] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
+
+  const pdfMeta = useMemo(() => {
+    if (!pdfUrl) return null;
+    const s = scanStore.get();
+    const pages = s.pages.length > 0 ? s.pages.length : s.imageDataUrl ? 1 : 0;
+    const b64 = pdfUrl.split(",")[1] ?? "";
+    const bytes = Math.floor(b64.length * 0.75);
+    const mb = bytes / (1024 * 1024);
+    return {
+      pages,
+      mb: mb.toLocaleString(lang === "sv" ? "sv-SE" : "en-US", {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1,
+      }),
+    };
+  }, [pdfUrl, lang]);
 
   const emailSchema = useMemo(() => makeEmailSchema(t), [t]);
   const trimmedTo = to.trim();
@@ -267,6 +284,15 @@ function SendPage() {
       </div>
 
       <div className="flex-1" />
+
+      {pdfMeta && (
+        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground py-2">
+          <FileText className="h-4 w-4" />
+          <span>
+            {pdfMeta.pages} {pdfMeta.pages === 1 ? t("pageSingular") : t("pagePlural")} • {pdfMeta.mb} MB
+          </span>
+        </div>
+      )}
 
       <div className="pt-5 flex flex-col gap-3">
         <PrimaryButton onClick={send} disabled={!emailValid || !pdfUrl || sending}>
