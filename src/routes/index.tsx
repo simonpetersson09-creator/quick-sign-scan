@@ -36,9 +36,14 @@ function Home() {
       {/* Center everything vertically */}
       <div className="flex-1 flex flex-col items-center justify-center gap-8">
         {/* Title */}
-        <h1 className="text-[32px] leading-none font-semibold tracking-tight text-center">
-          SSPP Sign <span className="text-muted-foreground/50 font-light">&</span> Go
-        </h1>
+        <div className="flex items-baseline justify-center gap-2">
+          <h1 className="text-[32px] leading-none font-semibold tracking-tight text-center">
+            Sign <span className="text-muted-foreground/50 font-light">&</span> Go
+          </h1>
+          <span className="text-[13px] text-muted-foreground/70 font-medium tracking-tight">
+            By SSPP
+          </span>
+        </div>
 
         {/* Flow */}
         <div className="flex flex-col items-center">
