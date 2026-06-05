@@ -124,8 +124,6 @@ function SignPage() {
         </button>
       </div>
 
-      <div className="flex-1" />
-
       <div className="flex flex-col gap-3 pt-5">
         <PrimaryButton onClick={done} disabled={!hasInk}>
           {t("doneContinue")}
