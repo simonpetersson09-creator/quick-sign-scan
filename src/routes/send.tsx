@@ -18,6 +18,7 @@ import { Check, Mail, FileText } from "lucide-react";
 import { Paywall } from "@/components/Paywall";
 import { usePremium, useUsage } from "@/hooks/usePremium";
 import { usage } from "@/lib/usage";
+import { purchasePremium } from "@/lib/premium";
 
 function makeEmailSchema(t: (k: string) => string) {
   return z
