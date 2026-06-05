@@ -101,14 +101,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "SSPP Sign & Go" },
+      { name: "description", content: "Scan, sign, and email documents instantly with Sign & Go." },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "SSPP Sign & Go" },
+      { property: "og:description", content: "Scan, sign, and email documents instantly with Sign & Go." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "SSPP Sign & Go" },
+      { name: "twitter:description", content: "Scan, sign, and email documents instantly with Sign & Go." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/2aac0786-89ec-468c-9a3d-71ce841bc18f/id-preview-6c59cc44--69a35b64-3eb9-4e68-8e67-6b39a3a3ec0e.lovable.app-1780645899204.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/2aac0786-89ec-468c-9a3d-71ce841bc18f/id-preview-6c59cc44--69a35b64-3eb9-4e68-8e67-6b39a3a3ec0e.lovable.app-1780645899204.png" },
     ],
     links: [
       {
