@@ -57,6 +57,8 @@ export function clearAccessCode() {
 }
 
 export function hasUsableAccessCode(): boolean {
+  // Dev / preview build — no gate so development stays friction-free.
+  if (isDev()) return true;
   // Capacitor build always carries a baked-in code; the gate should never show.
   if (isCapacitor()) return true;
   if (BUILD_TIME_CODE && BUILD_TIME_CODE.length > 0) return true;
