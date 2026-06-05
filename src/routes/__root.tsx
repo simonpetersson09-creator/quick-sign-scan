@@ -112,8 +112,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:site", content: "@Lovable" },
       { name: "twitter:title", content: "SSPP Sign & Go" },
       { name: "twitter:description", content: "." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/3b1aecfe-c636-4774-849b-7691b1101adb/id-preview-e92d01e2--69a35b64-3eb9-4e68-8e67-6b39a3a3ec0e.lovable.app-1780659925127.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/3b1aecfe-c636-4774-849b-7691b1101adb/id-preview-e92d01e2--69a35b64-3eb9-4e68-8e67-6b39a3a3ec0e.lovable.app-1780659925127.png" },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/71807420-192d-43db-9d16-8d469fe22ccd/id-preview-42d562a8--69a35b64-3eb9-4e68-8e67-6b39a3a3ec0e.lovable.app-1780670043466.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/71807420-192d-43db-9d16-8d469fe22ccd/id-preview-42d562a8--69a35b64-3eb9-4e68-8e67-6b39a3a3ec0e.lovable.app-1780670043466.png" },
     ],
     links: [
       {
