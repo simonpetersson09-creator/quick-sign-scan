@@ -2,15 +2,17 @@ import { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { ChevronLeft } from "lucide-react";
 import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 interface Props {
   title?: string;
   back?: string;
   children: ReactNode;
   rightSlot?: ReactNode;
+  className?: string;
 }
 
-export function AppShell({ title, back, children, rightSlot }: Props) {
+export function AppShell({ title, back, children, rightSlot, className }: Props) {
   const t = useT();
   return (
     <div className="min-h-dvh flex flex-col bg-background">
