@@ -214,9 +214,13 @@ export const sendScanEmail = createServerFn({ method: "POST" })
         "https://localhost",
       ]);
       if (origin) {
+        if (NATIVE_ORIGINS.has(origin)) {
+          ok = true;
+        } else {
         try {
           const originUrl = new URL(origin);
-          if (NATIVE_ORIGINS.has(originUrl.origin)) {
+          const normalizedOrigin = `${originUrl.protocol}//${originUrl.host}`;
+          if (NATIVE_ORIGINS.has(normalizedOrigin)) {
             ok = true;
           } else {
             const originHost = originUrl.host;
@@ -226,6 +230,7 @@ export const sendScanEmail = createServerFn({ method: "POST" })
           }
         } catch {
           ok = false;
+        }
         }
       }
       if (!ok) {
