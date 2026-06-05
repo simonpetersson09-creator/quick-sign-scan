@@ -217,7 +217,7 @@ const sv: Dict = {
 
   // soft prompt after sending (when only 1 free doc remains)
   soft_one_left_title: "Du har 1 gratis dokument kvar.",
-  soft_one_left_body: "Lås upp obegränsad användning för endast 99 kr/år.",
+  soft_one_left_body: "Sign & Go Premium ger obegränsad skanning, signering och PDF-utskick för endast 99 kr/år.",
   soft_continue: "Fortsätt",
 
   // premium status (settings)
@@ -450,7 +450,7 @@ const en: Dict = {
 
   // soft prompt after sending
   soft_one_left_title: "You have 1 free document left.",
-  soft_one_left_body: "Unlock unlimited use for just 99 SEK/year.",
+  soft_one_left_body: "Sign & Go Premium gives you unlimited scanning, signing and PDF sending for just 99 SEK/year.",
   soft_continue: "Continue",
 
   // premium status (settings)
