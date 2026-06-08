@@ -1788,6 +1788,69 @@ function closeEdgeGaps(edges: Uint8Array, width: number, height: number): Uint8A
   return erodeMask(dilated, width, height);
 }
 
+// Bright AND low-chroma mask. Implements feature flag A (whiteness
+// channel). Same morphology pattern as buildBrightPaperMask so its
+// boundary feeds the same edgeComponents → quad pipeline.
+function buildWhitenessMask(
+  lum: Uint8ClampedArray,
+  chroma: Uint8ClampedArray,
+  width: number,
+  height: number,
+  lumThreshold: number,
+  maxChroma: number,
+): Uint8Array {
+  const mask = new Uint8Array(lum.length);
+  for (let i = 0; i < lum.length; i++) {
+    mask[i] = lum[i] >= lumThreshold && chroma[i] <= maxChroma ? 1 : 0;
+  }
+  let closed: Uint8Array<ArrayBufferLike> = mask;
+  for (let i = 0; i < 3; i++) closed = dilateMask(closed, width, height);
+  for (let i = 0; i < 3; i++) closed = erodeMask(closed, width, height);
+  return closed;
+}
+
+// Inside-quad chroma + luminance variance stats. Used by the paper-
+// interior prior to boost quads whose interior actually looks like a
+// uniform white sheet (low chroma, low lum variance).
+function insideChromaStats(
+  lum: Uint8ClampedArray,
+  chroma: Uint8ClampedArray,
+  width: number,
+  height: number,
+  quad: [Point, Point, Point, Point],
+): { chromaMean: number; lumStd: number; samples: number } {
+  const inner = scaleQuadAroundCentroid(quad, 0.78);
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of inner) {
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  }
+  minX = Math.max(0, Math.floor(minX));
+  minY = Math.max(0, Math.floor(minY));
+  maxX = Math.min(width - 1, Math.ceil(maxX));
+  maxY = Math.min(height - 1, Math.ceil(maxY));
+  const step = Math.max(2, Math.round(Math.min(maxX - minX, maxY - minY) / 40));
+  let cSum = 0, lSum = 0, lSqSum = 0, n = 0;
+  for (let y = minY; y <= maxY; y += step) {
+    for (let x = minX; x <= maxX; x += step) {
+      if (!pointInQuad({ x, y }, inner)) continue;
+      const idx = y * width + x;
+      cSum += chroma[idx];
+      const l = lum[idx];
+      lSum += l;
+      lSqSum += l * l;
+      n++;
+    }
+  }
+  if (n === 0) return { chromaMean: 255, lumStd: 255, samples: 0 };
+  const chromaMean = cSum / n;
+  const lumMean = lSum / n;
+  const lumVar = Math.max(0, lSqSum / n - lumMean * lumMean);
+  return { chromaMean, lumStd: Math.sqrt(lumVar), samples: n };
+}
+
 function buildBrightPaperMask(
   lum: Uint8ClampedArray,
   width: number,
