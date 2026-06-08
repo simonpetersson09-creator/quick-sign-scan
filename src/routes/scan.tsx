@@ -1577,16 +1577,23 @@ function ScanPage() {
             className="max-w-full max-h-full object-contain shadow-2xl"
             style={{ aspectRatio: "1 / 1.414" }}
           />
-          <div className="absolute inset-0 bg-black/35" />
-          <div className="absolute flex flex-col items-center gap-3 text-white">
-            <div
-              className="h-10 w-10 rounded-full border-[3px] border-white/30 border-t-white animate-spin"
-              aria-hidden="true"
-            />
-            <p className="text-[15px] font-medium tracking-tight tabular-nums">
-              {t("savingPage")}
+          <div className="absolute inset-0 bg-black/45" />
+          <div className="absolute bottom-[18%] left-0 right-0 px-8 flex flex-col items-center gap-3 text-white">
+            <p className="text-[16px] font-semibold tracking-tight text-center drop-shadow">
+              {captureStage?.label ?? t("savingPage")}
             </p>
-            <p className="text-[12px] text-white/80 tabular-nums">
+            <div className="w-full max-w-[260px] h-1.5 rounded-full bg-white/20 overflow-hidden">
+              <div
+                className="h-full bg-white rounded-full"
+                style={{
+                  width: `${Math.round((captureStage?.progress ?? 1) * 100)}%`,
+                  transition: "width 320ms ease-out",
+                }}
+              />
+            </div>
+            <p className="text-[12px] text-white/85 tabular-nums">
+              {Math.round((captureStage?.progress ?? 1) * 100)}%
+              <span className="mx-2 opacity-50">·</span>
               {pageCount} {pageCount === 1 ? t("pageSingular") : t("pagePlural")}
             </p>
           </div>
