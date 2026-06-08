@@ -2996,3 +2996,111 @@ export function refineQuadCorners(
 
   return refined;
 }
+
+/**
+ * Recompute edge tightness directly from the full-resolution source for an
+ * already-detected quad. Does NOT change the quad or any corners — only
+ * measures how well each of the four sides aligns with a strong gradient in
+ * the hi-res frame. Useful for small/far documents where the 280px detect
+ * frame has too few samples per edge to reach a confident tightness score.
+ *
+ * For each side we render a thin perpendicular strip (length × (2·BAND+1))
+ * by rotating the source so the side lies along the strip's centre row.
+ * For every column we find the row with the strongest vertical gradient;
+ * a column counts as "tight" when that peak is within ±TOL of the centre
+ * AND the peak magnitude exceeds MIN_GRAD.
+ *
+ * Returned tightness is on the same 0..1 scale as the 280px-path value.
+ */
+export function computeHiResEdgeTightness(
+  source: HTMLCanvasElement | HTMLVideoElement,
+  srcW: number,
+  srcH: number,
+  quad: [Point, Point, Point, Point],
+): { tightness: number; perSide: [number, number, number, number]; samples: number } | null {
+  const BAND = 6;
+  const TOL = 2;
+  const MIN_GRAD = 22;
+  const MAX_STRIP_W = 600;
+
+  const sides: Array<[Point, Point]> = [
+    [quad[0], quad[1]],
+    [quad[1], quad[2]],
+    [quad[2], quad[3]],
+    [quad[3], quad[0]],
+  ];
+
+  const strip = document.createElement("canvas");
+  const sctx = strip.getContext("2d", { willReadFrequently: true });
+  if (!sctx) return null;
+
+  const perSide: number[] = [];
+  let totalTight = 0;
+  let totalCols = 0;
+
+  for (const [p1, p2] of sides) {
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 8) {
+      perSide.push(0);
+      continue;
+    }
+    const angle = Math.atan2(dy, dx);
+    const stripW = Math.min(Math.round(len), MAX_STRIP_W);
+    const stripH = 2 * BAND + 1;
+    if (strip.width !== stripW || strip.height !== stripH) {
+      strip.width = stripW;
+      strip.height = stripH;
+    }
+    sctx.setTransform(1, 0, 0, 1, 0, 0);
+    sctx.clearRect(0, 0, stripW, stripH);
+    // Map strip column x ∈ [0, stripW) to source point along p1→p2; strip
+    // row BAND is exactly on the line, rows above/below are perpendicular.
+    const scale = stripW / len;
+    sctx.translate(0, BAND);
+    sctx.scale(scale, 1);
+    sctx.rotate(-angle);
+    sctx.translate(-p1.x, -p1.y);
+    try {
+      sctx.drawImage(source as CanvasImageSource, 0, 0, srcW, srcH);
+    } catch {
+      sctx.setTransform(1, 0, 0, 1, 0, 0);
+      perSide.push(0);
+      continue;
+    }
+    sctx.setTransform(1, 0, 0, 1, 0, 0);
+    const { data } = sctx.getImageData(0, 0, stripW, stripH);
+    const lum = new Float32Array(stripW * stripH);
+    for (let i = 0, j = 0; j < lum.length; i += 4, j++) {
+      lum[j] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    }
+    let tightCount = 0;
+    for (let x = 0; x < stripW; x++) {
+      let bestMag = 0;
+      let bestRow = -1;
+      for (let y = 1; y < stripH - 1; y++) {
+        const a = lum[(y - 1) * stripW + x];
+        const b = lum[(y + 1) * stripW + x];
+        const mag = b > a ? b - a : a - b;
+        if (mag > bestMag) {
+          bestMag = mag;
+          bestRow = y;
+        }
+      }
+      if (bestMag >= MIN_GRAD && bestRow >= 0 && Math.abs(bestRow - BAND) <= TOL) {
+        tightCount++;
+      }
+    }
+    perSide.push(stripW > 0 ? tightCount / stripW : 0);
+    totalTight += tightCount;
+    totalCols += stripW;
+  }
+
+  if (totalCols === 0) return null;
+  return {
+    tightness: clamp01(totalTight / totalCols),
+    perSide: perSide as [number, number, number, number],
+    samples: totalCols,
+  };
+}

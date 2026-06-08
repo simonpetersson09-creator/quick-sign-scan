@@ -18,6 +18,7 @@ import {
   enhancePaper,
   maxCornerDelta,
   refineQuadCorners,
+  computeHiResEdgeTightness,
   removeShadows,
   warpQuadToRect,
 } from "@/lib/perspective";
@@ -143,6 +144,16 @@ function ScanPage() {
   const lastRefineAtRef = useRef(0);
   const HI_DETECT_WIDTH = 520;
   const REFINE_COOLDOWN_MS = 140;
+  // Feature flag: recompute edgeTightness directly from the full-res video
+  // for the already-detected quad. Never changes the quad or its corners;
+  // only swaps in a higher hi-res tightness value when it is strictly better
+  // than the 280px-derived one. Goal: small/far documents whose edges are
+  // perfectly sharp in the original video but undersampled in the 280px
+  // detect frame can still pass capture-gates.
+  const ENABLE_HIRES_TIGHTNESS_RECOMPUTE = true;
+  const HIRES_TIGHT_COOLDOWN_MS = 140;
+  const lastHiResTightAtRef = useRef(0);
+  const lastHiResTightLogAtRef = useRef(0);
   // Feature flag: candidate-memory across recent frames. Cluster the last N
   // detections by corner similarity (+ areaRatio / a4Ratio) so an ambiguous
   // scene (multiple competing quads frame-to-frame) delays auto-capture
@@ -744,6 +755,62 @@ function ScanPage() {
         };
       } catch {
         // ignore — keep original 280px corners
+      }
+    }
+
+    // Hi-res edge-tightness recompute (Step B). Uses the EXISTING quad —
+    // no new detection, no new corners. Measures how tight each side of
+    // the (already-found) quad sits on a strong gradient in the full-res
+    // video, then swaps in the hi-res value only if it is better. This
+    // helps small/far A4 documents whose edges are sharp in 1920×1080 but
+    // undersampled in the 280px detect frame.
+    if (
+      ENABLE_HIRES_TIGHTNESS_RECOMPUTE &&
+      detection &&
+      now - lastHiResTightAtRef.current >= HIRES_TIGHT_COOLDOWN_MS
+    ) {
+      lastHiResTightAtRef.current = now;
+      try {
+        const sx = vw / dw;
+        const sy = vh / dh;
+        const quadFull = detection.corners.map((p) => ({
+          x: p.x * sx,
+          y: p.y * sy,
+        })) as [Point, Point, Point, Point];
+        const hi = computeHiResEdgeTightness(video, vw, vh, quadFull);
+        const origTight = detection.debug.edgeTightness ?? 0;
+        if (hi && hi.tightness > origTight) {
+          const wasBlockedByTightness =
+            !detection.readyForCapture &&
+            (detection.reasonNotReady === "edgeTightnessLow" ||
+              detection.reasonNotReady === "edgeTightnessLowAdaptive");
+          // Threshold mirrors capture-gate: 0.45 normally; 0.34 if the
+          // 280px path already qualified for adaptive treatment.
+          const adaptive = getLastDetectDiagnostics().adaptiveUsed;
+          const tightThresh = adaptive ? adaptive.threshold : MIN_EDGE_TIGHTNESS_FOR_CAPTURE;
+          const clearsGate = hi.tightness >= tightThresh;
+          detection = {
+            ...detection,
+            debug: { ...detection.debug, edgeTightness: hi.tightness },
+            ...(wasBlockedByTightness && clearsGate
+              ? { readyForCapture: true, reasonNotReady: undefined }
+              : {}),
+          };
+          if (debugEnabled && now - lastHiResTightLogAtRef.current > 750) {
+            lastHiResTightLogAtRef.current = now;
+            // eslint-disable-next-line no-console
+            console.log("[scan] hires-tightness", {
+              orig: +origTight.toFixed(3),
+              hires: +hi.tightness.toFixed(3),
+              perSide: hi.perSide.map((v) => +v.toFixed(2)),
+              samples: hi.samples,
+              threshold: +tightThresh.toFixed(2),
+              clearedGate: wasBlockedByTightness && clearsGate,
+            });
+          }
+        }
+      } catch {
+        // ignore — keep 280px-derived tightness
       }
     }
 
