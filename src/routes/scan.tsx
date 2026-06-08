@@ -1639,6 +1639,18 @@ function ScanPage() {
         logScanStage("whiten-background", { applied: false, reason: "exception" });
       }
 
+      // Local ink-contrast boost — mild unsharp mask gated to dark pixels
+      // (L<=150). Sharpens thin/light text (footers, body 8–9pt) without
+      // amplifying background sensor noise on the now-white paper.
+      try {
+        warped = boostInkContrast(warped);
+        logScanCanvas("after-ink-boost", warped, debugEnabled);
+        logScanStage("ink-boost", { applied: true });
+      } catch (e) {
+        console.warn("[scan] boostInkContrast failed; keeping previous frame", e);
+        logScanStage("ink-boost", { applied: false, reason: "exception" });
+      }
+
       // Post-capture sharpness gate. If the warped doc is blurry we abandon
       // this capture and let auto-focus retry — better to wait a second
       // longer than to save an unreadable PDF page. Bail after a few retries
