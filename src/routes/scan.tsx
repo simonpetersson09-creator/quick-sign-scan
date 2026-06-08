@@ -165,6 +165,16 @@ function ScanPage() {
   const lastRawQuad = useRef<[Point, Point, Point, Point] | null>(null);
   const smoothQuad = useRef<[Point, Point, Point, Point] | null>(null); // normalized 0..1
   const detectionMeta = useRef<ReturnType<typeof detectDocumentQuad> | null>(null);
+  type CandidateEntry = {
+    norm: [Point, Point, Point, Point];
+    conf: number;
+    areaRatio: number;
+    a4Ratio: number;
+    edge: number;
+    t: number;
+  };
+  const candidateHistoryRef = useRef<CandidateEntry[]>([]);
+  const ambiguousFramesRef = useRef(0);
   const stableCount = useRef(0);
   const detectCount = useRef(0);
   const missCount = useRef(0);
