@@ -1607,7 +1607,10 @@ function ScanPage() {
       // på 150–350 kB med bibehållen läsbarhet för text och signaturer.
       const JPEG_QUALITY = 0.82;
       setCaptureStage({ label: t("capStagePreview"), progress: 0.88 });
-      const dataUrl = warped.toDataURL("image/jpeg", JPEG_QUALITY);
+      const dataUrl = canvasToSafeImageDataUrl(warped, JPEG_QUALITY);
+      if (!dataUrl) {
+        throw new Error("Unable to encode scanned page");
+      }
       // sourceDataUrl används inte för PDF — håll den liten så minnet inte
       // sväller när användaren skannar många sidor.
       const sourceCanvas = document.createElement("canvas");
@@ -1618,7 +1621,7 @@ function ScanPage() {
       sourceCanvas
         .getContext("2d")!
         .drawImage(video, 0, 0, sourceCanvas.width, sourceCanvas.height);
-      const sourceDataUrl = sourceCanvas.toDataURL("image/jpeg", 0.6);
+      const sourceDataUrl = canvasToSafeImageDataUrl(sourceCanvas, 0.6, 900) ?? dataUrl;
 
       logScanCanvas("final-image-to-pdf", warped, debugEnabled);
       logScanStage("pdf-input", {
@@ -1681,7 +1684,12 @@ function ScanPage() {
     canvas.width = vw;
     canvas.height = vh;
     canvas.getContext("2d")!.drawImage(video, 0, 0, vw, vh);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+    const dataUrl = canvasToSafeImageDataUrl(canvas, 0.82);
+    if (!dataUrl) {
+      capturedRef.current = false;
+      setStatus("searching");
+      return;
+    }
     // Use full-frame "quad" so downstream code has valid corners.
     const fullQuad: [Point, Point, Point, Point] = [
       { x: 0, y: 0 },
@@ -1761,8 +1769,8 @@ function ScanPage() {
     if (savedTimer1Ref.current) window.clearTimeout(savedTimer1Ref.current);
     if (savedTimer2Ref.current) window.clearTimeout(savedTimer2Ref.current);
     if (savedTimer3Ref.current) window.clearTimeout(savedTimer3Ref.current);
-    const storePages = scanStore.getPages();
-    const pages = storePages.length ? storePages : lastThumbnail ? [lastThumbnail] : [];
+    const storePages = scanStore.getPages().filter(isUsableImageDataUrl);
+    const pages = storePages.length ? storePages : isUsableImageDataUrl(lastThumbnail) ? [lastThumbnail] : [];
     console.info("[scan] scanStore.getPages before Done", {
       pages: pages.length,
       firstPageExists: Boolean(pages[0]),
@@ -1781,7 +1789,10 @@ function ScanPage() {
       to: "/preview",
       state: (prev) => ({
         ...prev,
-        scanPages: pages,
+        // Keep large base64 images out of history.state. The in-memory store
+        // is the source of truth; bloating history can silently fail on mobile
+        // and leave /preview with an empty image.
+        scanPages: undefined,
         scanActiveIndex: pages.length - 1,
       }),
     });
