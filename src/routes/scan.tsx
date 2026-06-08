@@ -841,7 +841,13 @@ function ScanPage() {
     );
     // Soft thresholds, intentionally looser than the hard capture gates
     // so we coach the user *before* the auto-capture is blocked.
-    const tooFar = areaRatio > 0 && areaRatio < 0.12;
+    // "Too far" uses persistence: nag only once the doc has been small
+    // for ~1s, so we don't flicker hints while the user is still framing.
+    if (areaRatio > 0 && areaRatio < 0.18) tooFarFramesRef.current++;
+    else tooFarFramesRef.current = 0;
+    const tooFar =
+      areaRatio > 0 &&
+      (areaRatio < 0.12 || (areaRatio < 0.18 && tooFarFramesRef.current > 25));
     const tooClose = areaRatio > 0.88;
     const tilted = a4Diff > 0.35;
     const looseEdges = edgeTightness > 0 && edgeTightness < 0.45;
