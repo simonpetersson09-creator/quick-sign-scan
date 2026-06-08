@@ -898,7 +898,11 @@ function renderToA4Portrait(source: HTMLCanvasElement): HTMLCanvasElement {
   const ctx = out.getContext("2d")!;
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, outW, outH);
-  const scale = Math.min(outW / source.width, outH / source.height);
+  // The input is already a perspective-warped A4 page. If a fine deskew
+  // rotation expanded the canvas, contain-scaling creates visible white
+  // bands (as in the preview screenshot). Cover-scaling keeps the page full
+  // frame and only crops the synthetic rotation padding / tiny edge slivers.
+  const scale = Math.max(outW / source.width, outH / source.height);
   const drawW = source.width * scale;
   const drawH = source.height * scale;
   ctx.imageSmoothingEnabled = true;
