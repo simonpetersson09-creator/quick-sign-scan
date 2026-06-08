@@ -2627,3 +2627,119 @@ export function canvasLaplacianVariance(canvas: HTMLCanvasElement): number {
   const my = Math.round(h * 0.1);
   return laplacianVariance(id.data, w, h, { x0: mx, y0: my, x1: w - mx, y1: h - my });
 }
+
+/**
+ * Standard deviation of luma across the canvas interior. Used as a
+ * post-capture "is this actually a document?" gate — a uniformly grey
+ * or blown-out frame scores very low here.
+ */
+export function canvasContrast(canvas: HTMLCanvasElement): number {
+  const targetW = 320;
+  const w = Math.min(targetW, canvas.width);
+  const h = Math.max(1, Math.round((canvas.height / canvas.width) * w));
+  const tmp = document.createElement("canvas");
+  tmp.width = w;
+  tmp.height = h;
+  const ctx = tmp.getContext("2d", { willReadFrequently: true })!;
+  ctx.drawImage(canvas, 0, 0, w, h);
+  const { data } = ctx.getImageData(0, 0, w, h);
+  const mx = Math.round(w * 0.1);
+  const my = Math.round(h * 0.1);
+  let sum = 0;
+  let sumSq = 0;
+  let n = 0;
+  for (let y = my; y < h - my; y += 2) {
+    for (let x = mx; x < w - mx; x += 2) {
+      const i = (y * w + x) * 4;
+      const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+      sum += lum;
+      sumSq += lum * lum;
+      n++;
+    }
+  }
+  if (!n) return 0;
+  const mean = sum / n;
+  const variance = Math.max(0, sumSq / n - mean * mean);
+  return Math.sqrt(variance);
+}
+
+/**
+ * Subpixel refinement of the four document corners on a full-resolution
+ * source canvas. For each corner we sample a small window of luma,
+ * compute the local Sobel gradient magnitude, and shift the corner toward
+ * the weighted centroid of strong-edge pixels (where the real paper edge
+ * lives). Movement is hard-clamped to ±MAX_SHIFT_PX so the refinement can
+ * never drag a corner onto the wrong edge — worst case it stays put.
+ */
+export function refineQuadCorners(
+  source: HTMLCanvasElement | HTMLVideoElement,
+  srcW: number,
+  srcH: number,
+  quad: [Point, Point, Point, Point],
+): [Point, Point, Point, Point] {
+  const WINDOW = 21; // half-size 10px around the corner
+  const HALF = (WINDOW - 1) / 2;
+  const MAX_SHIFT_PX = 5;
+  const MIN_GRAD = 30; // ignore noise
+
+  const cx = (quad[0].x + quad[1].x + quad[2].x + quad[3].x) / 4;
+  const cy = (quad[0].y + quad[1].y + quad[2].y + quad[3].y) / 4;
+
+  const sampleCanvas = document.createElement("canvas");
+  sampleCanvas.width = WINDOW;
+  sampleCanvas.height = WINDOW;
+  const sctx = sampleCanvas.getContext("2d", { willReadFrequently: true })!;
+
+  const refined = quad.map((p) => {
+    const sx = Math.round(Math.max(HALF, Math.min(srcW - HALF - 1, p.x)));
+    const sy = Math.round(Math.max(HALF, Math.min(srcH - HALF - 1, p.y)));
+    sctx.clearRect(0, 0, WINDOW, WINDOW);
+    sctx.drawImage(
+      source as CanvasImageSource,
+      sx - HALF, sy - HALF, WINDOW, WINDOW,
+      0, 0, WINDOW, WINDOW,
+    );
+    const { data } = sctx.getImageData(0, 0, WINDOW, WINDOW);
+    const lum = new Float32Array(WINDOW * WINDOW);
+    for (let i = 0, j = 0; j < lum.length; i += 4, j++) {
+      lum[j] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    }
+    // Sobel + weighted centroid of strong edges in window-local coords.
+    let mx = 0;
+    let my = 0;
+    let mw = 0;
+    for (let y = 1; y < WINDOW - 1; y++) {
+      for (let x = 1; x < WINDOW - 1; x++) {
+        const i = y * WINDOW + x;
+        const gx =
+          -lum[i - WINDOW - 1] - 2 * lum[i - 1] - lum[i + WINDOW - 1] +
+          lum[i - WINDOW + 1] + 2 * lum[i + 1] + lum[i + WINDOW + 1];
+        const gy =
+          -lum[i - WINDOW - 1] - 2 * lum[i - WINDOW] - lum[i - WINDOW + 1] +
+          lum[i + WINDOW - 1] + 2 * lum[i + WINDOW] + lum[i + WINDOW + 1];
+        const mag = Math.hypot(gx, gy);
+        if (mag < MIN_GRAD) continue;
+        mx += x * mag;
+        my += y * mag;
+        mw += mag;
+      }
+    }
+    if (mw <= 0) return { x: p.x, y: p.y };
+    const wx = mx / mw - HALF; // shift relative to window centre
+    const wy = my / mw - HALF;
+    // Hard clamp so a noisy window can never drag the corner more than a few px.
+    const dx = Math.max(-MAX_SHIFT_PX, Math.min(MAX_SHIFT_PX, wx));
+    const dy = Math.max(-MAX_SHIFT_PX, Math.min(MAX_SHIFT_PX, wy));
+    // Bias the shift slightly outward — paper edges sit just beyond the
+    // detected corner more often than just inside (Sobel-snap tends to
+    // overshoot inward by 1–2px on the 280px detect frame).
+    const outX = p.x - cx >= 0 ? 1 : -1;
+    const outY = p.y - cy >= 0 ? 1 : -1;
+    return {
+      x: Math.max(0, Math.min(srcW - 1, sx + dx + 0.5 * outX)),
+      y: Math.max(0, Math.min(srcH - 1, sy + dy + 0.5 * outY)),
+    };
+  }) as [Point, Point, Point, Point];
+
+  return refined;
+}
