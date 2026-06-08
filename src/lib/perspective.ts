@@ -1863,14 +1863,21 @@ function evaluateEdgeQuad(args: {
     minY <= edgeMargin ||
     maxX >= width - 1 - edgeMargin ||
     maxY >= height - 1 - edgeMargin
-  )
+  ) {
+    recordReject("touchesFrameEdge");
     return null;
-  if (minX < margin && minY < margin && maxX > width - margin && maxY > height - margin)
+  }
+  if (minX < margin && minY < margin && maxX > width - margin && maxY > height - margin) {
+    recordReject("fillsEntireFrame");
     return null;
+  }
 
   const area = Math.abs(polygonArea(ordered));
   const areaRatio = area / frameArea;
-  if (areaRatio < 0.04 || areaRatio > 0.95) return null;
+  if (areaRatio < 0.04 || areaRatio > 0.95) {
+    recordReject(areaRatio < 0.04 ? "areaTooSmall" : "areaTooLarge", { areaRatio });
+    return null;
+  }
 
   const top = dist(ordered[0], ordered[1]);
   const right = dist(ordered[1], ordered[2]);
@@ -1890,10 +1897,22 @@ function evaluateEdgeQuad(args: {
   const bboxArea = Math.max(1, (maxX - minX + 1) * (maxY - minY + 1));
   const polygonFill = bboxArea / Math.max(1, area);
 
-  if (ratioError > 1.1) return null;
-  if (perspectiveError > 4.5) return null;
-  if (sideDeviation > 0.22) return null;
-  if (polygonFill < 0.45 || polygonFill > 2.4) return null;
+  if (ratioError > 1.1) {
+    recordReject("a4RatioOff", { areaRatio });
+    return null;
+  }
+  if (perspectiveError > 4.5) {
+    recordReject("perspectiveExtreme", { areaRatio });
+    return null;
+  }
+  if (sideDeviation > 0.22) {
+    recordReject("sidesNotStraight", { areaRatio });
+    return null;
+  }
+  if (polygonFill < 0.45 || polygonFill > 2.4) {
+    recordReject("polygonFillOff", { areaRatio });
+    return null;
+  }
 
   const stats = polygonImageStats(ordered, lum, width, height);
   const edgeScore = quadEdgeSupport(ordered, edges, width, height);
@@ -1923,14 +1942,16 @@ function evaluateEdgeQuad(args: {
     // Heaviest single weight: did the polygon actually snap to real edges?
     0.25 * tightScore;
 
-  if (edgeScore < 0.18) return null;
-  if (stats.mean < 135) return null;
-  if (stats.brightRatio < 0.55) return null;
-  if (stats.darkRatio > 0.32) return null;
-  if (stats.mean - stats.exteriorMean < 12) return null;
+  const contrast = stats.mean - stats.exteriorMean;
+  const m = { areaRatio, edgeScore, edgeTightness, a4Score, meanEdgeOffset, statsMean: stats.mean, contrast };
+  if (edgeScore < 0.18) { recordReject("edgeScoreLow", m); return null; }
+  if (stats.mean < 135) { recordReject("interiorTooDark", m); return null; }
+  if (stats.brightRatio < 0.55) { recordReject("notEnoughPaperPixels", m); return null; }
+  if (stats.darkRatio > 0.32) { recordReject("tooMuchDarkContent", m); return null; }
+  if (stats.mean - stats.exteriorMean < 12) { recordReject("lowPaperBgContrast", m); return null; }
   // At least half the sampled side-points must snap onto a real gradient —
   // otherwise the polygon is sitting on noise, not on the document edge.
-  if (edgeTightness < 0.45) return null;
+  if (edgeTightness < 0.45) { recordReject("edgeTightnessLow", m); return null; }
 
   return {
     corners: ordered,
