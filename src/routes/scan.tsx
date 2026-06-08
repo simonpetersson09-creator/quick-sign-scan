@@ -941,6 +941,30 @@ function ScanPage() {
       setDebugInfo((d) => ({ ...d, vw, vh, ready: true, lastCapture: Date.now() }));
     }
 
+    // Show the just-taken raw frame immediately so the user sees that the
+    // photo is done — no need to keep the phone still. Processing status
+    // (deskew → enhance → preview) is layered on top.
+    try {
+      const snap = document.createElement("canvas");
+      const SNAP_W = Math.min(vw, 720);
+      snap.width = SNAP_W;
+      snap.height = Math.max(1, Math.round((vh / vw) * SNAP_W));
+      snap.getContext("2d")!.drawImage(video, 0, 0, snap.width, snap.height);
+      const snapUrl = snap.toDataURL("image/jpeg", 0.7);
+      if (savedTimer1Ref.current) window.clearTimeout(savedTimer1Ref.current);
+      if (savedTimer2Ref.current) window.clearTimeout(savedTimer2Ref.current);
+      if (savedTimer3Ref.current) window.clearTimeout(savedTimer3Ref.current);
+      setSavedOverlay({ dataUrl: snapUrl, visible: true });
+      setCaptureStage({ label: t("capStageShot"), progress: 0.05 });
+      if (stageTimerRef.current) window.clearTimeout(stageTimerRef.current);
+      stageTimerRef.current = window.setTimeout(() => {
+        if (cancelledRef.current) return;
+        setCaptureStage({ label: t("capStageDeskew"), progress: 0.25 });
+      }, 400);
+    } catch {
+      // snapshot is best-effort; processing continues regardless
+    }
+
     // Sortera alltid hörnen i exakt ordning TL, TR, BR, BL innan warp.
     const orderedNormQuad = orderQuad(normQuad);
 
