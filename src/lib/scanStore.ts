@@ -1,10 +1,11 @@
-// In-memory only scan session store.
+// Scan session store.
 //
 // Privacy requirement: documents, images, PDFs, signatures and related
-// metadata MUST NEVER be persisted. Nothing here touches localStorage,
-// sessionStorage, IndexedDB, cookies, or any other durable storage.
-// All data lives only in this module's memory for the lifetime of the tab,
-// and is wiped on reload / navigation away / tab close.
+// metadata normally lives only in memory and is wiped on reload / tab close.
+// The one exception is a short-lived same-tab handoff used only while moving
+// from /scan to /preview; preview consumes and removes it immediately. This
+// prevents mobile browsers or stale route chunks from dropping the captured
+// image during navigation.
 
 type Listener = () => void;
 
@@ -60,6 +61,15 @@ type StoreBag = {
   cleanupBound: boolean;
 };
 
+type PreviewHandoff = {
+  pages: string[];
+  activeIndex: number;
+  createdAt: number;
+};
+
+const PREVIEW_HANDOFF_KEY = "docscan.preview-handoff.v1";
+const PREVIEW_HANDOFF_MAX_AGE_MS = 2 * 60 * 1000;
+
 const storeGlobal = globalThis as typeof globalThis & {
   __SIGN_GO_SCAN_STORE__?: StoreBag;
 };
@@ -101,6 +111,19 @@ function sessionPages(session: ScanSession) {
       : [];
 }
 
+function isUsablePreviewPage(value: unknown): value is string {
+  return typeof value === "string" && value.startsWith("data:image/") && value.length > 1024;
+}
+
+function safeSessionStorage() {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
 export const scanStore = {
   get: () => bag.state,
   getPages: () => sessionPages(bag.state),
@@ -125,6 +148,54 @@ export const scanStore = {
   set: (patch: Partial<ScanSession>) => {
     bag.state = { ...bag.state, ...patch };
     notify();
+  },
+  savePreviewHandoff: (pages: string[], activeIndex: number) => {
+    const safePages = pages.filter(isUsablePreviewPage);
+    if (!safePages.length) return false;
+    const storage = safeSessionStorage();
+    if (!storage) return false;
+    try {
+      const safeActiveIndex = Math.max(0, Math.min(safePages.length - 1, activeIndex));
+      storage.setItem(
+        PREVIEW_HANDOFF_KEY,
+        JSON.stringify({ pages: safePages, activeIndex: safeActiveIndex, createdAt: Date.now() }),
+      );
+      debugScanStore("saved preview handoff", {
+        pages: safePages.length,
+        activeIndex: safeActiveIndex,
+      });
+      return true;
+    } catch (error) {
+      debugScanStore("preview handoff save failed", {
+        pages: safePages.length,
+        error: error instanceof Error ? error.name : "unknown",
+      });
+      return false;
+    }
+  },
+  consumePreviewHandoff: (): PreviewHandoff | null => {
+    const storage = safeSessionStorage();
+    if (!storage) return null;
+    try {
+      const raw = storage.getItem(PREVIEW_HANDOFF_KEY);
+      if (!raw) return null;
+      storage.removeItem(PREVIEW_HANDOFF_KEY);
+      const parsed = JSON.parse(raw) as Partial<PreviewHandoff>;
+      const pages = Array.isArray(parsed.pages) ? parsed.pages.filter(isUsablePreviewPage) : [];
+      const createdAt = typeof parsed.createdAt === "number" ? parsed.createdAt : 0;
+      if (!pages.length || Date.now() - createdAt > PREVIEW_HANDOFF_MAX_AGE_MS) return null;
+      const activeIndex =
+        typeof parsed.activeIndex === "number"
+          ? Math.max(0, Math.min(pages.length - 1, parsed.activeIndex))
+          : pages.length - 1;
+      debugScanStore("consumed preview handoff", { pages: pages.length, activeIndex });
+      return { pages, activeIndex, createdAt };
+    } catch {
+      try {
+        storage.removeItem(PREVIEW_HANDOFF_KEY);
+      } catch {}
+      return null;
+    }
   },
   clear: (reason = "explicit") => {
     debugScanStore("clear called", {
