@@ -41,12 +41,18 @@ function PreviewPage() {
         : [],
     [navState.scanPages],
   );
-  const consumedHandoffRef = useRef<ReturnType<typeof scanStore.consumePreviewHandoff> | null>(null);
-  if (consumedHandoffRef.current === null) {
-    consumedHandoffRef.current = scanStore.consumePreviewHandoff();
+  const consumedHandoffRef = useRef<{
+    read: boolean;
+    value: ReturnType<typeof scanStore.consumePreviewHandoff>;
+  }>({ read: false, value: null });
+  if (!consumedHandoffRef.current.read) {
+    consumedHandoffRef.current = { read: true, value: scanStore.consumePreviewHandoff() };
   }
-  const recoveredPages = consumedHandoffRef.current?.pages ?? [];
-  const recoveredActiveIndex = consumedHandoffRef.current?.activeIndex;
+  const recoveredPages = useMemo(
+    () => consumedHandoffRef.current.value?.pages ?? [],
+    [],
+  );
+  const recoveredActiveIndex = consumedHandoffRef.current.value?.activeIndex;
   // Initialize synchronously from the in-memory store so we don't flash the
   // empty state when pages are already present (e.g. just-finished scan).
   const [pages, setPages] = useState<string[]>(() => {

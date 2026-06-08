@@ -101,6 +101,9 @@ function wipe(reason: string) {
     imageDataUrlExists: Boolean(bag.state.imageDataUrl),
   });
   bag.state = createInitial();
+  try {
+    safeSessionStorage()?.removeItem(PREVIEW_HANDOFF_KEY);
+  } catch {}
 }
 
 function sessionPages(session: ScanSession) {
