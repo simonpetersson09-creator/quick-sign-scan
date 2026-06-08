@@ -1572,16 +1572,11 @@ function ScanPage() {
         threshold: SHARPNESS_CAPTURE_MIN,
         retries: captureRetryRef.current,
       });
-      if (postSharpness < SHARPNESS_CAPTURE_MIN && captureRetryRef.current < 3) {
-        captureRetryRef.current++;
-        capturedRef.current = false;
-        stableCount.current = 0;
-        blurFramesRef.current = BLUR_HINT_FRAMES + 1;
-        setProgress(0);
-        setStatus("focusing");
-        setSavedOverlay(null);
-        setCaptureStage(null);
-        return;
+      if (postSharpness < SHARPNESS_CAPTURE_MIN) {
+        console.info("[scan] post-capture sharpness below target; keeping captured page", {
+          value: postSharpness,
+          threshold: SHARPNESS_CAPTURE_MIN,
+        });
       }
       // Post-capture contrast gate. A washed-out / blown-out frame with
       // almost no luma variance is almost certainly a misfire (lens cover,
@@ -1594,15 +1589,8 @@ function ScanPage() {
         threshold: 12,
         retries: captureRetryRef.current,
       });
-      if (postContrast < 12 && captureRetryRef.current < 3) {
-        captureRetryRef.current++;
-        capturedRef.current = false;
-        stableCount.current = 0;
-        setProgress(0);
-        setStatus("uncertain");
-        setSavedOverlay(null);
-        setCaptureStage(null);
-        return;
+      if (postContrast < 3) {
+        throw new Error("Processed scan is nearly blank; falling back to raw camera frame");
       }
       captureRetryRef.current = 0;
 
