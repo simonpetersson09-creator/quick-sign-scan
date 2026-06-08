@@ -1993,13 +1993,8 @@ function evaluateEdgeQuad(args: {
     }
   }
 
-  const tightScore = edgeTightness;
-  // Recompute confidence after potential tightness boost.
-  // (Identical formula — only `tightScore` may have changed.)
-  // NB: confidence above still uses the pre-boost value; the difference
-  // is at most ~0.05 and never crosses MIN_DOCUMENT_CONFIDENCE on its own,
-  // so we leave `confidence` as-is to keep ranking stable across frames.
-  void tightScore;
+
+
 
   const m = { areaRatio, edgeScore, edgeTightness, a4Score, meanEdgeOffset, statsMean: stats.mean, contrast };
   if (edgeScore < 0.18) { recordReject("edgeScoreLow", m); return null; }
