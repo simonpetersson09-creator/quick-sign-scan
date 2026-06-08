@@ -84,7 +84,13 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
           <button
             onClick={() => {
               if (isChunkError && typeof window !== "undefined") {
-                window.location.reload();
+                const hasInflightSession = scanStore.getPages().length > 0;
+                if (!hasInflightSession) {
+                  window.location.reload();
+                  return;
+                }
+                router.invalidate();
+                reset();
                 return;
               }
               router.invalidate();
