@@ -679,7 +679,6 @@ function ScanPage() {
         }
       }
     }
-    }
 
     const corners = detection?.corners ?? null;
 
