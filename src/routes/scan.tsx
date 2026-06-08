@@ -636,11 +636,7 @@ function ScanPage() {
       : undefined;
     let detection = detectDocumentQuad(data, dw, dh, { prefer: preferQuad });
 
-    // Multi-scale refinement: when the cheap 280px pass is borderline OR
-    // we're approaching lock (HOLD_FRAMES), re-run detection on a ~520px
-    // crop of the same frame to refine corner precision. Especially helps
-    // small/distant documents where 280px corners snap a few px off.
-    {
+    if (ENABLE_HI_RES_DETECT) {
       const conf = detection?.confidence ?? 0;
       const nearLock = stableCount.current >= HOLD_FRAMES;
       const borderline = detection !== null && conf >= 0.3 && conf <= 0.6;
@@ -670,9 +666,6 @@ function ScanPage() {
             ])
           : undefined;
         const hiDetection = detectDocumentQuad(hiData, hiDw, hiDh, { prefer: preferHi });
-        // Accept refined corners if hi-res confidence is comparable. We
-        // remap corners back into the lo-res pixel coordinate system used
-        // by the rest of the pipeline, but keep hi-res scoring/debug.
         if (hiDetection && hiDetection.confidence >= conf - 0.05) {
           const sx = dw / hiDw;
           const sy = dh / hiDh;
@@ -685,6 +678,7 @@ function ScanPage() {
           };
         }
       }
+    }
     }
 
     const corners = detection?.corners ?? null;
