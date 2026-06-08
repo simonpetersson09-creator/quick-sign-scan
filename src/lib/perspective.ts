@@ -1617,7 +1617,7 @@ const WHITENESS_MAX_CHROMA = 22;
 // candidates whose inside is textured/colored (a book cover, the wood
 // floor itself, a laptop screen). Augments the existing inside/outside
 // luminance gap check rather than replacing it.
-const ENABLE_PAPER_INTERIOR_PRIOR = true;
+const ENABLE_PAPER_INTERIOR_PRIOR = false;
 
 // Feature flag D — Hough line detection. Finds dominant straight lines on
 // the Canny edge map, classifies them into top/bottom/left/right by angle
