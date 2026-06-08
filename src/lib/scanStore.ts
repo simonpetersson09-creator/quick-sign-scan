@@ -68,6 +68,7 @@ type PreviewHandoff = {
 };
 
 const PREVIEW_HANDOFF_KEY = "docscan.preview-handoff.v1";
+const PREVIEW_HANDOFF_WINDOW_NAME_PREFIX = `${PREVIEW_HANDOFF_KEY}:`;
 const PREVIEW_HANDOFF_MAX_AGE_MS = 2 * 60 * 1000;
 
 const storeGlobal = globalThis as typeof globalThis & {
@@ -153,36 +154,46 @@ export const scanStore = {
     const safePages = pages.filter(isUsablePreviewPage);
     if (!safePages.length) return false;
     const storage = safeSessionStorage();
+    let saved = false;
     if (!storage) return false;
     try {
       const safeActiveIndex = Math.max(0, Math.min(safePages.length - 1, activeIndex));
-      storage.setItem(
-        PREVIEW_HANDOFF_KEY,
-        JSON.stringify({ pages: safePages, activeIndex: safeActiveIndex, createdAt: Date.now() }),
-      );
+      const payload = JSON.stringify({ pages: safePages, activeIndex: safeActiveIndex, createdAt: Date.now() });
+      storage.setItem(PREVIEW_HANDOFF_KEY, payload);
+      // Secondary same-tab handoff. This survives a dev-server/HMR reload or
+      // route-chunk reload even when sessionStorage write/read is unavailable.
+      window.name = `${PREVIEW_HANDOFF_WINDOW_NAME_PREFIX}${payload}`;
       debugScanStore("saved preview handoff", {
         pages: safePages.length,
         activeIndex: safeActiveIndex,
       });
-      return true;
+      saved = true;
     } catch (error) {
       debugScanStore("preview handoff save failed", {
         pages: safePages.length,
         error: error instanceof Error ? error.name : "unknown",
       });
-      return false;
     }
+    return saved;
   },
   readPreviewHandoff: (): PreviewHandoff | null => {
     const storage = safeSessionStorage();
-    if (!storage) return null;
+    const candidates: string[] = [];
     try {
       const raw = storage.getItem(PREVIEW_HANDOFF_KEY);
-      if (!raw) return null;
+      if (raw) candidates.push(raw);
+    } catch {}
+    try {
+      if (window.name.startsWith(PREVIEW_HANDOFF_WINDOW_NAME_PREFIX)) {
+        candidates.push(window.name.slice(PREVIEW_HANDOFF_WINDOW_NAME_PREFIX.length));
+      }
+    } catch {}
+    for (const raw of candidates) {
+      try {
       const parsed = JSON.parse(raw) as Partial<PreviewHandoff>;
       const pages = Array.isArray(parsed.pages) ? parsed.pages.filter(isUsablePreviewPage) : [];
       const createdAt = typeof parsed.createdAt === "number" ? parsed.createdAt : 0;
-      if (!pages.length || Date.now() - createdAt > PREVIEW_HANDOFF_MAX_AGE_MS) return null;
+        if (!pages.length || Date.now() - createdAt > PREVIEW_HANDOFF_MAX_AGE_MS) continue;
       const activeIndex =
         typeof parsed.activeIndex === "number"
           ? Math.max(0, Math.min(pages.length - 1, parsed.activeIndex))
@@ -190,15 +201,19 @@ export const scanStore = {
       debugScanStore("read preview handoff", { pages: pages.length, activeIndex });
       return { pages, activeIndex, createdAt };
     } catch {
-      try {
-        storage.removeItem(PREVIEW_HANDOFF_KEY);
-      } catch {}
-      return null;
+        // Try the next handoff source.
+      }
     }
-  },
+    try {
+      storage?.removeItem(PREVIEW_HANDOFF_KEY);
+      if (window.name.startsWith(PREVIEW_HANDOFF_WINDOW_NAME_PREFIX)) window.name = "";
+    } catch {}
+    return null;
+    }
   clearPreviewHandoff: () => {
     try {
       safeSessionStorage()?.removeItem(PREVIEW_HANDOFF_KEY);
+      if (window.name.startsWith(PREVIEW_HANDOFF_WINDOW_NAME_PREFIX)) window.name = "";
     } catch {}
   },
   clear: (reason = "explicit") => {
