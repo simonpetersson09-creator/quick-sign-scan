@@ -307,6 +307,18 @@ export function removeShadows(canvas: HTMLCanvasElement): HTMLCanvasElement {
 // Paper enhancement: shading-correct (remove shadows / uneven lighting),
 // then stretch whites and crisp up ink so the result looks like a clean
 // office-scanner output (white paper, dark text, no background tones).
+//
+// Feature flags for "destructive" cleanup passes that have been observed to
+// eat real text (light grey ink, isolated punctuation, table borders,
+// page numbers). Toggle to false to roll back the corresponding pass.
+const ENABLE_BG_BLOB_SUPPRESSION = true;     // step 9
+const ENABLE_ARTIFACT_SUPPRESSION = true;    // step 10
+const ENABLE_NEIGHBOUR_DESPECKLE = true;     // step 8b
+// Tuned-down thresholds (A + B + D). Were: 130 / 175 / 205 / 0.000035.
+const BG_BLOB_LOCAL_MIN_GATE = 170;          // was 130 — only bleach if local min is clearly bright
+const BG_BLOB_LUM_GATE = 200;                // was 175 — only bleach pixels that are already near-white
+const ARTIFACT_DARK_THRESHOLD = 180;         // was 205 — only really dark components qualify
+const ARTIFACT_SPECK_AREA_FACTOR = 0.0000115; // was 0.000035 — ~3× smaller, spares punctuation
 export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
   const w = canvas.width;
   const h = canvas.height;
@@ -419,20 +431,22 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
       d[i + 2] = 255;
     }
   }
-  for (let y = 1; y < h - 1; y++) {
-    for (let x = 1; x < w - 1; x++) {
-      const j = y * w + x;
-      if (lum2[j] >= 90) continue;
-      if (
-        lum2[j - 1] > 210 &&
-        lum2[j + 1] > 210 &&
-        lum2[j - w] > 210 &&
-        lum2[j + w] > 210
-      ) {
-        const i = j * 4;
-        d[i] = 255;
-        d[i + 1] = 255;
-        d[i + 2] = 255;
+  if (ENABLE_NEIGHBOUR_DESPECKLE) {
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        const j = y * w + x;
+        if (lum2[j] >= 90) continue;
+        if (
+          lum2[j - 1] > 210 &&
+          lum2[j + 1] > 210 &&
+          lum2[j - w] > 210 &&
+          lum2[j + w] > 210
+        ) {
+          const i = j * 4;
+          d[i] = 255;
+          d[i + 1] = 255;
+          d[i + 2] = 255;
+        }
       }
     }
   }
@@ -442,7 +456,7 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
   //    not dark enough to be flagged as ink. Strategy: downsample, compute
   //    a local-min map; any region whose local min is still bright means
   //    there's no real ink nearby — safe to bleach to white.
-  {
+  if (ENABLE_BG_BLOB_SUPPRESSION) {
     const SCALE = 4;
     const sw = Math.max(1, Math.floor(w / SCALE));
     const sh = Math.max(1, Math.floor(h / SCALE));
@@ -492,15 +506,16 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
         minXY[y * sw + x] = m;
       }
     }
-    // Apply: pixels in regions with no nearby ink (local min > 130) and
-    // current luminance > 175 get bleached to pure white.
+    // Apply: pixels in regions with no nearby ink (local min above gate) and
+    // current luminance above gate get bleached to pure white. Gates tuned
+    // up to spare light-grey text and thin strokes.
     for (let y = 0; y < h; y++) {
       const sy = Math.min(sh - 1, (y / SCALE) | 0);
       for (let x = 0; x < w; x++) {
         const sx = Math.min(sw - 1, (x / SCALE) | 0);
-        if (minXY[sy * sw + sx] <= 130) continue;
+        if (minXY[sy * sw + sx] <= BG_BLOB_LOCAL_MIN_GATE) continue;
         const j = y * w + x;
-        if (lum2[j] < 175) continue;
+        if (lum2[j] < BG_BLOB_LUM_GATE) continue;
         const i = j * 4;
         d[i] = 255;
         d[i + 1] = 255;
@@ -513,8 +528,8 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
   //     defects like the tall left-margin streak and tiny specks. We only
   //     delete connected dark components that are isolated from other ink,
   //     so normal text, dots over letters, stamps and dense form content stay.
-  {
-    const darkThreshold = 205;
+  if (ENABLE_ARTIFACT_SUPPRESSION) {
+    const darkThreshold = ARTIFACT_DARK_THRESHOLD;
     const finalLum = new Uint8ClampedArray(n);
     for (let i = 0, j = 0; i < d.length; i += 4, j++) {
       finalLum[j] = (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) | 0;
@@ -523,7 +538,7 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
     const visited = new Uint8Array(n);
     const stack = new Int32Array(n);
     const pad = Math.max(14, Math.round(Math.max(w, h) * 0.018));
-    const maxSpeckArea = Math.max(48, Math.round(n * 0.000035));
+    const maxSpeckArea = Math.max(16, Math.round(n * ARTIFACT_SPECK_AREA_FACTOR));
     const marginX = Math.round(w * 0.24);
     const marginY = Math.round(h * 0.18);
     const whitenComponent = (pixels: number[]) => {
