@@ -2,7 +2,6 @@ import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router"
 import { useEffect, useRef, useState, useCallback } from "react";
 import { scanStore } from "@/lib/scanStore";
 import {
-  autoOrientAndDeskewDocument,
   canvasContrast,
   canvasLaplacianVariance,
   detectDocumentQuad,
@@ -19,7 +18,6 @@ import {
   computeHiResEdgeTightness,
   warpQuadToRect,
 } from "@/lib/perspective";
-import type { DocumentAlignmentDiagnostics } from "@/lib/perspective";
 import { useT } from "@/lib/i18n";
 import { Camera, CameraOff, X, RefreshCw, ArrowLeft, ArrowRight, Zap, ZapOff, Settings } from "lucide-react";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
