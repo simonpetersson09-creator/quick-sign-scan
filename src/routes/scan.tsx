@@ -2040,24 +2040,30 @@ function ScanPage() {
           spinner + "Sparar sida…", then softly fades to reveal the camera. */}
       {savedOverlay && (
         <div
-          className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-black"
+          className="pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center gap-6 bg-black/95 px-6"
           style={{
             opacity: savedOverlay.visible ? 1 : 0,
             transition: "opacity 380ms ease-out",
           }}
         >
-          <img
-            src={savedOverlay.dataUrl}
-            alt=""
-            className="max-w-full max-h-full object-contain shadow-2xl"
-            style={{ aspectRatio: "1 / 1.414" }}
-          />
-          <div className="absolute inset-0 bg-black/45" />
-          <div className="absolute bottom-[18%] left-0 right-0 px-8 flex flex-col items-center gap-3 text-white">
+          <div
+            className="relative overflow-hidden rounded-xl bg-white shadow-2xl"
+            style={{
+              width: "min(70vw, 280px)",
+              aspectRatio: "1 / 1.414",
+            }}
+          >
+            <img
+              src={savedOverlay.dataUrl}
+              alt=""
+              className="block w-full h-full object-cover"
+            />
+          </div>
+          <div className="flex flex-col items-center gap-3 text-white w-full max-w-[280px]">
             <p className="text-[16px] font-semibold tracking-tight text-center drop-shadow">
               {captureStage?.label ?? t("savingPage")}
             </p>
-            <div className="w-full max-w-[260px] h-1.5 rounded-full bg-white/20 overflow-hidden">
+            <div className="w-full h-1.5 rounded-full bg-white/20 overflow-hidden">
               <div
                 className="h-full bg-white rounded-full"
                 style={{
