@@ -456,7 +456,7 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
   //    not dark enough to be flagged as ink. Strategy: downsample, compute
   //    a local-min map; any region whose local min is still bright means
   //    there's no real ink nearby — safe to bleach to white.
-  {
+  if (ENABLE_BG_BLOB_SUPPRESSION) {
     const SCALE = 4;
     const sw = Math.max(1, Math.floor(w / SCALE));
     const sh = Math.max(1, Math.floor(h / SCALE));
