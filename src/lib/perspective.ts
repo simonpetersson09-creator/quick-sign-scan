@@ -1220,6 +1220,12 @@ export interface DocumentDetection {
      *  and the nearest strong gradient after snap. Lower = tighter frame. */
     meanEdgeOffset: number;
   };
+  /** Generous-overlay flag: true when the detection passed all strict
+   *  capture gates; false when it only passed structural gates and is
+   *  returned for overlay/coaching purposes (auto-capture must not fire). */
+  readyForCapture?: boolean;
+  /** When readyForCapture is false, the first strict gate that failed. */
+  reasonNotReady?: string;
 }
 
 const A4_RATIO = Math.SQRT2;
@@ -1234,6 +1240,13 @@ export interface DetectOptions {
   /** Previous detection corners (in source pixel coords) — used to
    *  temporally bias scoring so the frame doesn't jump between objects. */
   prefer?: [Point, Point, Point, Point];
+  /** Generous-overlay mode: when no candidate passes the strict capture
+   *  gates, fall back to the best candidate that passed structural gates
+   *  (area / A4 / perspective / polygonFill / not-touching-edge) so the
+   *  on-screen frame can show that the document IS being seen. Such a
+   *  result is returned with readyForCapture=false; auto-capture must
+   *  refuse to fire on it. Strict pipeline is unchanged when this is off. */
+  allowOverlay?: boolean;
 }
 
 export function detectDocumentQuad(
