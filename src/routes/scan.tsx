@@ -1869,6 +1869,30 @@ function ScanPage() {
             lastCapture:{" "}
             {debugInfo.lastCapture ? new Date(debugInfo.lastCapture).toLocaleTimeString() : "—"}
           </div>
+          {(() => {
+            const d = getLastDetectDiagnostics();
+            const reasons = Object.entries(d.rejects).sort((a, b) => b[1] - a[1]).slice(0, 3);
+            const br = d.bestRejected;
+            return (
+              <>
+                <div className="mt-1 border-t border-white/20 pt-1">
+                  cands: {d.candidateCount} · rejects:
+                </div>
+                {reasons.length === 0 ? (
+                  <div>  (none)</div>
+                ) : (
+                  reasons.map(([k, n]) => (
+                    <div key={k}>  {k}: {n}</div>
+                  ))
+                )}
+                {br && (
+                  <div className="mt-0.5">
+                    best-rej [{br.reason}]: area={br.areaRatio.toFixed(2)} edge={br.edgeScore.toFixed(2)} tight={br.edgeTightness.toFixed(2)} a4={br.a4Score.toFixed(2)} off={br.meanEdgeOffset.toFixed(1)}px ctr={br.contrast.toFixed(0)}
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
 
