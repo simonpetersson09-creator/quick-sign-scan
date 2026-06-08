@@ -173,13 +173,12 @@ export const scanStore = {
       return false;
     }
   },
-  consumePreviewHandoff: (): PreviewHandoff | null => {
+  readPreviewHandoff: (): PreviewHandoff | null => {
     const storage = safeSessionStorage();
     if (!storage) return null;
     try {
       const raw = storage.getItem(PREVIEW_HANDOFF_KEY);
       if (!raw) return null;
-      storage.removeItem(PREVIEW_HANDOFF_KEY);
       const parsed = JSON.parse(raw) as Partial<PreviewHandoff>;
       const pages = Array.isArray(parsed.pages) ? parsed.pages.filter(isUsablePreviewPage) : [];
       const createdAt = typeof parsed.createdAt === "number" ? parsed.createdAt : 0;
@@ -188,7 +187,7 @@ export const scanStore = {
         typeof parsed.activeIndex === "number"
           ? Math.max(0, Math.min(pages.length - 1, parsed.activeIndex))
           : pages.length - 1;
-      debugScanStore("consumed preview handoff", { pages: pages.length, activeIndex });
+      debugScanStore("read preview handoff", { pages: pages.length, activeIndex });
       return { pages, activeIndex, createdAt };
     } catch {
       try {
@@ -196,6 +195,11 @@ export const scanStore = {
       } catch {}
       return null;
     }
+  },
+  clearPreviewHandoff: () => {
+    try {
+      safeSessionStorage()?.removeItem(PREVIEW_HANDOFF_KEY);
+    } catch {}
   },
   clear: (reason = "explicit") => {
     debugScanStore("clear called", {

@@ -43,10 +43,10 @@ function PreviewPage() {
   );
   const consumedHandoffRef = useRef<{
     read: boolean;
-    value: ReturnType<typeof scanStore.consumePreviewHandoff>;
+    value: ReturnType<typeof scanStore.readPreviewHandoff>;
   }>({ read: false, value: null });
   if (!consumedHandoffRef.current.read) {
-    consumedHandoffRef.current = { read: true, value: scanStore.consumePreviewHandoff() };
+    consumedHandoffRef.current = { read: true, value: scanStore.readPreviewHandoff() };
   }
   const recoveredPages = useMemo(
     () => consumedHandoffRef.current.value?.pages ?? [],
@@ -96,10 +96,13 @@ function PreviewPage() {
         pages: fallbackPages,
         imageDataUrl: fallbackPages[safeActive],
       });
+      scanStore.clearPreviewHandoff();
       window.history.replaceState(
         { ...window.history.state, scanPages: undefined, scanActiveIndex: undefined },
         "",
       );
+    } else if (scanStore.getPages().length) {
+      scanStore.clearPreviewHandoff();
     }
     const first = list[0];
     console.info("[preview] mounted with pages count", {
