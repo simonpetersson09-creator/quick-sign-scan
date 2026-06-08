@@ -123,6 +123,10 @@ function ScanPage() {
   // Higher-resolution detection canvas — used for an opportunistic refinement
   // pass when the cheap 280px detection is borderline or near-lock. Improves
   // corner precision for documents that don't fill much of the frame.
+  // Feature flag: multi-scale (520px) detection refinement. Disabled by
+  // default — the extra pass destabilised lock on some devices. Set to
+  // true to A/B test again later.
+  const ENABLE_HI_RES_DETECT = false;
   const hiDetectCanvas = useRef<HTMLCanvasElement | null>(null);
   const lastRefineAtRef = useRef(0);
   const HI_DETECT_WIDTH = 520;
