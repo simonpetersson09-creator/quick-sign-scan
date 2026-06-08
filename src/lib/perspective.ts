@@ -837,9 +837,7 @@ export function autoOrientAndDeskewDocument(
     oriented = rotateCanvas(oriented, appliedDeskewAngle);
   }
 
-  cleanPaperEdges(oriented);
   const finalCanvas = renderToA4Portrait(oriented);
-  cleanPaperEdges(finalCanvas);
   onDiagnostics?.({
     input: { width: canvas.width, height: canvas.height },
     orientationCandidates,
