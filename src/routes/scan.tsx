@@ -1761,8 +1761,6 @@ function ScanPage() {
 
 
   function finishScanning() {
-    cancelledRef.current = true;
-    cameraStartTokenRef.current += 1;
     if (savedTimer1Ref.current) window.clearTimeout(savedTimer1Ref.current);
     if (savedTimer2Ref.current) window.clearTimeout(savedTimer2Ref.current);
     if (savedTimer3Ref.current) window.clearTimeout(savedTimer3Ref.current);
@@ -1780,6 +1778,8 @@ function ScanPage() {
       setStatus("searching");
       return;
     }
+    cancelledRef.current = true;
+    cameraStartTokenRef.current += 1;
     stopCamera("done-to-preview");
     scanStore.set({ pages, imageDataUrl: pages[pages.length - 1] });
     navigate({
