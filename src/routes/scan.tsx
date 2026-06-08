@@ -642,55 +642,54 @@ function ScanPage() {
 
     // Bias detection toward the previously-locked quad (in pixel coords) so
     // the frame doesn't hop between competing objects between rendered frames.
+    // BUT: only after we already have a confident, tight lock — otherwise we
+    // risk locking the detector onto a noisy/wrong contour from previous frames.
     const prevSmooth = smoothQuad.current;
-    const preferQuad = prevSmooth
-      ? (prevSmooth.map((p) => ({ x: p.x * dw, y: p.y * dh })) as [Point, Point, Point, Point])
-      : undefined;
+    const prevMeta = detectionMeta.current;
+    const prevConfidentEnough =
+      !ENABLE_PREFER_BIAS_GATE ||
+      (prevMeta !== null &&
+        prevMeta.confidence >= PREFER_BIAS_MIN_CONF &&
+        prevMeta.debug.edgeTightness >= PREFER_BIAS_MIN_EDGE);
+    const preferQuad =
+      prevSmooth && prevConfidentEnough
+        ? (prevSmooth.map((p) => ({ x: p.x * dw, y: p.y * dh })) as [Point, Point, Point, Point])
+        : undefined;
     let detection = detectDocumentQuad(data, dw, dh, { prefer: preferQuad });
 
-    if (ENABLE_HI_RES_DETECT) {
-      const conf = detection?.confidence ?? 0;
-      const nearLock = stableCount.current >= HOLD_FRAMES;
-      const borderline = detection !== null && conf >= 0.3 && conf <= 0.6;
-      if (
-        (borderline || nearLock) &&
-        now - lastRefineAtRef.current >= REFINE_COOLDOWN_MS
-      ) {
-        lastRefineAtRef.current = now;
-        const hiDw = Math.min(HI_DETECT_WIDTH, vw);
-        const hiDh = Math.round((vh / vw) * hiDw);
-        if (!hiDetectCanvas.current)
-          hiDetectCanvas.current = document.createElement("canvas");
-        const hc = hiDetectCanvas.current;
-        if (hc.width !== hiDw || hc.height !== hiDh) {
-          hc.width = hiDw;
-          hc.height = hiDh;
-        }
-        const hctx = hc.getContext("2d", { willReadFrequently: true })!;
-        hctx.drawImage(video, 0, 0, hiDw, hiDh);
-        const { data: hiData } = hctx.getImageData(0, 0, hiDw, hiDh);
-        const preferHi = prevSmooth
-          ? (prevSmooth.map((p) => ({ x: p.x * hiDw, y: p.y * hiDh })) as [
-              Point,
-              Point,
-              Point,
-              Point,
-            ])
-          : undefined;
-        const hiDetection = detectDocumentQuad(hiData, hiDw, hiDh, { prefer: preferHi });
-        if (hiDetection && hiDetection.confidence >= conf - 0.05) {
-          const sx = dw / hiDw;
-          const sy = dh / hiDh;
-          detection = {
-            ...hiDetection,
-            corners: hiDetection.corners.map((p) => ({
-              x: p.x * sx,
-              y: p.y * sy,
-            })) as [Point, Point, Point, Point],
-          };
-        }
+    // Optional hi-res local corner refinement on the full video frame. Does
+    // NOT run a new detection — only nudges already-detected corners toward
+    // local edges. Cannot change the quad shape; clamped to ±a few px.
+    if (
+      ENABLE_LIVE_CORNER_REFINE &&
+      detection &&
+      now - lastRefineAtRef.current >= REFINE_COOLDOWN_MS
+    ) {
+      lastRefineAtRef.current = now;
+      try {
+        const sx = vw / dw;
+        const sy = vh / dh;
+        const quadFull = detection.corners.map((p) => ({
+          x: p.x * sx,
+          y: p.y * sy,
+        })) as [Point, Point, Point, Point];
+        const refinedFull = refineQuadCorners(video, vw, vh, quadFull);
+        detection = {
+          ...detection,
+          corners: refinedFull.map((p) => ({
+            x: p.x / sx,
+            y: p.y / sy,
+          })) as [Point, Point, Point, Point],
+        };
+      } catch {
+        // ignore — keep original 280px corners
       }
     }
+
+    // Reference unused hi-res symbols so TS doesn't complain when flags off.
+    void ENABLE_HI_RES_DETECT;
+    void HI_DETECT_WIDTH;
+    void hiDetectCanvas;
 
     const corners = detection?.corners ?? null;
 
