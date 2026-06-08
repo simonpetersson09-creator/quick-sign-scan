@@ -2026,11 +2026,6 @@ function evaluateEdgeQuad(args: {
 
 
   const m = { areaRatio, edgeScore, edgeTightness, a4Score, meanEdgeOffset, statsMean: stats.mean, contrast };
-  if (edgeScore < 0.18) { recordReject("edgeScoreLow", m); return null; }
-  if (stats.mean < 135) { recordReject("interiorTooDark", m); return null; }
-  if (stats.brightRatio < 0.55) { recordReject("notEnoughPaperPixels", m); return null; }
-  if (stats.darkRatio > 0.32) { recordReject("tooMuchDarkContent", m); return null; }
-  if (stats.mean - stats.exteriorMean < 12) { recordReject("lowPaperBgContrast", m); return null; }
 
   // Adaptive tightness threshold. Stricter for big docs, gentler for
   // small docs that already pass A4/edge/contrast sanity above.
@@ -2048,8 +2043,55 @@ function evaluateEdgeQuad(args: {
       accepted: edgeTightness >= tightnessThreshold,
     };
   }
-  if (edgeTightness < tightnessThreshold) {
-    recordReject(adaptiveQualifies ? "edgeTightnessLowAdaptive" : "edgeTightnessLow", m);
+
+  // Compute strict-gate failure (if any) WITHOUT short-circuit returning.
+  // This lets us record a generous "overlay candidate" with the actual
+  // reason it's not capture-ready, while preserving the original reject
+  // counters and bestRejected behavior.
+  let strictReason: string | null = null;
+  if (edgeScore < 0.18) strictReason = "edgeScoreLow";
+  else if (stats.mean < 135) strictReason = "interiorTooDark";
+  else if (stats.brightRatio < 0.55) strictReason = "notEnoughPaperPixels";
+  else if (stats.darkRatio > 0.32) strictReason = "tooMuchDarkContent";
+  else if (stats.mean - stats.exteriorMean < 12) strictReason = "lowPaperBgContrast";
+  else if (edgeTightness < tightnessThreshold)
+    strictReason = adaptiveQualifies ? "edgeTightnessLowAdaptive" : "edgeTightnessLow";
+
+  // ===== Generous overlay candidate (feature-flagged) =====
+  // Record best structurally-plausible quad regardless of strict-gate
+  // outcome. detectDocumentQuad uses this only when caller passes
+  // allowOverlay and no strict result wins.
+  const ENABLE_GENEROUS_OVERLAY_DETECTION = true;
+  if (
+    ENABLE_GENEROUS_OVERLAY_DETECTION &&
+    a4Score >= 0.5 &&
+    areaRatio >= 0.04 &&
+    areaRatio <= 0.95
+  ) {
+    const score =
+      a4Score * 0.55 +
+      clamp01(areaRatio / 0.5) * 0.3 +
+      clamp01(edgeScore / 0.3) * 0.15;
+    const prev = lastDetectDiagnostics.overlayBest;
+    if (!prev || score > prev._score) {
+      lastDetectDiagnostics.overlayBest = {
+        corners: ordered.map((p) => ({ x: p.x, y: p.y })) as [Point, Point, Point, Point],
+        a4Ratio,
+        a4Score,
+        edgeScore,
+        edgeTightness,
+        areaRatio,
+        statsMean: stats.mean,
+        contrast,
+        confidence,
+        reasonNotReady: strictReason,
+        _score: score,
+      };
+    }
+  }
+
+  if (strictReason) {
+    recordReject(strictReason, m);
     return null;
   }
 
