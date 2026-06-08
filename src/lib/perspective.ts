@@ -1814,6 +1814,21 @@ export type DetectDiagnostics = {
     contrast: number;
     accepted: boolean;
   };
+  /** Best structurally-plausible overlay candidate this frame (generous
+   *  detection). May be present even when no strict result is returned. */
+  overlayBest: null | {
+    corners: [Point, Point, Point, Point];
+    a4Ratio: number;
+    a4Score: number;
+    edgeScore: number;
+    edgeTightness: number;
+    areaRatio: number;
+    statsMean: number;
+    contrast: number;
+    confidence: number;
+    reasonNotReady: string | null;
+    _score: number;
+  };
 };
 
 let lastDetectDiagnostics: DetectDiagnostics = {
@@ -1821,6 +1836,7 @@ let lastDetectDiagnostics: DetectDiagnostics = {
   bestRejected: null,
   candidateCount: 0,
   adaptiveUsed: null,
+  overlayBest: null,
 };
 
 export function getLastDetectDiagnostics(): DetectDiagnostics {
@@ -1828,7 +1844,7 @@ export function getLastDetectDiagnostics(): DetectDiagnostics {
 }
 
 function resetDetectDiagnostics() {
-  lastDetectDiagnostics = { rejects: {}, bestRejected: null, candidateCount: 0, adaptiveUsed: null };
+  lastDetectDiagnostics = { rejects: {}, bestRejected: null, candidateCount: 0, adaptiveUsed: null, overlayBest: null };
 }
 
 function recordReject(
