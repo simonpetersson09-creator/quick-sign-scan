@@ -1377,7 +1377,16 @@ export function detectDocumentQuad(
   if (best) {
     best.debug.candidateCount = candidateCount;
   }
-  return best && best.confidence >= MIN_DOCUMENT_CONFIDENCE ? best : null;
+  lastDetectDiagnostics.candidateCount = candidateCount;
+  const result = best && best.confidence >= MIN_DOCUMENT_CONFIDENCE ? best : null;
+  if (!result && best) recordReject("confidenceBelowMin", {
+    areaRatio: best.debug.areaRatio,
+    edgeScore: best.debug.edgeScore,
+    edgeTightness: best.debug.edgeTightness,
+    a4Score: best.debug.a4Score,
+    meanEdgeOffset: best.debug.meanEdgeOffset,
+  });
+  return result;
 }
 
 // Backwards-compatible API for camera overlay/capture.
