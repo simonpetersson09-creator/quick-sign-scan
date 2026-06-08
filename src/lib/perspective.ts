@@ -1220,6 +1220,12 @@ export interface DocumentDetection {
      *  and the nearest strong gradient after snap. Lower = tighter frame. */
     meanEdgeOffset: number;
   };
+  /** Generous-overlay flag: true when the detection passed all strict
+   *  capture gates; false when it only passed structural gates and is
+   *  returned for overlay/coaching purposes (auto-capture must not fire). */
+  readyForCapture?: boolean;
+  /** When readyForCapture is false, the first strict gate that failed. */
+  reasonNotReady?: string;
 }
 
 const A4_RATIO = Math.SQRT2;
@@ -1234,6 +1240,13 @@ export interface DetectOptions {
   /** Previous detection corners (in source pixel coords) — used to
    *  temporally bias scoring so the frame doesn't jump between objects. */
   prefer?: [Point, Point, Point, Point];
+  /** Generous-overlay mode: when no candidate passes the strict capture
+   *  gates, fall back to the best candidate that passed structural gates
+   *  (area / A4 / perspective / polygonFill / not-touching-edge) so the
+   *  on-screen frame can show that the document IS being seen. Such a
+   *  result is returned with readyForCapture=false; auto-capture must
+   *  refuse to fire on it. Strict pipeline is unchanged when this is off. */
+  allowOverlay?: boolean;
 }
 
 export function detectDocumentQuad(
@@ -1386,7 +1399,39 @@ export function detectDocumentQuad(
     a4Score: best.debug.a4Score,
     meanEdgeOffset: best.debug.meanEdgeOffset,
   });
-  return result;
+  if (result) {
+    return { ...result, readyForCapture: true };
+  }
+  // Generous-overlay fallback: synthesize a non-capture-ready detection
+  // from the best structurally-plausible candidate so the live overlay
+  // can show that the document IS being seen. Auto-capture must check
+  // readyForCapture before firing.
+  if (options.allowOverlay && lastDetectDiagnostics.overlayBest) {
+    const o = lastDetectDiagnostics.overlayBest;
+    return {
+      corners: o.corners,
+      a4Ratio: o.a4Ratio,
+      confidence: o.confidence,
+      debug: {
+        edgeThreshold: 0,
+        threshold: 0,
+        candidateCount,
+        a4Score: o.a4Score,
+        edgeScore: o.edgeScore,
+        brightnessScore: 0,
+        textScore: 0,
+        areaRatio: o.areaRatio,
+        sideDeviation: 0,
+        perspectiveError: 0,
+        polygonFill: 1,
+        edgeTightness: o.edgeTightness,
+        meanEdgeOffset: 0,
+      },
+      readyForCapture: false,
+      reasonNotReady: o.reasonNotReady ?? "confidenceBelowMin",
+    };
+  }
+  return null;
 }
 
 // Backwards-compatible API for camera overlay/capture.
@@ -1801,6 +1846,21 @@ export type DetectDiagnostics = {
     contrast: number;
     accepted: boolean;
   };
+  /** Best structurally-plausible overlay candidate this frame (generous
+   *  detection). May be present even when no strict result is returned. */
+  overlayBest: null | {
+    corners: [Point, Point, Point, Point];
+    a4Ratio: number;
+    a4Score: number;
+    edgeScore: number;
+    edgeTightness: number;
+    areaRatio: number;
+    statsMean: number;
+    contrast: number;
+    confidence: number;
+    reasonNotReady: string | null;
+    _score: number;
+  };
 };
 
 let lastDetectDiagnostics: DetectDiagnostics = {
@@ -1808,6 +1868,7 @@ let lastDetectDiagnostics: DetectDiagnostics = {
   bestRejected: null,
   candidateCount: 0,
   adaptiveUsed: null,
+  overlayBest: null,
 };
 
 export function getLastDetectDiagnostics(): DetectDiagnostics {
@@ -1815,7 +1876,7 @@ export function getLastDetectDiagnostics(): DetectDiagnostics {
 }
 
 function resetDetectDiagnostics() {
-  lastDetectDiagnostics = { rejects: {}, bestRejected: null, candidateCount: 0, adaptiveUsed: null };
+  lastDetectDiagnostics = { rejects: {}, bestRejected: null, candidateCount: 0, adaptiveUsed: null, overlayBest: null };
 }
 
 function recordReject(
@@ -1997,11 +2058,6 @@ function evaluateEdgeQuad(args: {
 
 
   const m = { areaRatio, edgeScore, edgeTightness, a4Score, meanEdgeOffset, statsMean: stats.mean, contrast };
-  if (edgeScore < 0.18) { recordReject("edgeScoreLow", m); return null; }
-  if (stats.mean < 135) { recordReject("interiorTooDark", m); return null; }
-  if (stats.brightRatio < 0.55) { recordReject("notEnoughPaperPixels", m); return null; }
-  if (stats.darkRatio > 0.32) { recordReject("tooMuchDarkContent", m); return null; }
-  if (stats.mean - stats.exteriorMean < 12) { recordReject("lowPaperBgContrast", m); return null; }
 
   // Adaptive tightness threshold. Stricter for big docs, gentler for
   // small docs that already pass A4/edge/contrast sanity above.
@@ -2019,8 +2075,55 @@ function evaluateEdgeQuad(args: {
       accepted: edgeTightness >= tightnessThreshold,
     };
   }
-  if (edgeTightness < tightnessThreshold) {
-    recordReject(adaptiveQualifies ? "edgeTightnessLowAdaptive" : "edgeTightnessLow", m);
+
+  // Compute strict-gate failure (if any) WITHOUT short-circuit returning.
+  // This lets us record a generous "overlay candidate" with the actual
+  // reason it's not capture-ready, while preserving the original reject
+  // counters and bestRejected behavior.
+  let strictReason: string | null = null;
+  if (edgeScore < 0.18) strictReason = "edgeScoreLow";
+  else if (stats.mean < 135) strictReason = "interiorTooDark";
+  else if (stats.brightRatio < 0.55) strictReason = "notEnoughPaperPixels";
+  else if (stats.darkRatio > 0.32) strictReason = "tooMuchDarkContent";
+  else if (stats.mean - stats.exteriorMean < 12) strictReason = "lowPaperBgContrast";
+  else if (edgeTightness < tightnessThreshold)
+    strictReason = adaptiveQualifies ? "edgeTightnessLowAdaptive" : "edgeTightnessLow";
+
+  // ===== Generous overlay candidate (feature-flagged) =====
+  // Record best structurally-plausible quad regardless of strict-gate
+  // outcome. detectDocumentQuad uses this only when caller passes
+  // allowOverlay and no strict result wins.
+  const ENABLE_GENEROUS_OVERLAY_DETECTION = true;
+  if (
+    ENABLE_GENEROUS_OVERLAY_DETECTION &&
+    a4Score >= 0.5 &&
+    areaRatio >= 0.04 &&
+    areaRatio <= 0.95
+  ) {
+    const score =
+      a4Score * 0.55 +
+      clamp01(areaRatio / 0.5) * 0.3 +
+      clamp01(edgeScore / 0.3) * 0.15;
+    const prev = lastDetectDiagnostics.overlayBest;
+    if (!prev || score > prev._score) {
+      lastDetectDiagnostics.overlayBest = {
+        corners: ordered.map((p) => ({ x: p.x, y: p.y })) as [Point, Point, Point, Point],
+        a4Ratio,
+        a4Score,
+        edgeScore,
+        edgeTightness,
+        areaRatio,
+        statsMean: stats.mean,
+        contrast,
+        confidence,
+        reasonNotReady: strictReason,
+        _score: score,
+      };
+    }
+  }
+
+  if (strictReason) {
+    recordReject(strictReason, m);
     return null;
   }
 

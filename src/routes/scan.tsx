@@ -155,6 +155,15 @@ function ScanPage() {
   const CANDIDATE_AREA_TOL = 0.18;
   const CANDIDATE_A4_TOL = 0.25;
   const CANDIDATE_AMBIGUITY_RATIO = 0.55; // 2nd cluster vs best
+  // Feature flag: generous overlay detection. The live document frame is
+  // allowed to display as soon as a candidate passes structural gates
+  // (area / A4 ratio / perspective / sides / polygon-fill / not-touching-
+  // frame). Auto-capture still requires the full strict pipeline
+  // (edgeTightness, sharpness, brightness, stability, confidence, no
+  // ambiguity). Goal: user sees that the document is found at longer
+  // distance, but no photo is taken until quality is good.
+  const ENABLE_GENEROUS_OVERLAY = true;
+  const lastOverlayLogAtRef = useRef(0);
   // Throttle detection to ~22 Hz. The full pipeline (Canny + Sobel + snap)
   // is too heavy to run at 60 fps on mid-range mobile — it starves the UI
   // thread and the camera's continuous autofocus callback, which actually
@@ -680,7 +689,13 @@ function ScanPage() {
       prevSmooth && prevConfidentEnough
         ? (prevSmooth.map((p) => ({ x: p.x * dw, y: p.y * dh })) as [Point, Point, Point, Point])
         : undefined;
-    let detection = detectDocumentQuad(data, dw, dh, { prefer: preferQuad });
+    let detection = detectDocumentQuad(data, dw, dh, { prefer: preferQuad, allowOverlay: ENABLE_GENEROUS_OVERLAY });
+    // Separate live-detection (overlay) from capture-readiness. A detection
+    // returned with readyForCapture=false has only passed structural gates
+    // and is shown to coach the user — auto-capture must not fire.
+    const detectedForOverlay = !!detection;
+    const readyForCapture = !!detection && detection.readyForCapture !== false;
+    const reasonNotReady = detection?.reasonNotReady;
 
     // Optional hi-res local corner refinement on the full video frame. Does
     // NOT run a new detection — only nudges already-detected corners toward
@@ -770,6 +785,74 @@ function ScanPage() {
 
     // Normalize to 0..1
     const norm = corners.map((p) => ({ x: p.x / dw, y: p.y / dh })) as [Point, Point, Point, Point];
+
+    // ===== Generous overlay branch (feature-flagged) =====
+    // The detection passed structural gates but NOT the strict capture
+    // gates (edgeTightness / contrast / brightness / etc.). Show the
+    // document frame to the user so they can see it IS being found, and
+    // coach them with a reason. Auto-capture is blocked here by design.
+    if (ENABLE_GENEROUS_OVERLAY && !readyForCapture) {
+      // Gentle EMA so the overlay glides instead of jittering.
+      const smoothed = emaQuad(smoothQuad.current, norm, 0.5);
+      smoothQuad.current = smoothed;
+      lastRawQuad.current = norm;
+      stableCount.current = 0;
+      lockedRef.current = false;
+      lockBreakFramesRef.current = 0;
+      setProgress(0);
+      drawOverlay(smoothed, "hold");
+
+      const areaRatio = detection?.debug.areaRatio ?? 0;
+      const a4Ratio = detection?.a4Ratio ?? Math.SQRT2;
+      const a4Diff = Math.min(
+        Math.abs(a4Ratio - Math.SQRT2),
+        Math.abs(a4Ratio - 1 / Math.SQRT2),
+      );
+      // Map reasonNotReady (+ live metrics) to actionable hint.
+      let nextStatus: Status = "align";
+      if (
+        reasonNotReady === "interiorTooDark" ||
+        reasonNotReady === "lowPaperBgContrast" ||
+        !isBrightEnough
+      ) {
+        nextStatus = "lowLight";
+      } else if (
+        reasonNotReady === "edgeTightnessLow" ||
+        reasonNotReady === "edgeTightnessLowAdaptive" ||
+        reasonNotReady === "edgeScoreLow"
+      ) {
+        // Weak edges almost always mean "document too far away" for A4.
+        if (areaRatio > 0 && areaRatio < 0.22) nextStatus = "tooFar";
+        else if (a4Diff > 0.3) nextStatus = "tilt";
+        else nextStatus = "align";
+      } else if (areaRatio > 0 && areaRatio < 0.22) {
+        nextStatus = "tooFar";
+      } else if (a4Diff > 0.3) {
+        nextStatus = "tilt";
+      } else {
+        nextStatus = "hold";
+      }
+      setStatus(nextStatus);
+
+      if (debugEnabled && now - lastOverlayLogAtRef.current > 750) {
+        lastOverlayLogAtRef.current = now;
+        // eslint-disable-next-line no-console
+        console.log("[scan] detection", {
+          detectedForOverlay,
+          readyForCapture,
+          reasonNotReady,
+          areaRatio,
+          a4Ratio,
+          edgeTightness: detection?.debug.edgeTightness,
+          edgeScore: detection?.debug.edgeScore,
+          a4Score: detection?.debug.a4Score,
+          confidence: detection?.confidence,
+          nextStatus,
+        });
+      }
+      return;
+    }
+
 
     // Candidate memory — record this detection so we can spot scenes where
     // multiple competing quads keep flickering frame-to-frame. We never
