@@ -1458,7 +1458,23 @@ function ScanPage() {
     }
 
     // Sortera alltid hörnen i exakt ordning TL, TR, BR, BL innan warp.
-    const orderedNormQuad = orderQuad(normQuad);
+    // Multi-frame voting: median of the last N smoothed quads (per corner).
+    // En enstaka skakig frame kan inte längre dra warp-hörnen av pappret.
+    const votes = recentSmoothQuadsRef.current;
+    let votedQuad: [Point, Point, Point, Point] = normQuad;
+    if (votes.length >= 3) {
+      const orderedVotes = votes.map((v) => orderQuad(v));
+      const median = (arr: number[]) => {
+        const s = [...arr].sort((a, b) => a - b);
+        const m = Math.floor(s.length / 2);
+        return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+      };
+      votedQuad = [0, 1, 2, 3].map((i) => ({
+        x: median(orderedVotes.map((q) => q[i].x)),
+        y: median(orderedVotes.map((q) => q[i].y)),
+      })) as [Point, Point, Point, Point];
+    }
+    const orderedNormQuad = orderQuad(votedQuad);
 
     // Text-safe mode: do not grow or shrink the detected crop. Growing shows
     // desk/background; shrinking risks cutting off real text near the edges.
