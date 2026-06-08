@@ -41,18 +41,31 @@ function PreviewPage() {
         : [],
     [navState.scanPages],
   );
+  const consumedHandoffRef = useRef<ReturnType<typeof scanStore.consumePreviewHandoff> | null>(null);
+  if (consumedHandoffRef.current === null) {
+    consumedHandoffRef.current = scanStore.consumePreviewHandoff();
+  }
+  const recoveredPages = consumedHandoffRef.current?.pages ?? [];
+  const recoveredActiveIndex = consumedHandoffRef.current?.activeIndex;
   // Initialize synchronously from the in-memory store so we don't flash the
   // empty state when pages are already present (e.g. just-finished scan).
   const [pages, setPages] = useState<string[]>(() => {
     const list = scanStore.getPages();
-    return list.length ? list : handedOffPages;
+    return list.length ? list : handedOffPages.length ? handedOffPages : recoveredPages;
   });
   const [activeIndex, setActiveIndex] = useState<number>(() => {
     const s = scanStore.get();
-    const list = scanStore.getPages().length ? scanStore.getPages() : handedOffPages;
+    const list = scanStore.getPages().length
+      ? scanStore.getPages()
+      : handedOffPages.length
+        ? handedOffPages
+        : recoveredPages;
     if (!list.length) return 0;
     if (typeof navState.scanActiveIndex === "number") {
       return Math.max(0, Math.min(list.length - 1, navState.scanActiveIndex));
+    }
+    if (typeof recoveredActiveIndex === "number") {
+      return Math.max(0, Math.min(list.length - 1, recoveredActiveIndex));
     }
     return s.imageDataUrl ? Math.max(0, list.indexOf(s.imageDataUrl)) : list.length - 1;
   });
@@ -63,11 +76,19 @@ function PreviewPage() {
   const [filtering, setFiltering] = useState(false);
 
   useEffect(() => {
-    const list = scanStore.getPages().length ? scanStore.getPages() : handedOffPages;
-    if (handedOffPages.length && !scanStore.getPages().length) {
+    const fallbackPages = handedOffPages.length ? handedOffPages : recoveredPages;
+    const fallbackActiveIndex =
+      typeof navState.scanActiveIndex === "number"
+        ? navState.scanActiveIndex
+        : typeof recoveredActiveIndex === "number"
+          ? recoveredActiveIndex
+          : fallbackPages.length - 1;
+    const list = scanStore.getPages().length ? scanStore.getPages() : fallbackPages;
+    if (fallbackPages.length && !scanStore.getPages().length) {
+      const safeActive = Math.max(0, Math.min(fallbackPages.length - 1, fallbackActiveIndex));
       scanStore.set({
-        pages: handedOffPages,
-        imageDataUrl: handedOffPages[handedOffPages.length - 1],
+        pages: fallbackPages,
+        imageDataUrl: fallbackPages[safeActive],
       });
       window.history.replaceState(
         { ...window.history.state, scanPages: undefined, scanActiveIndex: undefined },
@@ -81,7 +102,7 @@ function PreviewPage() {
       firstImageSrcValid: Boolean(first?.startsWith("data:image/") || first?.startsWith("blob:")),
       imageDataUrlExists: Boolean(scanStore.get().imageDataUrl),
     });
-  }, [handedOffPages]);
+  }, [handedOffPages, navState.scanActiveIndex, recoveredActiveIndex, recoveredPages]);
 
   // Subscribe to store updates so any late mutation (race with navigation,
   // or external change) reflects here.
