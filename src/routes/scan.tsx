@@ -17,6 +17,7 @@ import {
   refineQuadCorners,
   computeHiResEdgeTightness,
   warpQuadToRect,
+  autoOrientAndDeskewDocument,
 } from "@/lib/perspective";
 import { useT } from "@/lib/i18n";
 import { Camera, CameraOff, X, RefreshCw, ArrowLeft, ArrowRight, Zap, ZapOff, Settings } from "lucide-react";
@@ -1543,13 +1544,21 @@ function ScanPage() {
       let warped = warpQuadToRect(bestFrame ?? video, vw, vh, refinedSrcQuad, outW, outH);
       logScanCanvas("after-perspective-transform", warped, debugEnabled);
 
-      // Keep the captured page faithful. Do not run post-capture deskew or
-      // scanner-cleanup here: those extra resampling/bleaching steps can make
-      // small footer text fade or disappear. The perspective warp already
-      // straightens the page enough for preview/PDF.
+      // Rama in resultatet på en ren A4-yta och korrigera små vinklar.
+      // autoOrientAndDeskewDocument gör INGEN text-bleknings-cleanup längre
+      // (cleanPaperEdges/enhancePaper/removeShadows är borttagna), så denna
+      // pass påverkar inte tunn text – den ger bara en ren vit bakgrund
+      // istället för bordsskivan runt papperet.
       if (stageTimerRef.current) window.clearTimeout(stageTimerRef.current);
       setCaptureStage({ label: t("capStageEnhance"), progress: 0.6 });
-      logScanStage("deskew", { skipped: true, reason: "preserve faint text" });
+      try {
+        warped = autoOrientAndDeskewDocument(warped);
+        logScanCanvas("after-deskew", warped, debugEnabled);
+        logScanStage("deskew", { skipped: false });
+      } catch (e) {
+        console.warn("[scan] autoOrientAndDeskewDocument failed; using warped frame", e);
+        logScanStage("deskew", { skipped: true, reason: "exception" });
+      }
 
       // Post-capture sharpness gate. If the warped doc is blurry we abandon
       // this capture and let auto-focus retry — better to wait a second
