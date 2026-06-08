@@ -930,12 +930,51 @@ function ScanPage() {
       drawOverlay(smoothed, "ready");
       const isShaky =
         motionAvailableRef.current && motionMagRef.current > MOTION_STILL_THRESHOLD;
+      // Candidate-memory ambiguity gate. If recent frames produced two
+      // meaningfully different quads with similar support, hold off auto-
+      // capture so we don't snap the wrong one.
+      let ambiguous = false;
+      if (ENABLE_CANDIDATE_MEMORY) {
+        const hist = candidateHistoryRef.current;
+        if (hist.length >= 6) {
+          const clusters: { rep: CandidateEntry; count: number }[] = [];
+          for (const e of hist) {
+            let placed = false;
+            for (const c of clusters) {
+              if (
+                maxCornerDelta(e.norm, c.rep.norm) <= CANDIDATE_CLUSTER_DELTA &&
+                Math.abs(e.areaRatio - c.rep.areaRatio) <= CANDIDATE_AREA_TOL &&
+                Math.abs(e.a4Ratio - c.rep.a4Ratio) <= CANDIDATE_A4_TOL
+              ) {
+                c.count++;
+                placed = true;
+                break;
+              }
+            }
+            if (!placed) clusters.push({ rep: e, count: 1 });
+          }
+          clusters.sort((a, b) => b.count - a.count);
+          if (
+            clusters.length >= 2 &&
+            clusters[1].count >= Math.max(3, Math.ceil(clusters[0].count * CANDIDATE_AMBIGUITY_RATIO))
+          ) {
+            ambiguous = true;
+          }
+        }
+        ambiguousFramesRef.current = ambiguous
+          ? ambiguousFramesRef.current + 1
+          : 0;
+      }
       if (performance.now() < armedAtRef.current) {
         // Re-aim cooldown after a saved page — show "ready" but don't snap yet.
         setStatus("ready");
         stableCount.current = Math.min(stableCount.current, STABLE_FRAMES - 1);
       } else if (isShaky) {
         // Phone is moving — keep "ready" but don't auto-capture this frame.
+        setStatus("ready");
+        stableCount.current = Math.min(stableCount.current, STABLE_FRAMES - 1);
+      } else if (ambiguous) {
+        // Competing candidates — wait for one to win.
         setStatus("ready");
         stableCount.current = Math.min(stableCount.current, STABLE_FRAMES - 1);
       } else {
