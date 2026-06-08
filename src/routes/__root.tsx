@@ -59,8 +59,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   // user loses the pages they just captured. In that case we instead let the
   // user retry the failed route load via the "Try again" button, which calls
   // router.invalidate() and re-imports the chunk without nuking app state.
-  const hasInflightSession =
-    typeof window !== "undefined" && scanStore.getPages().length > 0;
+  const hasInflightSession = typeof window !== "undefined" && scanStore.getPages().length > 0;
 
   if (typeof window !== "undefined" && isChunkError && !hasInflightSession) {
     // Avoid an infinite reload loop — only auto-reload once per session.
@@ -84,7 +83,13 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
           <button
             onClick={() => {
               if (isChunkError && typeof window !== "undefined") {
-                window.location.reload();
+                const hasInflightSession = scanStore.getPages().length > 0;
+                if (!hasInflightSession) {
+                  window.location.reload();
+                  return;
+                }
+                router.invalidate();
+                reset();
                 return;
               }
               router.invalidate();
@@ -105,8 +110,6 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
     </div>
   );
 }
-
-
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
@@ -122,8 +125,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:site", content: "@Lovable" },
       { name: "twitter:title", content: "SSPP Sign & Go" },
       { name: "twitter:description", content: "." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/71807420-192d-43db-9d16-8d469fe22ccd/id-preview-42d562a8--69a35b64-3eb9-4e68-8e67-6b39a3a3ec0e.lovable.app-1780670043466.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/71807420-192d-43db-9d16-8d469fe22ccd/id-preview-42d562a8--69a35b64-3eb9-4e68-8e67-6b39a3a3ec0e.lovable.app-1780670043466.png" },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/71807420-192d-43db-9d16-8d469fe22ccd/id-preview-42d562a8--69a35b64-3eb9-4e68-8e67-6b39a3a3ec0e.lovable.app-1780670043466.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/71807420-192d-43db-9d16-8d469fe22ccd/id-preview-42d562a8--69a35b64-3eb9-4e68-8e67-6b39a3a3ec0e.lovable.app-1780670043466.png",
+      },
     ],
     links: [
       {
