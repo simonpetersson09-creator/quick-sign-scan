@@ -18,6 +18,7 @@ import {
   enhancePaper,
   maxCornerDelta,
   refineQuadCorners,
+  computeHiResEdgeTightness,
   removeShadows,
   warpQuadToRect,
 } from "@/lib/perspective";
