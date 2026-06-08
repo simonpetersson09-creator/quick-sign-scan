@@ -829,18 +829,45 @@ function ScanPage() {
       return;
     }
 
+    // Derive richer hints from detector diagnostics that are already
+    // computed each frame — avoids new algorithm work but lets us tell
+    // the user exactly why we're not auto-capturing yet.
+    const areaRatio = detection?.debug.areaRatio ?? 0;
+    const edgeTightness = detection?.debug.edgeTightness ?? 0;
+    const a4Ratio = detection?.a4Ratio ?? Math.SQRT2;
+    const a4Diff = Math.min(
+      Math.abs(a4Ratio - Math.SQRT2),
+      Math.abs(a4Ratio - 1 / Math.SQRT2),
+    );
+    // Soft thresholds, intentionally looser than the hard capture gates
+    // so we coach the user *before* the auto-capture is blocked.
+    const tooFar = areaRatio > 0 && areaRatio < 0.12;
+    const tooClose = areaRatio > 0.88;
+    const tilted = a4Diff > 0.35;
+    const looseEdges = edgeTightness > 0 && edgeTightness < 0.45;
+
     if (!isBrightEnough && lowLightFramesRef.current > 15) {
       drawOverlay(smoothed, "hold");
       setStatus("lowLight");
     } else if (stableCount.current < HOLD_FRAMES) {
       drawOverlay(smoothed, "hold");
-      setStatus("align");
+      // While the user is still framing, prefer the most actionable hint.
+      if (tooFar) setStatus("tooFar");
+      else if (tooClose) setStatus("tooClose");
+      else if (tilted) setStatus("tilt");
+      else setStatus("align");
     } else if (!isSharp) {
       drawOverlay(smoothed, "hold");
       setStatus(blurFramesRef.current > BLUR_HINT_FRAMES ? "moveBack" : "focusing");
     } else if (stableCount.current < READY_FRAMES) {
       drawOverlay(smoothed, "hold");
-      setStatus("hold");
+      // Even when motion is stable, surface a framing problem before
+      // the user keeps holding the phone for nothing.
+      if (tooFar) setStatus("tooFar");
+      else if (tooClose) setStatus("tooClose");
+      else if (tilted) setStatus("tilt");
+      else if (looseEdges) setStatus("align");
+      else setStatus("hold");
     } else if (stableCount.current < STABLE_FRAMES) {
       drawOverlay(smoothed, "ready");
       setStatus("ready");
