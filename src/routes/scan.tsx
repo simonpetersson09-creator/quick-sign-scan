@@ -2067,6 +2067,29 @@ function ScanPage() {
               </>
             );
           })()}
+          {(() => {
+            const g = captureGateRef.current;
+            if (!g) return null;
+            return (
+              <>
+                <div className="mt-1 border-t border-white/20 pt-1">
+                  cap-gate: <span className={g.reason ? "text-amber-300" : "text-emerald-300"}>{g.reason ?? "READY ✓"}</span>
+                </div>
+                <div>
+                  stable: {g.stable}/{g.stableTarget} · sharp: {g.sharpness.toFixed(0)}/{g.sharpnessMin}
+                </div>
+                <div>
+                  bright: {g.brightness.toFixed(0)}/{g.brightnessMin} · motion: {g.motionAvail ? g.motionMag.toFixed(2) : "n/a"}
+                </div>
+                <div>
+                  conf: {g.confidence.toFixed(2)} · tight: {g.edgeTightness.toFixed(2)}
+                </div>
+                <div>
+                  a4Δ: {g.a4Diff.toFixed(2)} · area: {g.areaRatio.toFixed(2)} · cd: {g.cooldownMs > 0 ? g.cooldownMs.toFixed(0) + "ms" : "—"}
+                </div>
+              </>
+            );
+          })()}
         </div>
       )}
 
