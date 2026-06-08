@@ -757,6 +757,16 @@ function ScanPage() {
     missCount.current = 0;
     detectionMeta.current = detection;
 
+    // Throttled log when adaptive-edge-tightness path accepted a candidate.
+    if (debugEnabled) {
+      const adaptive = getLastDetectDiagnostics().adaptiveUsed;
+      if (adaptive && adaptive.accepted && now - lastAdaptiveLogAtRef.current > 750) {
+        lastAdaptiveLogAtRef.current = now;
+        // eslint-disable-next-line no-console
+        console.log("[scan] adaptive-edge-tightness", adaptive);
+      }
+    }
+
     // Normalize to 0..1
     const norm = corners.map((p) => ({ x: p.x / dw, y: p.y / dh })) as [Point, Point, Point, Point];
 
