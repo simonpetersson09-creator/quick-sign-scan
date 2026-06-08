@@ -1368,6 +1368,35 @@ export function detectDocumentQuad(
     }
   }
 
+  // === Hough-line candidates (feature flag D) ===
+  // Detect the 4 dominant page borders directly as lines on the edge map,
+  // intersect them → 4 corners. Catches A4 sheets whose contour breaks up
+  // (occluded corner, soft shadow on one edge, scattered noise on the
+  // table) but whose top/bottom/left/right are still long, straight and
+  // dominant in the edge image — the case where contour-based extraction
+  // tends to lock onto a sub-rectangle inside the page.
+  if (ENABLE_HOUGH_LINE_DETECTION) {
+    const houghQuads = houghLineQuadCandidates(connectedEdges, width, height);
+    for (const q of houghQuads) {
+      candidateCount++;
+      const detection = evaluateEdgeQuad({
+        quad: q,
+        hull: q.slice() as Point[],
+        lum,
+        edges,
+        gradMag,
+        width,
+        height,
+        frameArea: total,
+        edgeThreshold: highThreshold,
+        candidateCount,
+      });
+      if (detection) allDetections.push(detection);
+    }
+  }
+
+
+
   // Drop inner candidates: if a detection's quad lies (almost) entirely
   // inside another, larger detection's quad, it's content on the page —
   // text blocks, photos, tables — not the outer A4 boundary. We only keep
