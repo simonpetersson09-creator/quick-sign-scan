@@ -1310,6 +1310,7 @@ function ScanPage() {
     detectionMeta.current = null;
     blurFramesRef.current = 0;
     captureRetryRef.current = 0;
+    tooFarFramesRef.current = 0;
     sharpnessRef.current = 0;
     lockedRef.current = false;
     lockBreakFramesRef.current = 0;
