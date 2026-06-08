@@ -46,6 +46,43 @@ export async function initNative() {
       true,
     );
   }
+
+  // Tap outside input/textarea to dismiss keyboard.
+  // Only on native iOS; on web the browser handles this natively.
+  if (typeof window !== "undefined") {
+    document.addEventListener(
+      "touchend",
+      (e) => {
+        const active = document.activeElement as HTMLElement | null;
+        if (!active) return;
+        if (active.tagName !== "INPUT" && active.tagName !== "TEXTAREA") return;
+
+        const target = e.target as HTMLElement | null;
+        if (!target) return;
+
+        // Don't dismiss when touching the active input itself.
+        if (target === active) return;
+
+        // Don't dismiss when touching inside a label that owns the active input.
+        const label = target.closest("label");
+        if (label && label.contains(active)) return;
+
+        // Don't dismiss when touching another input/textarea (let focusin handle it).
+        if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
+
+        // Don't dismiss when touching interactive controls — buttons, links, selects —
+        // so that tapping e.g. "Send" or a recipient chip doesn't hide the keyboard
+        // before the click handler runs.
+        const interactive = target.closest(
+          "button, a[href], select, [role='button']",
+        );
+        if (interactive) return;
+
+        active.blur();
+      },
+      { passive: true, capture: true },
+    );
+  }
 }
 
 /** Open the iOS Settings app (used when camera permission is denied). */
