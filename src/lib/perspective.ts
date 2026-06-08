@@ -1539,6 +1539,22 @@ const ENABLE_INSIDE_PAPER_PENALTY = true;
 // real paper boundary. Below this we flag it as innerTextBlock.
 const INSIDE_OUTSIDE_MIN_GAP = 10;
 
+// Feature flag A — use chroma (saturation proxy) as a second segmentation
+// channel. Whitens-out paper that has similar luminance to its background
+// (e.g. white A4 on light wood). Pure addition: extra candidates only.
+const ENABLE_WHITENESS_CHANNEL = true;
+// Max chroma (maxC−minC) for a pixel to count as "paper-white" in the
+// whiteness mask. Real paper: 0–15. White wood/textile under warm light:
+// 20–60. 22 is a safe split that holds across daylight and lamp light.
+const WHITENESS_MAX_CHROMA = 22;
+
+// Feature flag C — paper-interior prior. Boosts candidates whose INSIDE
+// looks like paper (low chroma, low luminance variance) and penalizes
+// candidates whose inside is textured/colored (a book cover, the wood
+// floor itself, a laptop screen). Augments the existing inside/outside
+// luminance gap check rather than replacing it.
+const ENABLE_PAPER_INTERIOR_PRIOR = true;
+
 function scaleQuadAroundCentroid(
   quad: [Point, Point, Point, Point],
   factor: number,
