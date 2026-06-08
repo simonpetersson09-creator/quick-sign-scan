@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { scanStore } from "@/lib/scanStore";
 import {
   autoOrientAndDeskewDocument,
+  canvasContrast,
   canvasLaplacianVariance,
   cleanPaperEdges,
   detectDocumentQuad,
@@ -15,6 +16,7 @@ import {
   emaQuad,
   enhancePaper,
   maxCornerDelta,
+  refineQuadCorners,
   removeShadows,
   warpQuadToRect,
 } from "@/lib/perspective";
@@ -149,6 +151,7 @@ function ScanPage() {
   const sharpnessRef = useRef(0);
   const blurFramesRef = useRef(0);
   const captureRetryRef = useRef(0);
+  const tooFarFramesRef = useRef(0);
   const lockedRef = useRef(false);
   const lockBreakFramesRef = useRef(0);
   const brightnessRef = useRef(255);
@@ -838,7 +841,13 @@ function ScanPage() {
     );
     // Soft thresholds, intentionally looser than the hard capture gates
     // so we coach the user *before* the auto-capture is blocked.
-    const tooFar = areaRatio > 0 && areaRatio < 0.12;
+    // "Too far" uses persistence: nag only once the doc has been small
+    // for ~1s, so we don't flicker hints while the user is still framing.
+    if (areaRatio > 0 && areaRatio < 0.18) tooFarFramesRef.current++;
+    else tooFarFramesRef.current = 0;
+    const tooFar =
+      areaRatio > 0 &&
+      (areaRatio < 0.12 || (areaRatio < 0.18 && tooFarFramesRef.current > 25));
     const tooClose = areaRatio > 0.88;
     const tilted = a4Diff > 0.35;
     const looseEdges = edgeTightness > 0 && edgeTightness < 0.45;
@@ -1131,7 +1140,24 @@ function ScanPage() {
       }
       logScanStage("burst-capture", { bestSharpness: bestScore });
 
-      let warped = warpQuadToRect(bestFrame ?? video, vw, vh, srcQuad, outW, outH);
+      // Subpixel corner refinement on the full-res frame just before warp.
+      // The 280px detect frame can leave corners 2–5px off the true paper
+      // edge; refineQuadCorners shifts each corner toward the local edge
+      // mass within a hard ±5px clamp, so it can never drag onto wrong
+      // geometry — worst case it stays put.
+      const refineSource = bestFrame ?? video;
+      let refinedSrcQuad = srcQuad;
+      try {
+        refinedSrcQuad = refineQuadCorners(refineSource, vw, vh, srcQuad);
+        logScanStage("subpixel-refine", {
+          before: formatQuad(srcQuad),
+          after: formatQuad(refinedSrcQuad),
+        });
+      } catch (e) {
+        console.warn("[scan] subpixel refine failed, using raw quad", e);
+      }
+
+      let warped = warpQuadToRect(bestFrame ?? video, vw, vh, refinedSrcQuad, outW, outH);
       logScanCanvas("after-perspective-transform", warped, debugEnabled);
 
       // Paper enhancement: normalize lighting and stretch whites so the
@@ -1168,6 +1194,27 @@ function ScanPage() {
         blurFramesRef.current = BLUR_HINT_FRAMES + 1;
         setProgress(0);
         setStatus("focusing");
+        setSavedOverlay(null);
+        setCaptureStage(null);
+        return;
+      }
+      // Post-capture contrast gate. A washed-out / blown-out frame with
+      // almost no luma variance is almost certainly a misfire (lens cover,
+      // pointed at a uniform surface, severe over-exposure). Retry rather
+      // than save a blank page. Threshold is intentionally low so any real
+      // document with text or signatures sails through.
+      const postContrast = canvasContrast(warped);
+      logScanStage("post-capture-contrast", {
+        value: postContrast,
+        threshold: 12,
+        retries: captureRetryRef.current,
+      });
+      if (postContrast < 12 && captureRetryRef.current < 3) {
+        captureRetryRef.current++;
+        capturedRef.current = false;
+        stableCount.current = 0;
+        setProgress(0);
+        setStatus("uncertain");
         setSavedOverlay(null);
         setCaptureStage(null);
         return;
@@ -1301,6 +1348,7 @@ function ScanPage() {
     detectionMeta.current = null;
     blurFramesRef.current = 0;
     captureRetryRef.current = 0;
+    tooFarFramesRef.current = 0;
     sharpnessRef.current = 0;
     lockedRef.current = false;
     lockBreakFramesRef.current = 0;
