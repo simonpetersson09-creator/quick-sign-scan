@@ -5,7 +5,6 @@ import {
   autoOrientAndDeskewDocument,
   canvasContrast,
   canvasLaplacianVariance,
-  cleanPaperEdges,
   detectDocumentQuad,
   getLastDetectDiagnostics,
   laplacianVariance,
@@ -15,11 +14,9 @@ import {
   orderQuad,
   Point,
   emaQuad,
-  enhancePaper,
   maxCornerDelta,
   refineQuadCorners,
   computeHiResEdgeTightness,
-  removeShadows,
   warpQuadToRect,
 } from "@/lib/perspective";
 import type { DocumentAlignmentDiagnostics } from "@/lib/perspective";
@@ -1548,15 +1545,14 @@ function ScanPage() {
       let warped = warpQuadToRect(bestFrame ?? video, vw, vh, refinedSrcQuad, outW, outH);
       logScanCanvas("after-perspective-transform", warped, debugEnabled);
 
-      // Paper enhancement: normalize lighting and stretch whites so the
-      // document looks like a clean scanned A4 (white paper, dark ink).
+      // Keep the captured page faithful. The previous scanner-cleanup chain
+      // (shadow removal + paper enhancement + edge bleaching) made the paper
+      // look cleaner, but it could also turn very light printed text into
+      // white pixels. For legal/posted documents, preserving every mark wins.
       let alignmentDiagnostics: DocumentAlignmentDiagnostics | null = null;
       if (stageTimerRef.current) window.clearTimeout(stageTimerRef.current);
       setCaptureStage({ label: t("capStageEnhance"), progress: 0.6 });
       try {
-        removeShadows(warped);
-        enhancePaper(warped);
-        cleanPaperEdges(warped);
         warped = autoOrientAndDeskewDocument(warped, (diagnostics) => {
           alignmentDiagnostics = diagnostics;
         });
