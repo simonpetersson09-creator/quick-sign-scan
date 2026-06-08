@@ -751,7 +751,7 @@ function ScanPage() {
     // multiple competing quads keep flickering frame-to-frame. We never
     // change which quad we draw or warp; we only gate `stableCount` later
     // if the cluster picture is ambiguous.
-    if (ENABLE_CANDIDATE_MEMORY) {
+    if (ENABLE_CANDIDATE_MEMORY && detection) {
       const hist = candidateHistoryRef.current;
       hist.push({
         norm: norm.map((p) => ({ x: p.x, y: p.y })) as [Point, Point, Point, Point],
