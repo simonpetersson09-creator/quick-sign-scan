@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { scanStore } from "@/lib/scanStore";
 import {
@@ -114,6 +114,16 @@ type StartCameraOptions = {
 function ScanPage() {
   const t = useT();
   const navigate = useNavigate();
+  const router = useRouter();
+  // Warm the /preview route bundle on mount so the dynamic import is already
+  // cached when the user taps "Done". Without this, the bundle is fetched on
+  // navigation — and if the dev server (or a flaky network) returns a 504 /
+  // chunk-load error, the root errorComponent does a hard reload, which
+  // wipes the in-memory scanStore and surfaces the empty preview state.
+  useEffect(() => {
+    router.preloadRoute({ to: "/preview" }).catch(() => {});
+    router.preloadRoute({ to: "/place" }).catch(() => {});
+  }, [router]);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
