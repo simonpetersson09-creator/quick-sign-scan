@@ -17,8 +17,8 @@ export const Route = createFileRoute("/settings")({
 // SSR-safe initial state (matches what loadSettings returns on the server).
 const initial: AppSettings = {
   defaultRecipient: "",
-  defaultSubject: "Dokument",
-  defaultMessage: "Hej,\n\nBifogar dokumentet.\n\nVänliga hälsningar",
+  defaultSubject: "",
+  defaultMessage: "",
   recipients: [],
 };
 
