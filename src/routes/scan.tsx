@@ -629,7 +629,59 @@ function ScanPage() {
     const preferQuad = prevSmooth
       ? (prevSmooth.map((p) => ({ x: p.x * dw, y: p.y * dh })) as [Point, Point, Point, Point])
       : undefined;
-    const detection = detectDocumentQuad(data, dw, dh, { prefer: preferQuad });
+    let detection = detectDocumentQuad(data, dw, dh, { prefer: preferQuad });
+
+    // Multi-scale refinement: when the cheap 280px pass is borderline OR
+    // we're approaching lock (HOLD_FRAMES), re-run detection on a ~520px
+    // crop of the same frame to refine corner precision. Especially helps
+    // small/distant documents where 280px corners snap a few px off.
+    {
+      const conf = detection?.confidence ?? 0;
+      const nearLock = stableCount.current >= HOLD_FRAMES;
+      const borderline = detection !== null && conf >= 0.3 && conf <= 0.6;
+      if (
+        (borderline || nearLock) &&
+        now - lastRefineAtRef.current >= REFINE_COOLDOWN_MS
+      ) {
+        lastRefineAtRef.current = now;
+        const hiDw = Math.min(HI_DETECT_WIDTH, vw);
+        const hiDh = Math.round((vh / vw) * hiDw);
+        if (!hiDetectCanvas.current)
+          hiDetectCanvas.current = document.createElement("canvas");
+        const hc = hiDetectCanvas.current;
+        if (hc.width !== hiDw || hc.height !== hiDh) {
+          hc.width = hiDw;
+          hc.height = hiDh;
+        }
+        const hctx = hc.getContext("2d", { willReadFrequently: true })!;
+        hctx.drawImage(video, 0, 0, hiDw, hiDh);
+        const { data: hiData } = hctx.getImageData(0, 0, hiDw, hiDh);
+        const preferHi = prevSmooth
+          ? (prevSmooth.map((p) => ({ x: p.x * hiDw, y: p.y * hiDh })) as [
+              Point,
+              Point,
+              Point,
+              Point,
+            ])
+          : undefined;
+        const hiDetection = detectDocumentQuad(hiData, hiDw, hiDh, { prefer: preferHi });
+        // Accept refined corners if hi-res confidence is comparable. We
+        // remap corners back into the lo-res pixel coordinate system used
+        // by the rest of the pipeline, but keep hi-res scoring/debug.
+        if (hiDetection && hiDetection.confidence >= conf - 0.05) {
+          const sx = dw / hiDw;
+          const sy = dh / hiDh;
+          detection = {
+            ...hiDetection,
+            corners: hiDetection.corners.map((p) => ({
+              x: p.x * sx,
+              y: p.y * sy,
+            })) as [Point, Point, Point, Point],
+          };
+        }
+      }
+    }
+
     const corners = detection?.corners ?? null;
 
     if (!corners) {
