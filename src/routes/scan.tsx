@@ -345,6 +345,7 @@ function ScanPage() {
   const debugEnabled =
     typeof window !== "undefined" && /[?&]debug=1\b/.test(window.location.search);
   const cancelledRef = useRef(false);
+  const cameraStartTokenRef = useRef(0);
 
   const toggleTorch = useCallback(async () => {
     const track = streamRef.current?.getVideoTracks()[0];
@@ -450,6 +451,8 @@ function ScanPage() {
 
   const startCamera = useCallback(
     async (options: StartCameraOptions = {}) => {
+      const startToken = ++cameraStartTokenRef.current;
+      const isStaleStart = () => cancelledRef.current || startToken !== cameraStartTokenRef.current;
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
@@ -513,7 +516,7 @@ function ScanPage() {
         }
       }
 
-      if (cancelledRef.current) return;
+      if (isStaleStart()) return;
 
       if (knownState === "denied") {
         setErrorType("permission_denied");
@@ -547,7 +550,7 @@ function ScanPage() {
         ]);
         // If the user navigated away while getUserMedia was pending, immediately
         // shut down the stream so the camera light never lingers.
-        if (cancelledRef.current) {
+        if (isStaleStart()) {
           stopDetachedVideoStream(stream, "startCamera-cancelled-after-getUserMedia");
           return;
         }
@@ -608,14 +611,14 @@ function ScanPage() {
           // Race readiness against a short timeout — if metadata never arrives
           // we still let detect() bail safely on its own readyState check.
           await Promise.race([waitReady, new Promise<void>((r) => setTimeout(r, 4000))]);
-          if (cancelledRef.current) {
+          if (isStaleStart()) {
             stopDetachedVideoStream(stream, "startCamera-cancelled-after-video-ready");
             streamRef.current = null;
             return;
           }
           setCameraReady(videoEl.videoWidth > 0 && videoEl.videoHeight > 0);
         }
-        if (cancelledRef.current) {
+        if (isStaleStart()) {
           stopDetachedVideoStream(stream, "startCamera-cancelled-before-loop");
           streamRef.current = null;
           return;
@@ -623,7 +626,7 @@ function ScanPage() {
         setStatus("searching");
         loop();
       } catch (e) {
-        if (cancelledRef.current) return;
+        if (isStaleStart()) return;
         console.error(`[scan] camera error: ${(e as Error)?.name ?? "unknown"}`);
         const err = e as Error;
         if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
@@ -1775,10 +1778,13 @@ function ScanPage() {
       setStatus("searching");
       return;
     }
+    cancelledRef.current = true;
+    cameraStartTokenRef.current += 1;
     stopCamera("done-to-preview");
     scanStore.set({ pages, imageDataUrl: pages[pages.length - 1] });
     navigate({
       to: "/preview",
+      replace: true,
       state: (prev) => ({
         ...prev,
         // Keep large base64 images out of history.state. The in-memory store

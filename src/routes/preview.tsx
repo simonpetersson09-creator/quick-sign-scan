@@ -83,12 +83,6 @@ function PreviewPage() {
     });
   }, [handedOffPages]);
 
-  useEffect(() => {
-    if (!pages.length && !handedOffPages.length) {
-      navigate({ to: "/scan", replace: true });
-    }
-  }, [handedOffPages.length, navigate, pages.length]);
-
   // Subscribe to store updates so any late mutation (race with navigation,
   // or external change) reflects here.
   useEffect(() => {
@@ -242,7 +236,24 @@ function PreviewPage() {
   );
 
   if (!pages.length) {
-    return <div className="min-h-dvh bg-background" aria-hidden="true" />;
+    return (
+      <AppShell title={t("previewTitle")} back="/scan" className="h-dvh overflow-hidden">
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
+          <ScanLine className="h-10 w-10 text-muted-foreground" strokeWidth={1.75} />
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold tracking-tight text-foreground">
+              Ingen skanning att visa
+            </h2>
+            <p className="max-w-[260px] text-sm text-muted-foreground">
+              Bilden kunde inte hämtas. Skanna sidan igen utan att lämna appen under tiden.
+            </p>
+          </div>
+          <PrimaryButton onClick={() => navigate({ to: "/scan", replace: true })}>
+            {t("scanDocument")}
+          </PrimaryButton>
+        </div>
+      </AppShell>
+    );
   }
   return (
     <AppShell title={t("previewTitle")} back="/scan" className="h-dvh overflow-hidden">
