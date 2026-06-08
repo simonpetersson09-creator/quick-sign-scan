@@ -1543,21 +1543,13 @@ function ScanPage() {
       let warped = warpQuadToRect(bestFrame ?? video, vw, vh, refinedSrcQuad, outW, outH);
       logScanCanvas("after-perspective-transform", warped, debugEnabled);
 
-      // Keep the captured page faithful. The previous scanner-cleanup chain
-      // (shadow removal + paper enhancement + edge bleaching) made the paper
-      // look cleaner, but it could also turn very light printed text into
-      // white pixels. For legal/posted documents, preserving every mark wins.
-      let alignmentDiagnostics: DocumentAlignmentDiagnostics | null = null;
+      // Keep the captured page faithful. Do not run post-capture deskew or
+      // scanner-cleanup here: those extra resampling/bleaching steps can make
+      // small footer text fade or disappear. The perspective warp already
+      // straightens the page enough for preview/PDF.
       if (stageTimerRef.current) window.clearTimeout(stageTimerRef.current);
       setCaptureStage({ label: t("capStageEnhance"), progress: 0.6 });
-      try {
-        warped = autoOrientAndDeskewDocument(warped, (diagnostics) => {
-          alignmentDiagnostics = diagnostics;
-        });
-        logScanStage("deskew", alignmentDiagnostics);
-      } catch (e) {
-        console.error("[scan] enhance/orient failed, using raw warp", e);
-      }
+      logScanStage("deskew", { skipped: true, reason: "preserve faint text" });
 
       // Post-capture sharpness gate. If the warped doc is blurry we abandon
       // this capture and let auto-focus retry — better to wait a second
@@ -1591,10 +1583,8 @@ function ScanPage() {
       }
       captureRetryRef.current = 0;
 
-      // Komprimera den slutgiltiga sidan som JPEG 82 %. PNG genererade tidigare
-      // 5–10 MB per sida för en 2480px-bild — JPEG @ 1654px landar typiskt
-      // på 150–350 kB med bibehållen läsbarhet för text och signaturer.
-      const JPEG_QUALITY = 0.82;
+      // Use high-quality JPEG so tiny footer/header text survives PDF output.
+      const JPEG_QUALITY = 0.94;
       setCaptureStage({ label: t("capStagePreview"), progress: 0.88 });
       const dataUrl = canvasToSafeImageDataUrl(warped, JPEG_QUALITY);
       if (!dataUrl) {
