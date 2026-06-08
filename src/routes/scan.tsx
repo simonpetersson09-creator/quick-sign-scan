@@ -747,6 +747,25 @@ function ScanPage() {
     // Normalize to 0..1
     const norm = corners.map((p) => ({ x: p.x / dw, y: p.y / dh })) as [Point, Point, Point, Point];
 
+    // Candidate memory — record this detection so we can spot scenes where
+    // multiple competing quads keep flickering frame-to-frame. We never
+    // change which quad we draw or warp; we only gate `stableCount` later
+    // if the cluster picture is ambiguous.
+    if (ENABLE_CANDIDATE_MEMORY) {
+      const hist = candidateHistoryRef.current;
+      hist.push({
+        norm: norm.map((p) => ({ x: p.x, y: p.y })) as [Point, Point, Point, Point],
+        conf: detection.confidence,
+        areaRatio: detection.debug.areaRatio ?? 0,
+        a4Ratio: detection.a4Ratio ?? Math.SQRT2,
+        edge: detection.debug.edgeTightness ?? 0,
+        t: now,
+      });
+      // Drop oldest + entries older than ~1s.
+      while (hist.length > CANDIDATE_HISTORY_MAX) hist.shift();
+      while (hist.length && now - hist[0].t > 1000) hist.shift();
+    }
+
     // Outlier rejection — if a raw frame jumped wildly from the smoothed
     // estimate, treat it as noise and skip the update. Prevents the polygon
     // from twitching when one frame detects a wrong contour.
