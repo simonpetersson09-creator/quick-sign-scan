@@ -1448,9 +1448,8 @@ function ScanPage() {
     // Sortera alltid hörnen i exakt ordning TL, TR, BR, BL innan warp.
     const orderedNormQuad = orderQuad(normQuad);
 
-    // With snapQuadToPaperEdges pulling each side exactly onto the real
-    // paper edge below, the EDGE_MARGIN hack is no longer needed — neither
-    // grow (background visible) nor shrink (text cropped). Keep at 0.
+    // Text-safe mode: do not grow or shrink the detected crop. Growing shows
+    // desk/background; shrinking risks cutting off real text near the edges.
     const EDGE_MARGIN = 0;
     const cx = (orderedNormQuad[0].x + orderedNormQuad[1].x + orderedNormQuad[2].x + orderedNormQuad[3].x) / 4;
     const cy = (orderedNormQuad[0].y + orderedNormQuad[1].y + orderedNormQuad[2].y + orderedNormQuad[3].y) / 4;
