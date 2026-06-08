@@ -1679,9 +1679,9 @@ function ScanPage() {
     finishPageCapture(dataUrl, scanStore.getPages().length || session.pages.length);
   }
 
-  // After a successful capture: show the cropped A4 page full-screen with a
-  // small "Sparar sida…" spinner, then softly fade it out and resume the
-  // camera for the next page. No black flash, no preview detour.
+  // After a successful capture: show the cropped A4 page briefly, then go to
+  // preview. Returning to live search after the first page looked like the
+  // scanner had reset, and could also trigger a second unwanted capture.
   function finishPageCapture(dataUrl: string, count: number) {
     setPageCount(count);
     setLastThumbnail(dataUrl);
@@ -1713,31 +1713,13 @@ function ScanPage() {
     if (stageTimerRef.current) window.clearTimeout(stageTimerRef.current);
     setCaptureStage({ label: t("savingPage"), progress: 1 });
 
-    // Phase 2 (~1800ms): start the soft fade-out of the page overlay.
+    // Phase 2 (~700ms): hand off the captured page to preview while the scan
+    // session is still hot in memory. Multi-page scanning continues from
+    // preview via "Add page".
     savedTimer1Ref.current = window.setTimeout(() => {
       if (cancelledRef.current) return;
-      setSavedOverlay((s) => (s ? { ...s, visible: false } : s));
-    }, 1800);
-
-    // Phase 3 (~2400ms): overlay finished fading — resume detection loop.
-    savedTimer2Ref.current = window.setTimeout(() => {
-      if (cancelledRef.current) return;
-      capturedRef.current = false;
-      stableCount.current = 0;
-      detectCount.current = 0;
-      lockedRef.current = false;
-      setProgress(0);
-      armedAtRef.current = performance.now() + REARM_DELAY_MS;
-      setStatus("searching");
-      loop();
-    }, 2400);
-
-    // Phase 4 (~2800ms): unmount the overlay node entirely.
-    savedTimer3Ref.current = window.setTimeout(() => {
-      if (cancelledRef.current) return;
-      setSavedOverlay(null);
-      setCaptureStage(null);
-    }, 2800);
+      finishScanning();
+    }, 700);
   }
 
 
