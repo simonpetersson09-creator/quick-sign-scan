@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { scanStore } from "@/lib/scanStore";
 import {
   autoOrientAndDeskewDocument,
+  canvasContrast,
   canvasLaplacianVariance,
   cleanPaperEdges,
   detectDocumentQuad,
@@ -15,6 +16,7 @@ import {
   emaQuad,
   enhancePaper,
   maxCornerDelta,
+  refineQuadCorners,
   removeShadows,
   warpQuadToRect,
 } from "@/lib/perspective";
