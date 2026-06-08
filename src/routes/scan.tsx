@@ -143,6 +143,16 @@ function ScanPage() {
   const lastRefineAtRef = useRef(0);
   const HI_DETECT_WIDTH = 520;
   const REFINE_COOLDOWN_MS = 140;
+  // Feature flag: recompute edgeTightness directly from the full-res video
+  // for the already-detected quad. Never changes the quad or its corners;
+  // only swaps in a higher hi-res tightness value when it is strictly better
+  // than the 280px-derived one. Goal: small/far documents whose edges are
+  // perfectly sharp in the original video but undersampled in the 280px
+  // detect frame can still pass capture-gates.
+  const ENABLE_HIRES_TIGHTNESS_RECOMPUTE = true;
+  const HIRES_TIGHT_COOLDOWN_MS = 140;
+  const lastHiResTightAtRef = useRef(0);
+  const lastHiResTightLogAtRef = useRef(0);
   // Feature flag: candidate-memory across recent frames. Cluster the last N
   // detections by corner similarity (+ areaRatio / a4Ratio) so an ambiguous
   // scene (multiple competing quads frame-to-frame) delays auto-capture
