@@ -142,6 +142,18 @@ function ScanPage() {
   const lastRefineAtRef = useRef(0);
   const HI_DETECT_WIDTH = 520;
   const REFINE_COOLDOWN_MS = 140;
+  // Feature flag: candidate-memory across recent frames. Cluster the last N
+  // detections by corner similarity (+ areaRatio / a4Ratio) so an ambiguous
+  // scene (multiple competing quads frame-to-frame) delays auto-capture
+  // instead of locking onto whichever quad happened to win the last frame.
+  // Never changes the warp pipeline, min-area, or which quad is drawn —
+  // only gates `stableCount` when more than one candidate has real support.
+  const ENABLE_CANDIDATE_MEMORY = true;
+  const CANDIDATE_HISTORY_MAX = 15;
+  const CANDIDATE_CLUSTER_DELTA = 0.05; // normalized corner distance
+  const CANDIDATE_AREA_TOL = 0.18;
+  const CANDIDATE_A4_TOL = 0.25;
+  const CANDIDATE_AMBIGUITY_RATIO = 0.55; // 2nd cluster vs best
   // Throttle detection to ~22 Hz. The full pipeline (Canny + Sobel + snap)
   // is too heavy to run at 60 fps on mid-range mobile — it starves the UI
   // thread and the camera's continuous autofocus callback, which actually
