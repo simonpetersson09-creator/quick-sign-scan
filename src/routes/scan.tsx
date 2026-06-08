@@ -1812,6 +1812,7 @@ function ScanPage() {
     detectCount.current = 0;
     missCount.current = 0;
     smoothQuad.current = null;
+    recentSmoothQuadsRef.current = [];
     lastRawQuad.current = null;
     detectionMeta.current = null;
     blurFramesRef.current = 0;
