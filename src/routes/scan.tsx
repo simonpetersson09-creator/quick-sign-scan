@@ -689,7 +689,13 @@ function ScanPage() {
       prevSmooth && prevConfidentEnough
         ? (prevSmooth.map((p) => ({ x: p.x * dw, y: p.y * dh })) as [Point, Point, Point, Point])
         : undefined;
-    let detection = detectDocumentQuad(data, dw, dh, { prefer: preferQuad });
+    let detection = detectDocumentQuad(data, dw, dh, { prefer: preferQuad, allowOverlay: ENABLE_GENEROUS_OVERLAY });
+    // Separate live-detection (overlay) from capture-readiness. A detection
+    // returned with readyForCapture=false has only passed structural gates
+    // and is shown to coach the user — auto-capture must not fire.
+    const detectedForOverlay = !!detection;
+    const readyForCapture = !!detection && detection.readyForCapture !== false;
+    const reasonNotReady = detection?.reasonNotReady;
 
     // Optional hi-res local corner refinement on the full video frame. Does
     // NOT run a new detection — only nudges already-detected corners toward
