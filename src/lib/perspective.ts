@@ -307,6 +307,18 @@ export function removeShadows(canvas: HTMLCanvasElement): HTMLCanvasElement {
 // Paper enhancement: shading-correct (remove shadows / uneven lighting),
 // then stretch whites and crisp up ink so the result looks like a clean
 // office-scanner output (white paper, dark text, no background tones).
+//
+// Feature flags for "destructive" cleanup passes that have been observed to
+// eat real text (light grey ink, isolated punctuation, table borders,
+// page numbers). Toggle to false to roll back the corresponding pass.
+const ENABLE_BG_BLOB_SUPPRESSION = true;     // step 9
+const ENABLE_ARTIFACT_SUPPRESSION = true;    // step 10
+const ENABLE_NEIGHBOUR_DESPECKLE = true;     // step 8b
+// Tuned-down thresholds (A + B + D). Were: 130 / 175 / 205 / 0.000035.
+const BG_BLOB_LOCAL_MIN_GATE = 170;          // was 130 — only bleach if local min is clearly bright
+const BG_BLOB_LUM_GATE = 200;                // was 175 — only bleach pixels that are already near-white
+const ARTIFACT_DARK_THRESHOLD = 180;         // was 205 — only really dark components qualify
+const ARTIFACT_SPECK_AREA_FACTOR = 0.0000115; // was 0.000035 — ~3× smaller, spares punctuation
 export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
   const w = canvas.width;
   const h = canvas.height;
