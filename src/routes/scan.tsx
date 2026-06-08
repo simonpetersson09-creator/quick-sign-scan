@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { scanStore } from "@/lib/scanStore";
 import {
