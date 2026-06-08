@@ -154,19 +154,27 @@ export const scanStore = {
     const safePages = pages.filter(isUsablePreviewPage);
     if (!safePages.length) return false;
     const storage = safeSessionStorage();
+    const safeActiveIndex = Math.max(0, Math.min(safePages.length - 1, activeIndex));
+    const payload = JSON.stringify({ pages: safePages, activeIndex: safeActiveIndex, createdAt: Date.now() });
     let saved = false;
     try {
-      const safeActiveIndex = Math.max(0, Math.min(safePages.length - 1, activeIndex));
-      const payload = JSON.stringify({ pages: safePages, activeIndex: safeActiveIndex, createdAt: Date.now() });
       storage?.setItem(PREVIEW_HANDOFF_KEY, payload);
+      saved = true;
+    } catch (error) {
+      debugScanStore("preview session handoff save failed", {
+        pages: safePages.length,
+        error: error instanceof Error ? error.name : "unknown",
+      });
+    }
+    try {
       // Secondary same-tab handoff. This survives a dev-server/HMR reload or
       // route-chunk reload even when sessionStorage write/read is unavailable.
       window.name = `${PREVIEW_HANDOFF_WINDOW_NAME_PREFIX}${payload}`;
+      saved = true;
       debugScanStore("saved preview handoff", {
         pages: safePages.length,
         activeIndex: safeActiveIndex,
       });
-      saved = true;
     } catch (error) {
       debugScanStore("preview handoff save failed", {
         pages: safePages.length,
@@ -223,6 +231,7 @@ export const scanStore = {
     });
     try {
       safeSessionStorage()?.removeItem(PREVIEW_HANDOFF_KEY);
+      if (window.name.startsWith(PREVIEW_HANDOFF_WINDOW_NAME_PREFIX)) window.name = "";
     } catch {}
     wipe(reason);
     notify();
