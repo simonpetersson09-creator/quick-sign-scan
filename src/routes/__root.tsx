@@ -54,7 +54,15 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
     msg.includes("loading chunk") ||
     msg.includes("loading css chunk");
 
-  if (typeof window !== "undefined" && isChunkError) {
+  // Don't auto-reload if an in-memory scan session is in progress — a hard
+  // reload wipes scanStore (privacy-by-design: nothing is persisted) and the
+  // user loses the pages they just captured. In that case we instead let the
+  // user retry the failed route load via the "Try again" button, which calls
+  // router.invalidate() and re-imports the chunk without nuking app state.
+  const hasInflightSession =
+    typeof window !== "undefined" && scanStore.getPages().length > 0;
+
+  if (typeof window !== "undefined" && isChunkError && !hasInflightSession) {
     // Avoid an infinite reload loop — only auto-reload once per session.
     const KEY = "__lov_chunk_reloaded";
     if (!sessionStorage.getItem(KEY)) {
