@@ -261,6 +261,12 @@ function ScanPage() {
 
   const lastRawQuad = useRef<[Point, Point, Point, Point] | null>(null);
   const smoothQuad = useRef<[Point, Point, Point, Point] | null>(null); // normalized 0..1
+  // Multi-frame quad voting: stash the last N smoothed normalized quads. At
+  // capture time we take the per-corner median across this window so a
+  // single jittery frame can't pull the warp off the paper. Pure refinement —
+  // never gates capture, only smooths the corners that get warped.
+  const recentSmoothQuadsRef = useRef<Array<[Point, Point, Point, Point]>>([]);
+  const QUAD_VOTE_WINDOW = 7;
   const detectionMeta = useRef<ReturnType<typeof detectDocumentQuad> | null>(null);
   type CandidateEntry = {
     norm: [Point, Point, Point, Point];
@@ -1047,6 +1053,10 @@ function ScanPage() {
     const alpha = lockedRef.current ? ALPHA_POST_LOCK : ALPHA_PRE_LOCK;
     const smoothed = emaQuad(smoothQuad.current, norm, alpha);
     smoothQuad.current = smoothed;
+    // Push to the voting ring buffer (only the most recent frames count).
+    const buf = recentSmoothQuadsRef.current;
+    buf.push(smoothed.map((p) => ({ x: p.x, y: p.y })) as [Point, Point, Point, Point]);
+    if (buf.length > QUAD_VOTE_WINDOW) buf.shift();
 
     const last = lastRawQuad.current;
     lastRawQuad.current = norm;
