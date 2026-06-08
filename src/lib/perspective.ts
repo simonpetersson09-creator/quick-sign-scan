@@ -1869,7 +1869,7 @@ function evaluateEdgeQuad(args: {
   // a few cm outside the document" problem: contour extraction lives on a
   // dilated/eroded mask that is inherently a couple of pixels off the true
   // paper boundary, but the gradient peak sits on the real edge.
-  const snap = refineQuadToEdges(ordered, gradMag, edgeThreshold, width, height);
+  let snap = refineQuadToEdges(ordered, gradMag, edgeThreshold, width, height);
   if (snap) ordered = snap.quad;
 
   const minX = Math.min(...ordered.map((p) => p.x));
