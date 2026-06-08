@@ -75,9 +75,10 @@ function PreviewPage() {
     }
     return s.imageDataUrl ? Math.max(0, list.indexOf(s.imageDataUrl)) : list.length - 1;
   });
-  // Default to grayscale — safest for documents with faint/light text.
-  // BW (Sauvola) is still available but can erase very pale ink.
-  const [filterMode, setFilterMode] = useState<FilterMode>("gray");
+  // Default to the original color image. This is the safest preservation mode:
+  // grayscale/BW are optional presentation filters, but color keeps faint ink,
+  // stamps and pale printed text from being reduced or washed out by default.
+  const [filterMode, setFilterMode] = useState<FilterMode>("color");
   // Cache filtered results so flipping pages stays instant: key = `${index}|${mode}`
   const filterCache = useRef<Map<string, string>>(new Map());
   const [displayUrl, setDisplayUrl] = useState<string | null>(null);
