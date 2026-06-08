@@ -1782,6 +1782,7 @@ function ScanPage() {
     cameraStartTokenRef.current += 1;
     stopCamera("done-to-preview");
     scanStore.set({ pages, imageDataUrl: pages[pages.length - 1] });
+    scanStore.savePreviewHandoff(pages, pages.length - 1);
     navigate({
       to: "/preview",
       replace: true,
