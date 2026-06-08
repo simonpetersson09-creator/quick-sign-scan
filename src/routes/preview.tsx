@@ -32,11 +32,15 @@ function PreviewPage() {
     scanPages?: unknown;
     scanActiveIndex?: unknown;
   };
-  const handedOffPages = Array.isArray(navState.scanPages)
-    ? navState.scanPages.filter(
-        (page): page is string => typeof page === "string" && page.startsWith("data:image/"),
-      )
-    : [];
+  const handedOffPages = useMemo(
+    () =>
+      Array.isArray(navState.scanPages)
+        ? navState.scanPages.filter(
+            (page): page is string => typeof page === "string" && page.startsWith("data:image/"),
+          )
+        : [],
+    [navState.scanPages],
+  );
   // Initialize synchronously from the in-memory store so we don't flash the
   // empty state when pages are already present (e.g. just-finished scan).
   const [pages, setPages] = useState<string[]>(() => {
@@ -77,6 +81,12 @@ function PreviewPage() {
       imageDataUrlExists: Boolean(scanStore.get().imageDataUrl),
     });
   }, [handedOffPages]);
+
+  useEffect(() => {
+    if (!pages.length && !handedOffPages.length) {
+      navigate({ to: "/scan", replace: true });
+    }
+  }, [handedOffPages.length, navigate, pages.length]);
 
   // Subscribe to store updates so any late mutation (race with navigation,
   // or external change) reflects here.
@@ -233,28 +243,7 @@ function PreviewPage() {
   );
 
   if (!pages.length) {
-    return (
-      <AppShell title={t("previewTitle")} back="/scan" className="h-dvh overflow-hidden">
-        <div className="flex flex-1 flex-col items-center justify-center text-center pb-16">
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-secondary text-secondary-foreground">
-            <ScanLine className="h-6 w-6" />
-          </div>
-          <h2 className="text-[18px] font-semibold tracking-tight text-foreground">
-            {t("emptyPreviewTitle")}
-          </h2>
-          <p className="mt-2 max-w-[260px] text-sm leading-6 text-muted-foreground">
-            {t("emptyPreviewDesc")}
-          </p>
-        </div>
-        <div className="pb-5">
-          <PrimaryButton onClick={addPage}>
-            <span className="inline-flex items-center justify-center gap-2">
-              <ScanLine className="h-5 w-5" /> {t("scanDocument")}
-            </span>
-          </PrimaryButton>
-        </div>
-      </AppShell>
-    );
+    return <div className="min-h-dvh bg-background" aria-hidden="true" />;
   }
 
 
