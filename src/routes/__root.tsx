@@ -154,6 +154,7 @@ function RootComponent() {
           <Outlet />
         </AccessCodeGate>
         <Toaster />
+        <KeyboardToolbar />
       </LanguageProvider>
     </QueryClientProvider>
   );
