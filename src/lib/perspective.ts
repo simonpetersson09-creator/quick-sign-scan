@@ -2636,6 +2636,197 @@ function lineIntersection(p1: Point, p2: Point, p3: Point, p4: Point): Point | n
   return { x: x1 + t * (x2 - x1), y: y1 + t * (y2 - y1) };
 }
 
+// === Hough-line document candidates ===
+// Standard Hough Transform over the binary edge map. For each edge pixel
+// votes into (rho, theta); local maxima above a length threshold become
+// candidate lines. We then classify each line into one of {top, bottom,
+// left, right} by orientation + position relative to the frame centre,
+// pick the strongest few per side and intersect every combination → quads.
+// All combinatorial output is bounded to HOUGH_MAX_QUADS so the caller
+// can run them through evaluateEdgeQuad cheaply.
+type HoughLine = { rho: number; theta: number; votes: number };
+
+function houghTransform(
+  edges: Uint8Array,
+  width: number,
+  height: number,
+): HoughLine[] {
+  const thetaStep = (HOUGH_THETA_STEP_DEG * Math.PI) / 180;
+  const nTheta = Math.ceil(Math.PI / thetaStep);
+  const cosT = new Float32Array(nTheta);
+  const sinT = new Float32Array(nTheta);
+  for (let t = 0; t < nTheta; t++) {
+    const a = t * thetaStep;
+    cosT[t] = Math.cos(a);
+    sinT[t] = Math.sin(a);
+  }
+  const diag = Math.ceil(Math.hypot(width, height));
+  const nRho = Math.ceil((2 * diag) / HOUGH_RHO_STEP_PX) + 1;
+  const acc = new Uint32Array(nTheta * nRho);
+
+  for (let y = 0; y < height; y++) {
+    const row = y * width;
+    for (let x = 0; x < width; x++) {
+      if (!edges[row + x]) continue;
+      for (let t = 0; t < nTheta; t++) {
+        const rho = x * cosT[t] + y * sinT[t];
+        const ri = Math.round((rho + diag) / HOUGH_RHO_STEP_PX);
+        acc[t * nRho + ri]++;
+      }
+    }
+  }
+
+  const minVotes = Math.max(
+    24,
+    Math.round(Math.min(width, height) * HOUGH_MIN_VOTES_FRAC),
+  );
+  const lines: HoughLine[] = [];
+  const nmsT = 2;
+  const nmsR = 3;
+  for (let t = 0; t < nTheta; t++) {
+    for (let r = 0; r < nRho; r++) {
+      const v = acc[t * nRho + r];
+      if (v < minVotes) continue;
+      let isMax = true;
+      for (let dt = -nmsT; dt <= nmsT && isMax; dt++) {
+        const tt = t + dt;
+        if (tt < 0 || tt >= nTheta) continue;
+        for (let dr = -nmsR; dr <= nmsR; dr++) {
+          if (dt === 0 && dr === 0) continue;
+          const rr = r + dr;
+          if (rr < 0 || rr >= nRho) continue;
+          if (acc[tt * nRho + rr] > v) {
+            isMax = false;
+            break;
+          }
+        }
+      }
+      if (!isMax) continue;
+      const theta = t * thetaStep;
+      const rho = r * HOUGH_RHO_STEP_PX - diag;
+      lines.push({ rho, theta, votes: v });
+    }
+  }
+  lines.sort((a, b) => b.votes - a.votes);
+  return lines.slice(0, 64);
+}
+
+function houghLineQuadCandidates(
+  edges: Uint8Array,
+  width: number,
+  height: number,
+): [Point, Point, Point, Point][] {
+  const lines = houghTransform(edges, width, height);
+  if (lines.length < 4) return [];
+
+  const top: HoughLine[] = [];
+  const bot: HoughLine[] = [];
+  const left: HoughLine[] = [];
+  const right: HoughLine[] = [];
+  const tol = (HOUGH_ANGLE_TOL_DEG * Math.PI) / 180;
+  const cx = width / 2;
+  const cy = height / 2;
+
+  for (const ln of lines) {
+    const dh = Math.abs(ln.theta - Math.PI / 2); // near horizontal
+    const dv = Math.min(ln.theta, Math.abs(ln.theta - Math.PI)); // near vertical
+    if (dh < tol) {
+      const sin = Math.sin(ln.theta);
+      if (Math.abs(sin) < 0.15) continue;
+      const yAtCx = (ln.rho - cx * Math.cos(ln.theta)) / sin;
+      if (yAtCx < cy) top.push(ln);
+      else bot.push(ln);
+    } else if (dv < tol) {
+      const cos = Math.cos(ln.theta);
+      if (Math.abs(cos) < 0.15) continue;
+      const xAtCy = (ln.rho - cy * Math.sin(ln.theta)) / cos;
+      if (xAtCy < cx) left.push(ln);
+      else right.push(ln);
+    }
+  }
+
+  // Rank per side: vote-weight + outwardness (lines closer to image border
+  // win — that's where the A4 outer edge lives, not text inside the page).
+  function rankHoriz(arr: HoughLine[], wantTop: boolean) {
+    arr.sort((a, b) => score(b) - score(a));
+    function score(ln: HoughLine) {
+      const sin = Math.sin(ln.theta);
+      const y = (ln.rho - cx * Math.cos(ln.theta)) / sin;
+      const outward = wantTop ? (cy - y) / cy : (y - cy) / cy;
+      return ln.votes * 0.55 + Math.max(0, outward) * Math.min(width, height) * 0.45;
+    }
+    return arr.slice(0, HOUGH_TOP_LINES_PER_SIDE);
+  }
+  function rankVert(arr: HoughLine[], wantLeft: boolean) {
+    arr.sort((a, b) => score(b) - score(a));
+    function score(ln: HoughLine) {
+      const cos = Math.cos(ln.theta);
+      const x = (ln.rho - cy * Math.sin(ln.theta)) / cos;
+      const outward = wantLeft ? (cx - x) / cx : (x - cx) / cx;
+      return ln.votes * 0.55 + Math.max(0, outward) * Math.min(width, height) * 0.45;
+    }
+    return arr.slice(0, HOUGH_TOP_LINES_PER_SIDE);
+  }
+  const topL = rankHoriz(top, true);
+  const botL = rankHoriz(bot, false);
+  const leftL = rankVert(left, true);
+  const rightL = rankVert(right, false);
+  if (!topL.length || !botL.length || !leftL.length || !rightL.length) return [];
+
+  function lineToPoints(ln: HoughLine): [Point, Point] {
+    const c = Math.cos(ln.theta);
+    const s = Math.sin(ln.theta);
+    const L = 5000;
+    return [
+      { x: c * ln.rho - L * s, y: s * ln.rho + L * c },
+      { x: c * ln.rho + L * s, y: s * ln.rho - L * c },
+    ];
+  }
+
+  const quads: [Point, Point, Point, Point][] = [];
+  const margin = Math.max(20, Math.min(width, height) * 0.1);
+  outer: for (const tt of topL) {
+    const [t1, t2] = lineToPoints(tt);
+    for (const bb of botL) {
+      const [b1, b2] = lineToPoints(bb);
+      for (const ll of leftL) {
+        const [l1, l2] = lineToPoints(ll);
+        for (const rr of rightL) {
+          const [r1, r2] = lineToPoints(rr);
+          const tl = lineIntersection(t1, t2, l1, l2);
+          const tr = lineIntersection(t1, t2, r1, r2);
+          const br = lineIntersection(b1, b2, r1, r2);
+          const bl = lineIntersection(b1, b2, l1, l2);
+          if (!tl || !tr || !br || !bl) continue;
+          const pts: Point[] = [tl, tr, br, bl];
+          let ok = true;
+          for (const p of pts) {
+            if (
+              p.x < -margin ||
+              p.y < -margin ||
+              p.x > width + margin ||
+              p.y > height + margin
+            ) {
+              ok = false;
+              break;
+            }
+          }
+          if (!ok) continue;
+          const clamped: [Point, Point, Point, Point] = [
+            clampPoint(tl, width, height),
+            clampPoint(tr, width, height),
+            clampPoint(br, width, height),
+            clampPoint(bl, width, height),
+          ];
+          quads.push(orderQuad(clamped));
+          if (quads.length >= HOUGH_MAX_QUADS) break outer;
+        }
+      }
+    }
+  }
+  return quads;
+}
+
 function clampPoint(p: Point, width: number, height: number): Point {
   return {
     x: Math.max(0, Math.min(width - 1, p.x)),
