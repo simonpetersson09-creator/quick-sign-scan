@@ -20,6 +20,7 @@ import {
   warpQuadToRect,
   autoOrientAndDeskewDocument,
   whitenBackground,
+  boostInkContrast,
 } from "@/lib/perspective";
 import { useT } from "@/lib/i18n";
 import { Camera, CameraOff, X, RefreshCw, ArrowLeft, ArrowRight, Zap, ZapOff, Settings } from "lucide-react";

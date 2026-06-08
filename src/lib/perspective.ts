@@ -3918,7 +3918,72 @@ export function whitenBackground(canvas: HTMLCanvasElement): HTMLCanvasElement {
           or = 255;
           og = 255;
           ob = 255;
-        }
+}
+
+/**
+ * Mild local contrast boost targeted at ink only. After flat-field whitening
+ * paper is clean and bright, but thin/light text (8–9pt body, page numbers,
+ * footers) can look slightly washed out. We run a tiny unsharp mask and
+ * apply it ONLY where the original is darker than `INK_THRESHOLD` — bright
+ * paper pixels are untouched, so we never amplify sensor noise on the
+ * background. Same approach Microsoft Lens uses in its Document mode.
+ */
+export function boostInkContrast(canvas: HTMLCanvasElement): HTMLCanvasElement {
+  const w = canvas.width;
+  const h = canvas.height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  const n = w * h;
+
+  // Compute luminance plane.
+  const lum = new Uint8ClampedArray(n);
+  for (let i = 0, j = 0; i < d.length; i += 4, j++) {
+    lum[j] = (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) | 0;
+  }
+
+  // Light 3x3 box blur of luminance (separable).
+  const tmp = new Uint8ClampedArray(n);
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    for (let x = 0; x < w; x++) {
+      const x0 = x > 0 ? x - 1 : 0;
+      const x1 = x < w - 1 ? x + 1 : w - 1;
+      tmp[row + x] = ((lum[row + x0] + lum[row + x] + lum[row + x1]) / 3) | 0;
+    }
+  }
+  const blur = new Uint8ClampedArray(n);
+  for (let y = 0; y < h; y++) {
+    const y0 = y > 0 ? y - 1 : 0;
+    const y1 = y < h - 1 ? y + 1 : h - 1;
+    for (let x = 0; x < w; x++) {
+      blur[y * w + x] = ((tmp[y0 * w + x] + tmp[y * w + x] + tmp[y1 * w + x]) / 3) | 0;
+    }
+  }
+
+  // Unsharp: out = orig + amount * (orig - blur), gated to dark pixels.
+  const AMOUNT = 0.45;
+  const INK_THRESHOLD = 150; // only touch pixels at or below this luminance
+  for (let i = 0, j = 0; i < d.length; i += 4, j++) {
+    const L = lum[j];
+    if (L > INK_THRESHOLD) continue;
+    const diff = L - blur[j];
+    // Smooth ramp: full strength at L<=110, fading to 0 at L>=150.
+    const ramp = L <= 110 ? 1 : 1 - (L - 110) / (INK_THRESHOLD - 110);
+    const add = diff * AMOUNT * ramp;
+    let r0 = d[i] + add;
+    let g0 = d[i + 1] + add;
+    let b0 = d[i + 2] + add;
+    if (r0 < 0) r0 = 0; else if (r0 > 255) r0 = 255;
+    if (g0 < 0) g0 = 0; else if (g0 > 255) g0 = 255;
+    if (b0 < 0) b0 = 0; else if (b0 > 255) b0 = 255;
+    d[i] = r0;
+    d[i + 1] = g0;
+    d[i + 2] = b0;
+  }
+
+  ctx.putImageData(img, 0, 0);
+  return canvas;
       }
 
       d[i] = or;
