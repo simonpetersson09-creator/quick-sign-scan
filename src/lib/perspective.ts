@@ -1362,30 +1362,49 @@ export function detectDocumentQuad(
     const cx = (det.corners[0].x + det.corners[1].x + det.corners[2].x + det.corners[3].x) / 4;
     const cy = (det.corners[0].y + det.corners[1].y + det.corners[2].y + det.corners[3].y) / 4;
     const centerScore = clamp01(1 - (Math.hypot(cx - frameCx, cy - frameCy) / diag) * 2);
-    // Temporal bias — 0 when no previous quad, otherwise 1.0 when centroid
-    // overlaps the previous one and falls off over ~30% of the frame diag.
     const tempScore =
       prevCx !== null && prevCy !== null
         ? clamp01(1 - (Math.hypot(cx - prevCx, cy - prevCy) / diag) / 0.3)
         : 0;
+
+    // Inside/outside luminance check — rejects quads sitting INSIDE the
+    // paper (text blocks, tables, photos) by detecting that their outside
+    // ring is also paper-bright. A real paper edge has insideMean clearly
+    // higher than outsideMean (paper vs desk/floor).
+    let bgContrastScore = 0;
+    if (ENABLE_INSIDE_PAPER_PENALTY) {
+      const io = insideOutsideLuma(lum, width, height, det.corners);
+      if (io.outsideSamples >= 6 && io.gap < INSIDE_OUTSIDE_MIN_GAP) {
+        recordReject("innerTextBlock", {
+          areaRatio: det.debug.areaRatio,
+          edgeScore: det.debug.edgeScore,
+          edgeTightness: det.debug.edgeTightness,
+          a4Score,
+          statsMean: io.insideMean,
+          contrast: io.gap,
+        });
+        continue; // skip — almost certainly a text/content block on the page
+      }
+      // 0 at gap = MIN_GAP, saturates at gap >= 60 (clear paper-vs-desk)
+      bgContrastScore = clamp01((io.gap - INSIDE_OUTSIDE_MIN_GAP) / 50);
+    }
+
     // Outer-prioritized confidence: area dominates, then A4 match, then
-    // edge support, then centeredness, with a small temporal-stability
-    // bias to keep the frame locked on the same object across frames.
+    // edge support, paper/bg contrast, centeredness, then temporal bias.
     const outerConfidence =
-      0.4 * areaScore +
-      0.2 * a4Score +
-      0.13 * det.debug.edgeScore +
-      0.1 * centerScore +
-      0.1 * det.confidence +
+      0.36 * areaScore +
+      0.18 * a4Score +
+      0.12 * det.debug.edgeScore +
+      0.10 * bgContrastScore +
+      0.08 * centerScore +
+      0.09 * det.confidence +
       0.07 * tempScore;
-    // Keep the original `confidence` field on the returned object so the
-    // MIN_DOCUMENT_CONFIDENCE gate and downstream logging stay meaningful,
-    // but pick the winner by outerConfidence.
     if (outerConfidence > bestScore) {
       bestScore = outerConfidence;
       best = det;
     }
   }
+
 
   if (best) {
     best.debug.candidateCount = candidateCount;
@@ -1486,6 +1505,84 @@ function pointInQuad(p: Point, quad: [Point, Point, Point, Point]): boolean {
   }
   return inside;
 }
+
+// Feature flag: penalize candidates whose OUTSIDE looks like paper too
+// (i.e. quad sits *inside* the actual paper — a text block, table or
+// photo on the page). A real paper edge has bright inside and clearly
+// darker / different outside (desk, floor, etc).
+const ENABLE_INSIDE_PAPER_PENALTY = true;
+// Min luminance gap (inside − outside) for a quad to be accepted as a
+// real paper boundary. Below this we flag it as innerTextBlock.
+const INSIDE_OUTSIDE_MIN_GAP = 10;
+
+function scaleQuadAroundCentroid(
+  quad: [Point, Point, Point, Point],
+  factor: number,
+): [Point, Point, Point, Point] {
+  const cx = (quad[0].x + quad[1].x + quad[2].x + quad[3].x) / 4;
+  const cy = (quad[0].y + quad[1].y + quad[2].y + quad[3].y) / 4;
+  return quad.map((p) => ({
+    x: cx + (p.x - cx) * factor,
+    y: cy + (p.y - cy) * factor,
+  })) as [Point, Point, Point, Point];
+}
+
+// Compare mean luminance inside the quad (shrunk inward) vs in a thin
+// ring just outside the quad. Used to detect "inside paper" candidates:
+// when both samples are bright the quad almost certainly sits on top of
+// the real paper rather than along its edge.
+function insideOutsideLuma(
+  lum: Uint8ClampedArray,
+  width: number,
+  height: number,
+  quad: [Point, Point, Point, Point],
+): { insideMean: number; outsideMean: number; gap: number; outsideSamples: number } {
+  const inner = scaleQuadAroundCentroid(quad, 0.78);
+  const outer = scaleQuadAroundCentroid(quad, 1.22);
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
+  for (const p of outer) {
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  }
+  minX = Math.max(0, Math.floor(minX));
+  minY = Math.max(0, Math.floor(minY));
+  maxX = Math.min(width - 1, Math.ceil(maxX));
+  maxY = Math.min(height - 1, Math.ceil(maxY));
+  const step = Math.max(2, Math.round(Math.min(maxX - minX, maxY - minY) / 40));
+  let insideSum = 0,
+    insideN = 0,
+    outsideSum = 0,
+    outsideN = 0;
+  for (let y = minY; y <= maxY; y += step) {
+    for (let x = minX; x <= maxX; x += step) {
+      const p = { x, y };
+      const inInner = pointInQuad(p, inner);
+      if (inInner) {
+        insideSum += lum[y * width + x];
+        insideN++;
+        continue;
+      }
+      const inOuter = pointInQuad(p, outer);
+      const inQuad = pointInQuad(p, quad);
+      if (inOuter && !inQuad) {
+        outsideSum += lum[y * width + x];
+        outsideN++;
+      }
+    }
+  }
+  const insideMean = insideN ? insideSum / insideN : 0;
+  const outsideMean = outsideN ? outsideSum / outsideN : insideMean;
+  return { insideMean, outsideMean, gap: insideMean - outsideMean, outsideSamples: outsideN };
+}
+
+
+
+
 
 
 // Percentile-based contrast stretch. Finds the 2nd and 98th percentiles of
