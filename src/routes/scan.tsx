@@ -41,6 +41,9 @@ type Status =
   | "focusing"
   | "moveBack"
   | "lowLight"
+  | "tooFar"
+  | "tooClose"
+  | "tilt"
   | "ready"
   | "capturing"
   | "saved"
@@ -117,6 +120,13 @@ function ScanPage() {
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
   const detectCanvas = useRef<HTMLCanvasElement | null>(null);
+  // Higher-resolution detection canvas — used for an opportunistic refinement
+  // pass when the cheap 280px detection is borderline or near-lock. Improves
+  // corner precision for documents that don't fill much of the frame.
+  const hiDetectCanvas = useRef<HTMLCanvasElement | null>(null);
+  const lastRefineAtRef = useRef(0);
+  const HI_DETECT_WIDTH = 520;
+  const REFINE_COOLDOWN_MS = 140;
   // Throttle detection to ~22 Hz. The full pipeline (Canny + Sobel + snap)
   // is too heavy to run at 60 fps on mid-range mobile — it starves the UI
   // thread and the camera's continuous autofocus callback, which actually
@@ -582,6 +592,7 @@ function ScanPage() {
     const vw = video.videoWidth;
     const vh = video.videoHeight;
     if (!vw || !vh) return;
+    const now = performance.now();
 
     if (!detectCanvas.current) detectCanvas.current = document.createElement("canvas");
     const dc = detectCanvas.current;
@@ -619,7 +630,59 @@ function ScanPage() {
     const preferQuad = prevSmooth
       ? (prevSmooth.map((p) => ({ x: p.x * dw, y: p.y * dh })) as [Point, Point, Point, Point])
       : undefined;
-    const detection = detectDocumentQuad(data, dw, dh, { prefer: preferQuad });
+    let detection = detectDocumentQuad(data, dw, dh, { prefer: preferQuad });
+
+    // Multi-scale refinement: when the cheap 280px pass is borderline OR
+    // we're approaching lock (HOLD_FRAMES), re-run detection on a ~520px
+    // crop of the same frame to refine corner precision. Especially helps
+    // small/distant documents where 280px corners snap a few px off.
+    {
+      const conf = detection?.confidence ?? 0;
+      const nearLock = stableCount.current >= HOLD_FRAMES;
+      const borderline = detection !== null && conf >= 0.3 && conf <= 0.6;
+      if (
+        (borderline || nearLock) &&
+        now - lastRefineAtRef.current >= REFINE_COOLDOWN_MS
+      ) {
+        lastRefineAtRef.current = now;
+        const hiDw = Math.min(HI_DETECT_WIDTH, vw);
+        const hiDh = Math.round((vh / vw) * hiDw);
+        if (!hiDetectCanvas.current)
+          hiDetectCanvas.current = document.createElement("canvas");
+        const hc = hiDetectCanvas.current;
+        if (hc.width !== hiDw || hc.height !== hiDh) {
+          hc.width = hiDw;
+          hc.height = hiDh;
+        }
+        const hctx = hc.getContext("2d", { willReadFrequently: true })!;
+        hctx.drawImage(video, 0, 0, hiDw, hiDh);
+        const { data: hiData } = hctx.getImageData(0, 0, hiDw, hiDh);
+        const preferHi = prevSmooth
+          ? (prevSmooth.map((p) => ({ x: p.x * hiDw, y: p.y * hiDh })) as [
+              Point,
+              Point,
+              Point,
+              Point,
+            ])
+          : undefined;
+        const hiDetection = detectDocumentQuad(hiData, hiDw, hiDh, { prefer: preferHi });
+        // Accept refined corners if hi-res confidence is comparable. We
+        // remap corners back into the lo-res pixel coordinate system used
+        // by the rest of the pipeline, but keep hi-res scoring/debug.
+        if (hiDetection && hiDetection.confidence >= conf - 0.05) {
+          const sx = dw / hiDw;
+          const sy = dh / hiDh;
+          detection = {
+            ...hiDetection,
+            corners: hiDetection.corners.map((p) => ({
+              x: p.x * sx,
+              y: p.y * sy,
+            })) as [Point, Point, Point, Point],
+          };
+        }
+      }
+    }
+
     const corners = detection?.corners ?? null;
 
     if (!corners) {
@@ -766,18 +829,45 @@ function ScanPage() {
       return;
     }
 
+    // Derive richer hints from detector diagnostics that are already
+    // computed each frame — avoids new algorithm work but lets us tell
+    // the user exactly why we're not auto-capturing yet.
+    const areaRatio = detection?.debug.areaRatio ?? 0;
+    const edgeTightness = detection?.debug.edgeTightness ?? 0;
+    const a4Ratio = detection?.a4Ratio ?? Math.SQRT2;
+    const a4Diff = Math.min(
+      Math.abs(a4Ratio - Math.SQRT2),
+      Math.abs(a4Ratio - 1 / Math.SQRT2),
+    );
+    // Soft thresholds, intentionally looser than the hard capture gates
+    // so we coach the user *before* the auto-capture is blocked.
+    const tooFar = areaRatio > 0 && areaRatio < 0.12;
+    const tooClose = areaRatio > 0.88;
+    const tilted = a4Diff > 0.35;
+    const looseEdges = edgeTightness > 0 && edgeTightness < 0.45;
+
     if (!isBrightEnough && lowLightFramesRef.current > 15) {
       drawOverlay(smoothed, "hold");
       setStatus("lowLight");
     } else if (stableCount.current < HOLD_FRAMES) {
       drawOverlay(smoothed, "hold");
-      setStatus("align");
+      // While the user is still framing, prefer the most actionable hint.
+      if (tooFar) setStatus("tooFar");
+      else if (tooClose) setStatus("tooClose");
+      else if (tilted) setStatus("tilt");
+      else setStatus("align");
     } else if (!isSharp) {
       drawOverlay(smoothed, "hold");
       setStatus(blurFramesRef.current > BLUR_HINT_FRAMES ? "moveBack" : "focusing");
     } else if (stableCount.current < READY_FRAMES) {
       drawOverlay(smoothed, "hold");
-      setStatus("hold");
+      // Even when motion is stable, surface a framing problem before
+      // the user keeps holding the phone for nothing.
+      if (tooFar) setStatus("tooFar");
+      else if (tooClose) setStatus("tooClose");
+      else if (tilted) setStatus("tilt");
+      else if (looseEdges) setStatus("align");
+      else setStatus("hold");
     } else if (stableCount.current < STABLE_FRAMES) {
       drawOverlay(smoothed, "ready");
       setStatus("ready");
@@ -1306,6 +1396,9 @@ function ScanPage() {
     focusing: t("statusFocusing"),
     moveBack: t("statusMoveBack"),
     lowLight: t("statusLowLight"),
+    tooFar: t("statusTooFar"),
+    tooClose: t("statusTooClose"),
+    tilt: t("statusTilt"),
     ready: t("statusReady"),
     capturing: t("statusCapturing"),
     saved: t("statusSaved"),
