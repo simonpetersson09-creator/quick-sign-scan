@@ -1140,7 +1140,24 @@ function ScanPage() {
       }
       logScanStage("burst-capture", { bestSharpness: bestScore });
 
-      let warped = warpQuadToRect(bestFrame ?? video, vw, vh, srcQuad, outW, outH);
+      // Subpixel corner refinement on the full-res frame just before warp.
+      // The 280px detect frame can leave corners 2–5px off the true paper
+      // edge; refineQuadCorners shifts each corner toward the local edge
+      // mass within a hard ±5px clamp, so it can never drag onto wrong
+      // geometry — worst case it stays put.
+      const refineSource = bestFrame ?? video;
+      let refinedSrcQuad = srcQuad;
+      try {
+        refinedSrcQuad = refineQuadCorners(refineSource, vw, vh, srcQuad);
+        logScanStage("subpixel-refine", {
+          before: formatQuad(srcQuad),
+          after: formatQuad(refinedSrcQuad),
+        });
+      } catch (e) {
+        console.warn("[scan] subpixel refine failed, using raw quad", e);
+      }
+
+      let warped = warpQuadToRect(bestFrame ?? video, vw, vh, refinedSrcQuad, outW, outH);
       logScanCanvas("after-perspective-transform", warped, debugEnabled);
 
       // Paper enhancement: normalize lighting and stretch whites so the
