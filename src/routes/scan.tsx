@@ -60,6 +60,40 @@ type ErrorType =
   | "insecure_context"
   | "unknown";
 
+function isUsableImageDataUrl(value: string | null | undefined): value is string {
+  return typeof value === "string" && /^data:image\/(jpeg|jpg|png|webp);base64,/.test(value) && value.length > 1024;
+}
+
+function canvasToSafeImageDataUrl(
+  canvas: HTMLCanvasElement,
+  quality = 0.82,
+  maxLongEdge = 2200,
+): string | null {
+  const encode = (c: HTMLCanvasElement) => {
+    try {
+      const url = c.toDataURL("image/jpeg", quality);
+      return isUsableImageDataUrl(url) ? url : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const direct = encode(canvas);
+  if (direct) return direct;
+
+  const longEdge = Math.max(canvas.width, canvas.height);
+  if (!longEdge) return null;
+  const scale = Math.min(1, maxLongEdge / longEdge);
+  const fallback = document.createElement("canvas");
+  fallback.width = Math.max(1, Math.round(canvas.width * scale));
+  fallback.height = Math.max(1, Math.round(canvas.height * scale));
+  const ctx = fallback.getContext("2d")!;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, fallback.width, fallback.height);
+  ctx.drawImage(canvas, 0, 0, fallback.width, fallback.height);
+  return encode(fallback);
+}
+
 function isInIframe() {
   try {
     return window.self !== window.top;
