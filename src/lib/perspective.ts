@@ -3914,3 +3914,213 @@ export function whitenBackground(canvas: HTMLCanvasElement): HTMLCanvasElement {
   ctx.putImageData(img, 0, 0);
   return canvas;
 }
+
+/**
+ * Threshold-based paper finder. Used as a refinement just before warp when
+ * the live edge detector's quad may include desk/background. Strategy:
+ *
+ *   1. Downsample the source to ~480px long edge, grayscale.
+ *   2. Otsu threshold (paper is the bright class against darker desk/wood).
+ *   3. Pick the largest 4-connected bright component (rejects highlights,
+ *      sensor noise, and small specular bright spots).
+ *   4. Reject if it touches all four borders (i.e. background itself is
+ *      bright — Otsu gave a useless split, e.g. white paper on white desk).
+ *   5. Find minimum-area oriented bounding box around its boundary points
+ *      (angle scan in 1° steps). Those 4 corners are the paper quad.
+ *   6. Map back to source-pixel coordinates and return TL,TR,BR,BL.
+ *
+ * Returns null if no plausible paper region is found — caller should fall
+ * back to the edge-detector's quad.
+ */
+export function detectPaperByThreshold(
+  source: HTMLCanvasElement | HTMLVideoElement,
+  srcW: number,
+  srcH: number,
+): [Point, Point, Point, Point] | null {
+  const TARGET = 480;
+  const scale = Math.min(1, TARGET / Math.max(srcW, srcH));
+  const w = Math.max(16, Math.round(srcW * scale));
+  const h = Math.max(16, Math.round(srcH * scale));
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext("2d", { willReadFrequently: true })!;
+  ctx.drawImage(source, 0, 0, w, h);
+  const img = ctx.getImageData(0, 0, w, h).data;
+  const n = w * h;
+
+  const lum = new Uint8ClampedArray(n);
+  for (let i = 0, j = 0; i < img.length; i += 4, j++) {
+    lum[j] = (0.299 * img[i] + 0.587 * img[i + 1] + 0.114 * img[i + 2]) | 0;
+  }
+
+  // Otsu threshold.
+  const hist = new Uint32Array(256);
+  for (let i = 0; i < n; i++) hist[lum[i]]++;
+  let total = 0;
+  for (let v = 0; v < 256; v++) total += v * hist[v];
+  let wB = 0;
+  let sumB = 0;
+  let maxVar = 0;
+  let thr = 127;
+  for (let v = 0; v < 256; v++) {
+    wB += hist[v];
+    if (!wB) continue;
+    const wF = n - wB;
+    if (!wF) break;
+    sumB += v * hist[v];
+    const mB = sumB / wB;
+    const mF = (total - sumB) / wF;
+    const bv = wB * wF * (mB - mF) * (mB - mF);
+    if (bv > maxVar) {
+      maxVar = bv;
+      thr = v;
+    }
+  }
+  // Slight floor — never let the threshold be so low that mid-gray desk
+  // joins the paper class.
+  if (thr < 100) thr = 100;
+
+  const bin = new Uint8Array(n);
+  for (let i = 0; i < n; i++) bin[i] = lum[i] > thr ? 1 : 0;
+
+  // Largest 4-connected bright component.
+  const labels = new Int32Array(n);
+  const stack: number[] = [];
+  let label = 0;
+  let bestLabel = -1;
+  let bestArea = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const idx = y * w + x;
+      if (!bin[idx] || labels[idx]) continue;
+      label++;
+      labels[idx] = label;
+      stack.push(idx);
+      let area = 0;
+      while (stack.length) {
+        const p = stack.pop()!;
+        area++;
+        const px = p % w;
+        const py = (p / w) | 0;
+        if (px > 0) {
+          const q = p - 1;
+          if (bin[q] && !labels[q]) {
+            labels[q] = label;
+            stack.push(q);
+          }
+        }
+        if (px < w - 1) {
+          const q = p + 1;
+          if (bin[q] && !labels[q]) {
+            labels[q] = label;
+            stack.push(q);
+          }
+        }
+        if (py > 0) {
+          const q = p - w;
+          if (bin[q] && !labels[q]) {
+            labels[q] = label;
+            stack.push(q);
+          }
+        }
+        if (py < h - 1) {
+          const q = p + w;
+          if (bin[q] && !labels[q]) {
+            labels[q] = label;
+            stack.push(q);
+          }
+        }
+      }
+      if (area > bestArea) {
+        bestArea = area;
+        bestLabel = label;
+      }
+    }
+  }
+  if (bestLabel < 0 || bestArea < n * 0.06) return null;
+
+  // Reject if component touches all 4 borders (background is bright too).
+  let touchT = false, touchB = false, touchL = false, touchR = false;
+  for (let x = 0; x < w; x++) {
+    if (labels[x] === bestLabel) touchT = true;
+    if (labels[(h - 1) * w + x] === bestLabel) touchB = true;
+  }
+  for (let y = 0; y < h; y++) {
+    if (labels[y * w] === bestLabel) touchL = true;
+    if (labels[y * w + w - 1] === bestLabel) touchR = true;
+  }
+  if (touchT && touchB && touchL && touchR) return null;
+
+  // Collect boundary points of best component.
+  const pts: number[] = []; // flat x,y pairs
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const idx = y * w + x;
+      if (labels[idx] !== bestLabel) continue;
+      let border = false;
+      if (x === 0 || x === w - 1 || y === 0 || y === h - 1) {
+        border = true;
+      } else if (
+        labels[idx - 1] !== bestLabel ||
+        labels[idx + 1] !== bestLabel ||
+        labels[idx - w] !== bestLabel ||
+        labels[idx + w] !== bestLabel
+      ) {
+        border = true;
+      }
+      if (border) {
+        pts.push(x, y);
+      }
+    }
+  }
+  if (pts.length < 32) return null;
+
+  // Min-area oriented bounding box — 1° angle scan over [0, 90).
+  let bestAreaBox = Infinity;
+  let bestQuad: [Point, Point, Point, Point] | null = null;
+  for (let deg = 0; deg < 90; deg++) {
+    const a = (deg * Math.PI) / 180;
+    const cs = Math.cos(a);
+    const sn = Math.sin(a);
+    let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+    for (let k = 0; k < pts.length; k += 2) {
+      const px = pts[k];
+      const py = pts[k + 1];
+      const u = px * cs + py * sn;
+      const v = -px * sn + py * cs;
+      if (u < minU) minU = u;
+      if (u > maxU) maxU = u;
+      if (v < minV) minV = v;
+      if (v > maxV) maxV = v;
+    }
+    const areaBox = (maxU - minU) * (maxV - minV);
+    if (areaBox < bestAreaBox) {
+      bestAreaBox = areaBox;
+      // Back-rotate corner (u,v) -> (x,y): x = u*cs - v*sn, y = u*sn + v*cs
+      bestQuad = [
+        { x: minU * cs - minV * sn, y: minU * sn + minV * cs }, // TL'
+        { x: maxU * cs - minV * sn, y: maxU * sn + minV * cs }, // TR'
+        { x: maxU * cs - maxV * sn, y: maxU * sn + maxV * cs }, // BR'
+        { x: minU * cs - maxV * sn, y: minU * sn + maxV * cs }, // BL'
+      ];
+    }
+  }
+  if (!bestQuad) return null;
+
+  // Sanity: aspect ratio of the OBB must be in a plausible range for a
+  // photographed A4 (~0.4..2.5). Filters out long thin streaks of reflection.
+  const sideA = Math.hypot(bestQuad[1].x - bestQuad[0].x, bestQuad[1].y - bestQuad[0].y);
+  const sideB = Math.hypot(bestQuad[3].x - bestQuad[0].x, bestQuad[3].y - bestQuad[0].y);
+  const aspect = sideA > 0 && sideB > 0 ? Math.max(sideA, sideB) / Math.min(sideA, sideB) : 0;
+  if (aspect < 1.05 || aspect > 2.6) return null;
+
+  // Scale back to source pixel coordinates and order TL,TR,BR,BL.
+  const invX = srcW / w;
+  const invY = srcH / h;
+  const mapped = bestQuad.map((p) => ({
+    x: Math.max(0, Math.min(srcW - 1, p.x * invX)),
+    y: Math.max(0, Math.min(srcH - 1, p.y * invY)),
+  })) as [Point, Point, Point, Point];
+  return orderQuad(mapped);
+}
