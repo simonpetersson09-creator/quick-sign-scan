@@ -758,6 +758,62 @@ function ScanPage() {
       }
     }
 
+    // Hi-res edge-tightness recompute (Step B). Uses the EXISTING quad —
+    // no new detection, no new corners. Measures how tight each side of
+    // the (already-found) quad sits on a strong gradient in the full-res
+    // video, then swaps in the hi-res value only if it is better. This
+    // helps small/far A4 documents whose edges are sharp in 1920×1080 but
+    // undersampled in the 280px detect frame.
+    if (
+      ENABLE_HIRES_TIGHTNESS_RECOMPUTE &&
+      detection &&
+      now - lastHiResTightAtRef.current >= HIRES_TIGHT_COOLDOWN_MS
+    ) {
+      lastHiResTightAtRef.current = now;
+      try {
+        const sx = vw / dw;
+        const sy = vh / dh;
+        const quadFull = detection.corners.map((p) => ({
+          x: p.x * sx,
+          y: p.y * sy,
+        })) as [Point, Point, Point, Point];
+        const hi = computeHiResEdgeTightness(video, vw, vh, quadFull);
+        const origTight = detection.debug.edgeTightness ?? 0;
+        if (hi && hi.tightness > origTight) {
+          const wasBlockedByTightness =
+            !detection.readyForCapture &&
+            (detection.reasonNotReady === "edgeTightnessLow" ||
+              detection.reasonNotReady === "edgeTightnessLowAdaptive");
+          // Threshold mirrors capture-gate: 0.45 normally; 0.34 if the
+          // 280px path already qualified for adaptive treatment.
+          const adaptive = getLastDetectDiagnostics().adaptiveUsed;
+          const tightThresh = adaptive ? adaptive.threshold : MIN_EDGE_TIGHTNESS_FOR_CAPTURE;
+          const clearsGate = hi.tightness >= tightThresh;
+          detection = {
+            ...detection,
+            debug: { ...detection.debug, edgeTightness: hi.tightness },
+            ...(wasBlockedByTightness && clearsGate
+              ? { readyForCapture: true, reasonNotReady: undefined }
+              : {}),
+          };
+          if (debugEnabled && now - lastHiResTightLogAtRef.current > 750) {
+            lastHiResTightLogAtRef.current = now;
+            // eslint-disable-next-line no-console
+            console.log("[scan] hires-tightness", {
+              orig: +origTight.toFixed(3),
+              hires: +hi.tightness.toFixed(3),
+              perSide: hi.perSide.map((v) => +v.toFixed(2)),
+              samples: hi.samples,
+              threshold: +tightThresh.toFixed(2),
+              clearedGate: wasBlockedByTightness && clearsGate,
+            });
+          }
+        }
+      } catch {
+        // ignore — keep 280px-derived tightness
+      }
+    }
+
     // Reference unused hi-res symbols so TS doesn't complain when flags off.
     void ENABLE_HI_RES_DETECT;
     void HI_DETECT_WIDTH;
