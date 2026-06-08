@@ -1768,6 +1768,64 @@ function polygonPerimeter(points: Point[]): number {
   return p;
 }
 
+export type DetectDiagnostics = {
+  rejects: Record<string, number>;
+  bestRejected: null | {
+    reason: string;
+    areaRatio: number;
+    edgeScore: number;
+    edgeTightness: number;
+    a4Score: number;
+    meanEdgeOffset: number;
+    statsMean: number;
+    contrast: number;
+  };
+  candidateCount: number;
+};
+
+let lastDetectDiagnostics: DetectDiagnostics = {
+  rejects: {},
+  bestRejected: null,
+  candidateCount: 0,
+};
+
+export function getLastDetectDiagnostics(): DetectDiagnostics {
+  return lastDetectDiagnostics;
+}
+
+function resetDetectDiagnostics() {
+  lastDetectDiagnostics = { rejects: {}, bestRejected: null, candidateCount: 0 };
+}
+
+function recordReject(
+  reason: string,
+  metrics: {
+    areaRatio?: number;
+    edgeScore?: number;
+    edgeTightness?: number;
+    a4Score?: number;
+    meanEdgeOffset?: number;
+    statsMean?: number;
+    contrast?: number;
+  } = {},
+) {
+  lastDetectDiagnostics.rejects[reason] = (lastDetectDiagnostics.rejects[reason] ?? 0) + 1;
+  const area = metrics.areaRatio ?? 0;
+  const prev = lastDetectDiagnostics.bestRejected;
+  if (!prev || area > prev.areaRatio) {
+    lastDetectDiagnostics.bestRejected = {
+      reason,
+      areaRatio: area,
+      edgeScore: metrics.edgeScore ?? 0,
+      edgeTightness: metrics.edgeTightness ?? 0,
+      a4Score: metrics.a4Score ?? 0,
+      meanEdgeOffset: metrics.meanEdgeOffset ?? 0,
+      statsMean: metrics.statsMean ?? 0,
+      contrast: metrics.contrast ?? 0,
+    };
+  }
+}
+
 function evaluateEdgeQuad(args: {
   quad: [Point, Point, Point, Point];
   hull: Point[];
