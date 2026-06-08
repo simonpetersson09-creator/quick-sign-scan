@@ -1228,6 +1228,8 @@ function ScanPage() {
     if (savedTimer2Ref.current) window.clearTimeout(savedTimer2Ref.current);
     if (savedTimer3Ref.current) window.clearTimeout(savedTimer3Ref.current);
     setSavedOverlay({ dataUrl, visible: true });
+    if (stageTimerRef.current) window.clearTimeout(stageTimerRef.current);
+    setCaptureStage({ label: t("savingPage"), progress: 1 });
 
     // Phase 2 (~1800ms): start the soft fade-out of the page overlay.
     savedTimer1Ref.current = window.setTimeout(() => {
@@ -1252,6 +1254,7 @@ function ScanPage() {
     savedTimer3Ref.current = window.setTimeout(() => {
       if (cancelledRef.current) return;
       setSavedOverlay(null);
+      setCaptureStage(null);
     }, 2800);
   }
 
