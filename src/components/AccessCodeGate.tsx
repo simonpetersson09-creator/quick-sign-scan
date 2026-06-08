@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Lock, Loader2 } from "lucide-react";
 
@@ -47,9 +47,11 @@ const STRINGS: Record<"sv" | "en", Strings> = {
 };
 
 export function AccessCodeGate({ children }: { children: React.ReactNode }) {
-  // Capacitor build always has the baked-in code; render children immediately.
-  // On web, render the gate when no code is stored yet.
-  const [unlocked, setUnlocked] = useState(() => hasUsableAccessCode());
+  // Keep SSR and the first client render identical. Reading localStorage during
+  // the hydration render can make the server show the code gate while the client
+  // immediately shows the route, causing the visible access-code/preview flicker.
+  const [checked, setChecked] = useState(false);
+  const [unlocked, setUnlocked] = useState(false);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +59,15 @@ export function AccessCodeGate({ children }: { children: React.ReactNode }) {
   const t = STRINGS[lang];
 
   const verifyFn = useServerFn(verifyAccessCode);
+
+  useEffect(() => {
+    setUnlocked(hasUsableAccessCode());
+    setChecked(true);
+  }, []);
+
+  if (!checked) {
+    return <div className="min-h-dvh bg-background" aria-hidden="true" />;
+  }
 
   if (unlocked) return <>{children}</>;
   // Belt-and-braces: never show the gate inside the native shell.
