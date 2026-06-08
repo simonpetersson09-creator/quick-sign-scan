@@ -1950,6 +1950,20 @@ function evaluateEdgeQuad(args: {
   let meanEdgeOffset = snap ? snap.meanOffset : 999;
   const originalTightness = edgeTightness;
 
+  const confidence =
+    0.22 * edgeScore +
+    0.12 * straightScore +
+    0.06 * a4Score +
+    0.06 * brightnessScore +
+    0.04 * textScore +
+    0.06 * perspectiveScore +
+    0.05 * areaScore +
+    0.07 * contrastScore +
+    0.07 * purityScore +
+    // Heaviest single weight: did the polygon actually snap to real edges?
+    0.25 * edgeTightness;
+
+
   // ===== Adaptive small-document edge handling (feature-flagged) =====
   // Small A4 in a 280px detect frame has 1-2 px wide gradient peaks; the
   // default snap threshold is tuned for bigger documents and drops these.
