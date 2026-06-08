@@ -11,6 +11,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { LanguageProvider } from "@/lib/i18n";
 import { AccessCodeGate } from "@/components/AccessCodeGate";
 import { KeyboardToolbar } from "@/components/KeyboardToolbar";
+import { scanStore } from "@/lib/scanStore";
 
 import appCss from "../styles.css?url";
 
