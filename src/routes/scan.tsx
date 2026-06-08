@@ -155,6 +155,15 @@ function ScanPage() {
   const CANDIDATE_AREA_TOL = 0.18;
   const CANDIDATE_A4_TOL = 0.25;
   const CANDIDATE_AMBIGUITY_RATIO = 0.55; // 2nd cluster vs best
+  // Feature flag: generous overlay detection. The live document frame is
+  // allowed to display as soon as a candidate passes structural gates
+  // (area / A4 ratio / perspective / sides / polygon-fill / not-touching-
+  // frame). Auto-capture still requires the full strict pipeline
+  // (edgeTightness, sharpness, brightness, stability, confidence, no
+  // ambiguity). Goal: user sees that the document is found at longer
+  // distance, but no photo is taken until quality is good.
+  const ENABLE_GENEROUS_OVERLAY = true;
+  const lastOverlayLogAtRef = useRef(0);
   // Throttle detection to ~22 Hz. The full pipeline (Canny + Sobel + snap)
   // is too heavy to run at 60 fps on mid-range mobile — it starves the UI
   // thread and the camera's continuous autofocus callback, which actually
