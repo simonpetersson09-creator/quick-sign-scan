@@ -1050,6 +1050,8 @@ function ScanPage() {
       // Paper enhancement: normalize lighting and stretch whites so the
       // document looks like a clean scanned A4 (white paper, dark ink).
       let alignmentDiagnostics: DocumentAlignmentDiagnostics | null = null;
+      if (stageTimerRef.current) window.clearTimeout(stageTimerRef.current);
+      setCaptureStage({ label: t("capStageEnhance"), progress: 0.6 });
       try {
         removeShadows(warped);
         enhancePaper(warped);
@@ -1079,6 +1081,8 @@ function ScanPage() {
         blurFramesRef.current = BLUR_HINT_FRAMES + 1;
         setProgress(0);
         setStatus("focusing");
+        setSavedOverlay(null);
+        setCaptureStage(null);
         return;
       }
       captureRetryRef.current = 0;
@@ -1087,6 +1091,7 @@ function ScanPage() {
       // 5–10 MB per sida för en 2480px-bild — JPEG @ 1654px landar typiskt
       // på 150–350 kB med bibehållen läsbarhet för text och signaturer.
       const JPEG_QUALITY = 0.82;
+      setCaptureStage({ label: t("capStagePreview"), progress: 0.88 });
       const dataUrl = warped.toDataURL("image/jpeg", JPEG_QUALITY);
       // sourceDataUrl används inte för PDF — håll den liten så minnet inte
       // sväller när användaren skannar många sidor.
