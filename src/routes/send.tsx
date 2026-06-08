@@ -259,8 +259,10 @@ function SendPage() {
           }, 2200);
         }
       } else {
-        console.error(`[send] failed code=${result.code} status=${result.status ?? "n/a"}`);
-        setInfo(t(`err_${result.code}`) ?? t("err_unknown"));
+        console.error(`[send] failed code=${result.code} status=${result.status ?? "n/a"} detail=${result.detail ?? ""}`);
+        const baseMsg = t(`err_${result.code}`) ?? t("err_unknown");
+        // Append HTTP status to the visible message so TestFlight users can report it.
+        setInfo(result.status ? `${baseMsg} (HTTP ${result.status})` : baseMsg);
       }
     } catch (e) {
       console.error(`[send] unexpected error: ${e instanceof Error ? e.name : "unknown"}`);
