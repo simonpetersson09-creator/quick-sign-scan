@@ -1399,7 +1399,39 @@ export function detectDocumentQuad(
     a4Score: best.debug.a4Score,
     meanEdgeOffset: best.debug.meanEdgeOffset,
   });
-  return result;
+  if (result) {
+    return { ...result, readyForCapture: true };
+  }
+  // Generous-overlay fallback: synthesize a non-capture-ready detection
+  // from the best structurally-plausible candidate so the live overlay
+  // can show that the document IS being seen. Auto-capture must check
+  // readyForCapture before firing.
+  if (options.allowOverlay && lastDetectDiagnostics.overlayBest) {
+    const o = lastDetectDiagnostics.overlayBest;
+    return {
+      corners: o.corners,
+      a4Ratio: o.a4Ratio,
+      confidence: o.confidence,
+      debug: {
+        edgeThreshold: 0,
+        threshold: 0,
+        candidateCount,
+        a4Score: o.a4Score,
+        edgeScore: o.edgeScore,
+        brightnessScore: 0,
+        textScore: 0,
+        areaRatio: o.areaRatio,
+        sideDeviation: 0,
+        perspectiveError: 0,
+        polygonFill: 1,
+        edgeTightness: o.edgeTightness,
+        meanEdgeOffset: 0,
+      },
+      readyForCapture: false,
+      reasonNotReady: o.reasonNotReady ?? "confidenceBelowMin",
+    };
+  }
+  return null;
 }
 
 // Backwards-compatible API for camera overlay/capture.
