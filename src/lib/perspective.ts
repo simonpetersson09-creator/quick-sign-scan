@@ -798,9 +798,7 @@ export function autoOrientAndDeskewDocument(
   // flipped pages upside-down. We disable it: do NOT auto-rotate by
   // 90/180/270 anymore. Only the fine deskew (< a few degrees) is kept
   // below, which is what produces "perfectly straight" A4 output.
-  const bestRotation: (typeof rotations)[number] = 0;
   const orientationCandidates: DocumentAlignmentDiagnostics["orientationCandidates"] = [];
-  // Run analysis purely for diagnostics — never act on it for rotation.
   for (const rotation of rotations) {
     const rotatedSample = rotateCanvas(sample, rotation);
     const analysis = estimateTextSkew(rotatedSample, 7, 0.5);
@@ -817,6 +815,24 @@ export function autoOrientAndDeskewDocument(
   }
   const foundText = orientationCandidates.some((c) => c.hasText);
 
+  // Pick best rotation only when text is found AND it beats 0° decisively.
+  // Conservative gates avoid the historical "page is upside down" failure:
+  //   - winner must have hasText
+  //   - winner.score must beat 0° by ≥1.6× (clear margin)
+  //   - winner.uprightScore ≥ 0.6 (texten ser ut att stå rätt upp)
+  const zero = orientationCandidates.find((c) => c.rotation === 0)!;
+  const sortedByScore = [...orientationCandidates].sort((a, b) => b.score - a.score);
+  const winner = sortedByScore[0];
+  let bestRotation: (typeof rotations)[number] = 0;
+  if (
+    winner &&
+    winner.rotation !== 0 &&
+    winner.hasText &&
+    winner.uprightScore >= 0.6 &&
+    winner.score > Math.max(1e-6, zero.score) * 1.6
+  ) {
+    bestRotation = winner.rotation;
+  }
 
   let oriented = rotateCanvas(canvas, bestRotation);
   const skew = estimateTextSkew(oriented, 7, 0.25);
@@ -3909,6 +3925,69 @@ export function whitenBackground(canvas: HTMLCanvasElement): HTMLCanvasElement {
       d[i + 1] = og;
       d[i + 2] = ob;
     }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  return canvas;
+}
+
+/**
+ * Mild local contrast boost targeted at ink only. After flat-field whitening
+ * paper is clean and bright, but thin/light text (8–9pt body, page numbers,
+ * footers) can look slightly washed out. We run a tiny unsharp mask and
+ * apply it ONLY where the original is darker than `INK_THRESHOLD` — bright
+ * paper pixels are untouched, so we never amplify sensor noise on the
+ * background. Same approach Microsoft Lens uses in its Document mode.
+ */
+export function boostInkContrast(canvas: HTMLCanvasElement): HTMLCanvasElement {
+  const w = canvas.width;
+  const h = canvas.height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  const n = w * h;
+
+  const lum = new Uint8ClampedArray(n);
+  for (let i = 0, j = 0; i < d.length; i += 4, j++) {
+    lum[j] = (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) | 0;
+  }
+
+  // Light 3x3 box blur (separable).
+  const tmp = new Uint8ClampedArray(n);
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    for (let x = 0; x < w; x++) {
+      const x0 = x > 0 ? x - 1 : 0;
+      const x1 = x < w - 1 ? x + 1 : w - 1;
+      tmp[row + x] = ((lum[row + x0] + lum[row + x] + lum[row + x1]) / 3) | 0;
+    }
+  }
+  const blur = new Uint8ClampedArray(n);
+  for (let y = 0; y < h; y++) {
+    const y0 = y > 0 ? y - 1 : 0;
+    const y1 = y < h - 1 ? y + 1 : h - 1;
+    for (let x = 0; x < w; x++) {
+      blur[y * w + x] = ((tmp[y0 * w + x] + tmp[y * w + x] + tmp[y1 * w + x]) / 3) | 0;
+    }
+  }
+
+  const AMOUNT = 0.45;
+  const INK_THRESHOLD = 150;
+  for (let i = 0, j = 0; i < d.length; i += 4, j++) {
+    const L = lum[j];
+    if (L > INK_THRESHOLD) continue;
+    const diff = L - blur[j];
+    const ramp = L <= 110 ? 1 : 1 - (L - 110) / (INK_THRESHOLD - 110);
+    const add = diff * AMOUNT * ramp;
+    let r0 = d[i] + add;
+    let g0 = d[i + 1] + add;
+    let b0 = d[i + 2] + add;
+    if (r0 < 0) r0 = 0; else if (r0 > 255) r0 = 255;
+    if (g0 < 0) g0 = 0; else if (g0 > 255) g0 = 255;
+    if (b0 < 0) b0 = 0; else if (b0 > 255) b0 = 255;
+    d[i] = r0;
+    d[i + 1] = g0;
+    d[i + 2] = b0;
   }
 
   ctx.putImageData(img, 0, 0);

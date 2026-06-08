@@ -20,6 +20,7 @@ import {
   warpQuadToRect,
   autoOrientAndDeskewDocument,
   whitenBackground,
+  boostInkContrast,
 } from "@/lib/perspective";
 import { useT } from "@/lib/i18n";
 import { Camera, CameraOff, X, RefreshCw, ArrowLeft, ArrowRight, Zap, ZapOff, Settings } from "lucide-react";
@@ -261,6 +262,12 @@ function ScanPage() {
 
   const lastRawQuad = useRef<[Point, Point, Point, Point] | null>(null);
   const smoothQuad = useRef<[Point, Point, Point, Point] | null>(null); // normalized 0..1
+  // Multi-frame quad voting: stash the last N smoothed normalized quads. At
+  // capture time we take the per-corner median across this window so a
+  // single jittery frame can't pull the warp off the paper. Pure refinement —
+  // never gates capture, only smooths the corners that get warped.
+  const recentSmoothQuadsRef = useRef<Array<[Point, Point, Point, Point]>>([]);
+  const QUAD_VOTE_WINDOW = 7;
   const detectionMeta = useRef<ReturnType<typeof detectDocumentQuad> | null>(null);
   type CandidateEntry = {
     norm: [Point, Point, Point, Point];
@@ -1047,6 +1054,10 @@ function ScanPage() {
     const alpha = lockedRef.current ? ALPHA_POST_LOCK : ALPHA_PRE_LOCK;
     const smoothed = emaQuad(smoothQuad.current, norm, alpha);
     smoothQuad.current = smoothed;
+    // Push to the voting ring buffer (only the most recent frames count).
+    const buf = recentSmoothQuadsRef.current;
+    buf.push(smoothed.map((p) => ({ x: p.x, y: p.y })) as [Point, Point, Point, Point]);
+    if (buf.length > QUAD_VOTE_WINDOW) buf.shift();
 
     const last = lastRawQuad.current;
     lastRawQuad.current = norm;
@@ -1448,7 +1459,23 @@ function ScanPage() {
     }
 
     // Sortera alltid hörnen i exakt ordning TL, TR, BR, BL innan warp.
-    const orderedNormQuad = orderQuad(normQuad);
+    // Multi-frame voting: median of the last N smoothed quads (per corner).
+    // En enstaka skakig frame kan inte längre dra warp-hörnen av pappret.
+    const votes = recentSmoothQuadsRef.current;
+    let votedQuad: [Point, Point, Point, Point] = normQuad;
+    if (votes.length >= 3) {
+      const orderedVotes = votes.map((v) => orderQuad(v));
+      const median = (arr: number[]) => {
+        const s = [...arr].sort((a, b) => a - b);
+        const m = Math.floor(s.length / 2);
+        return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+      };
+      votedQuad = [0, 1, 2, 3].map((i) => ({
+        x: median(orderedVotes.map((q) => q[i].x)),
+        y: median(orderedVotes.map((q) => q[i].y)),
+      })) as [Point, Point, Point, Point];
+    }
+    const orderedNormQuad = orderQuad(votedQuad);
 
     // Text-safe mode: do not grow or shrink the detected crop. Growing shows
     // desk/background; shrinking risks cutting off real text near the edges.
@@ -1612,6 +1639,18 @@ function ScanPage() {
         logScanStage("whiten-background", { applied: false, reason: "exception" });
       }
 
+      // Local ink-contrast boost — mild unsharp mask gated to dark pixels
+      // (L<=150). Sharpens thin/light text (footers, body 8–9pt) without
+      // amplifying background sensor noise on the now-white paper.
+      try {
+        warped = boostInkContrast(warped);
+        logScanCanvas("after-ink-boost", warped, debugEnabled);
+        logScanStage("ink-boost", { applied: true });
+      } catch (e) {
+        console.warn("[scan] boostInkContrast failed; keeping previous frame", e);
+        logScanStage("ink-boost", { applied: false, reason: "exception" });
+      }
+
       // Post-capture sharpness gate. If the warped doc is blurry we abandon
       // this capture and let auto-focus retry — better to wait a second
       // longer than to save an unreadable PDF page. Bail after a few retries
@@ -1773,6 +1812,7 @@ function ScanPage() {
     detectCount.current = 0;
     missCount.current = 0;
     smoothQuad.current = null;
+    recentSmoothQuadsRef.current = [];
     lastRawQuad.current = null;
     detectionMeta.current = null;
     blurFramesRef.current = 0;
