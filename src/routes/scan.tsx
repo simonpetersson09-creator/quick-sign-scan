@@ -729,6 +729,17 @@ function ScanPage() {
         drawOverlay(null, "search");
         setProgress(0);
       }
+      // Throttled diagnostic log — why didn't *any* candidate pass?
+      if (debugEnabled && now - lastRejectLogAtRef.current > 750) {
+        lastRejectLogAtRef.current = now;
+        const d = getLastDetectDiagnostics();
+        // eslint-disable-next-line no-console
+        console.log("[scan] no-lock", {
+          candidates: d.candidateCount,
+          rejects: d.rejects,
+          bestRejected: d.bestRejected,
+        });
+      }
       setStatus((s) =>
         s === "starting"
           ? s
