@@ -1761,6 +1761,8 @@ function ScanPage() {
 
 
   function finishScanning() {
+    cancelledRef.current = true;
+    cameraStartTokenRef.current += 1;
     if (savedTimer1Ref.current) window.clearTimeout(savedTimer1Ref.current);
     if (savedTimer2Ref.current) window.clearTimeout(savedTimer2Ref.current);
     if (savedTimer3Ref.current) window.clearTimeout(savedTimer3Ref.current);
@@ -1782,6 +1784,7 @@ function ScanPage() {
     scanStore.set({ pages, imageDataUrl: pages[pages.length - 1] });
     navigate({
       to: "/preview",
+      replace: true,
       state: (prev) => ({
         ...prev,
         // Keep large base64 images out of history.state. The in-memory store
