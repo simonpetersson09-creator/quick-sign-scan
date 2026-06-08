@@ -3577,3 +3577,340 @@ export function computeHiResEdgeTightness(
     samples: totalCols,
   };
 }
+
+/**
+ * Snap each side of the detected quad onto the strongest local edge in the
+ * full-resolution frame. For each of the 4 sides we render a perpendicular
+ * strip of width = side length, height = 2*BAND+1, then for every column we
+ * find the row with the maximum |∂L/∂y|. The median offset from the centre
+ * row tells us how far the whole side is from the real paper edge — we then
+ * translate that side perpendicular by the median offset (clamped). Final
+ * quad corners are recomputed as intersections of adjacent snapped sides.
+ *
+ * Wider search window (±BAND px) than refineQuadCorners (±5 px), so even
+ * detections that land a few mm off the paper can be pulled exactly onto
+ * the edge. Median-based ⇒ robust to text/lines crossing the strip.
+ */
+export function snapQuadToPaperEdges(
+  source: HTMLCanvasElement | HTMLVideoElement,
+  srcW: number,
+  srcH: number,
+  quad: [Point, Point, Point, Point],
+): [Point, Point, Point, Point] {
+  const BAND = 28;         // ± search window in source pixels (per side)
+  const MIN_GRAD = 14;     // ignore weak gradients (noise, faint text)
+  const MAX_STRIP_W = 800;
+  const MAX_SHIFT = BAND - 2;
+
+  const sides: Array<[Point, Point]> = [
+    [quad[0], quad[1]], // top
+    [quad[1], quad[2]], // right
+    [quad[2], quad[3]], // bottom
+    [quad[3], quad[0]], // left
+  ];
+
+  const strip = document.createElement("canvas");
+  const sctx = strip.getContext("2d", { willReadFrequently: true });
+  if (!sctx) return quad;
+
+  // Centre of the quad — used to know the "outside" direction (positive
+  // perpendicular = away from centre). Paper is bright, surroundings darker
+  // (in general), so we accept either polarity but prefer the dominant one.
+  const cx = (quad[0].x + quad[1].x + quad[2].x + quad[3].x) / 4;
+  const cy = (quad[0].y + quad[1].y + quad[2].y + quad[3].y) / 4;
+
+  const offsets: number[] = [];
+  // Perpendicular unit vectors per side (rotated 90° CW relative to p1→p2),
+  // re-oriented so they point AWAY from the centre.
+  const normals: Array<{ nx: number; ny: number }> = [];
+
+  for (const [p1, p2] of sides) {
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 10) {
+      offsets.push(0);
+      normals.push({ nx: 0, ny: 0 });
+      continue;
+    }
+    const angle = Math.atan2(dy, dx);
+    // Perpendicular to (dx,dy), pointing outside the quad.
+    let nx = -dy / len;
+    let ny = dx / len;
+    const midX = (p1.x + p2.x) / 2;
+    const midY = (p1.y + p2.y) / 2;
+    if ((midX - cx) * nx + (midY - cy) * ny < 0) {
+      nx = -nx;
+      ny = -ny;
+    }
+    normals.push({ nx, ny });
+
+    const stripW = Math.min(Math.round(len), MAX_STRIP_W);
+    const stripH = 2 * BAND + 1;
+    if (strip.width !== stripW || strip.height !== stripH) {
+      strip.width = stripW;
+      strip.height = stripH;
+    }
+    sctx.setTransform(1, 0, 0, 1, 0, 0);
+    sctx.fillStyle = "#000";
+    sctx.fillRect(0, 0, stripW, stripH);
+    // Strip layout: row BAND = on the line, row > BAND = outside the quad
+    // (along +normal), row < BAND = inside.
+    const scale = stripW / len;
+    sctx.translate(0, BAND);
+    sctx.scale(scale, 1);
+    sctx.rotate(-angle);
+    sctx.translate(-p1.x, -p1.y);
+    try {
+      sctx.drawImage(source as CanvasImageSource, 0, 0, srcW, srcH);
+    } catch {
+      sctx.setTransform(1, 0, 0, 1, 0, 0);
+      offsets.push(0);
+      continue;
+    }
+    sctx.setTransform(1, 0, 0, 1, 0, 0);
+    const { data } = sctx.getImageData(0, 0, stripW, stripH);
+    const lum = new Float32Array(stripW * stripH);
+    for (let i = 0, j = 0; j < lum.length; i += 4, j++) {
+      lum[j] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    }
+
+    // For each column, find row with strongest vertical gradient.
+    // We prefer "bright-inside, dark-outside" transitions (paper→table),
+    // so we score signed gradient where row+1 is outside, row-1 inside:
+    //   signed = lum(inside) - lum(outside) ⇒ positive when paper is brighter.
+    const cols: number[] = [];
+    for (let x = 0; x < stripW; x++) {
+      let bestSigned = 0;
+      let bestRow = -1;
+      for (let y = 2; y < stripH - 2; y++) {
+        const inside = lum[(y - 1) * stripW + x];
+        const outside = lum[(y + 1) * stripW + x];
+        const signed = inside - outside; // >0 = bright→dark going outward
+        if (signed > bestSigned) {
+          bestSigned = signed;
+          bestRow = y;
+        }
+      }
+      if (bestSigned >= MIN_GRAD && bestRow >= 0) {
+        cols.push(bestRow - BAND); // offset from line; positive = outside
+      }
+    }
+
+    if (cols.length < stripW * 0.15) {
+      // Not enough edge evidence on this side — keep it where it is.
+      offsets.push(0);
+      continue;
+    }
+    cols.sort((a, b) => a - b);
+    const median = cols[Math.floor(cols.length / 2)];
+    const clamped = Math.max(-MAX_SHIFT, Math.min(MAX_SHIFT, median));
+    offsets.push(clamped);
+  }
+
+  // Shift each side perpendicular by its offset (in source px).
+  type Line = { p: Point; d: Point };
+  const lines: Line[] = sides.map(([p1, p2], i) => {
+    const n = normals[i];
+    const o = offsets[i];
+    return {
+      p: { x: p1.x + n.nx * o, y: p1.y + n.ny * o },
+      d: { x: p2.x - p1.x, y: p2.y - p1.y },
+    };
+  });
+
+  // Intersect adjacent sides: corner k = intersect(side[k-1], side[k]).
+  function intersect(a: Line, b: Line): Point | null {
+    const denom = a.d.x * b.d.y - a.d.y * b.d.x;
+    if (Math.abs(denom) < 1e-6) return null;
+    const t = ((b.p.x - a.p.x) * b.d.y - (b.p.y - a.p.y) * b.d.x) / denom;
+    return { x: a.p.x + a.d.x * t, y: a.p.y + a.d.y * t };
+  }
+
+  const newCorners: Point[] = [];
+  for (let i = 0; i < 4; i++) {
+    const prev = lines[(i + 3) % 4]; // side ending at corner i
+    const next = lines[i];           // side starting at corner i
+    const ip = intersect(prev, next);
+    if (!ip || !Number.isFinite(ip.x) || !Number.isFinite(ip.y)) {
+      newCorners.push(quad[i]);
+    } else {
+      newCorners.push({
+        x: Math.max(0, Math.min(srcW - 1, ip.x)),
+        y: Math.max(0, Math.min(srcH - 1, ip.y)),
+      });
+    }
+  }
+  return newCorners as [Point, Point, Point, Point];
+}
+
+/**
+ * "Smart whitening" — flat-field background correction that makes the paper
+ * uniformly white WITHOUT touching ink. Strategy:
+ *
+ *   1. Estimate per-pixel background brightness with a wide max-filter on
+ *      luminance (max ignores dark ink, so the background estimate reflects
+ *      the actual paper colour even under text).
+ *   2. Divide each pixel by background to flatten shadows/lighting; clamp
+ *      so very dark areas don't blow up.
+ *   3. Blend toward original by a weight that goes to 0 for dark pixels:
+ *      bright (paper) → fully whitened; dark (text) → unchanged. This is
+ *      the key difference from removeShadows/enhancePaper — text strokes
+ *      are mathematically protected, not just statistically.
+ *   4. Pure desaturation only on already-bright pixels so paper turns truly
+ *      white, while coloured ink/stamps keep their hue.
+ */
+export function whitenBackground(canvas: HTMLCanvasElement): HTMLCanvasElement {
+  const w = canvas.width;
+  const h = canvas.height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  const n = w * h;
+
+  // Downsample for background estimation.
+  const longEdge = Math.max(w, h);
+  const SCALE = Math.max(1, Math.round(longEdge / 320));
+  const sw = Math.max(1, Math.floor(w / SCALE));
+  const sh = Math.max(1, Math.floor(h / SCALE));
+
+  const small = new Float32Array(sw * sh);
+  for (let sy = 0; sy < sh; sy++) {
+    for (let sx = 0; sx < sw; sx++) {
+      const x0 = sx * SCALE;
+      const y0 = sy * SCALE;
+      const x1 = Math.min(w, x0 + SCALE);
+      const y1 = Math.min(h, y0 + SCALE);
+      let s = 0;
+      let c = 0;
+      for (let y = y0; y < y1; y++) {
+        const row = y * w;
+        for (let x = x0; x < x1; x++) {
+          const i = (row + x) * 4;
+          s += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+          c++;
+        }
+      }
+      small[sy * sw + sx] = c ? s / c : 0;
+    }
+  }
+
+  // Separable max-filter (radius ~8% of small image) — recovers paper
+  // brightness under text and through small smudges.
+  const R = Math.max(4, Math.round(Math.max(sw, sh) * 0.08));
+  const bgX = new Float32Array(sw * sh);
+  for (let y = 0; y < sh; y++) {
+    const row = y * sw;
+    for (let x = 0; x < sw; x++) {
+      let m = 0;
+      const a = Math.max(0, x - R);
+      const b = Math.min(sw - 1, x + R);
+      for (let xx = a; xx <= b; xx++) {
+        const v = small[row + xx];
+        if (v > m) m = v;
+      }
+      bgX[row + x] = m;
+    }
+  }
+  const bg = new Float32Array(sw * sh);
+  for (let x = 0; x < sw; x++) {
+    for (let y = 0; y < sh; y++) {
+      let m = 0;
+      const a = Math.max(0, y - R);
+      const b = Math.min(sh - 1, y + R);
+      for (let yy = a; yy <= b; yy++) {
+        const v = bgX[yy * sw + x];
+        if (v > m) m = v;
+      }
+      bg[y * sw + x] = m;
+    }
+  }
+  // Light 3-tap smoothing on bg to avoid blocky artifacts on upsample.
+  const bgS = new Float32Array(sw * sh);
+  for (let y = 0; y < sh; y++) {
+    for (let x = 0; x < sw; x++) {
+      let s = 0;
+      let c = 0;
+      for (let yy = Math.max(0, y - 1); yy <= Math.min(sh - 1, y + 1); yy++) {
+        for (let xx = Math.max(0, x - 1); xx <= Math.min(sw - 1, x + 1); xx++) {
+          s += bg[yy * sw + xx];
+          c++;
+        }
+      }
+      bgS[y * sw + x] = s / c;
+    }
+  }
+
+  // Per-pixel flat-field with text protection.
+  // Bright threshold: pixels with L >= T_FULL are fully whitened; pixels
+  // with L <= T_NONE (clearly text) are left exactly as-is; in between we
+  // blend smoothly. This is the safety net that guarantees no faint stroke
+  // gets bleached.
+  const T_NONE = 110;
+  const T_FULL = 175;
+  for (let y = 0; y < h; y++) {
+    const fy = Math.min(sh - 1, y / SCALE);
+    const sy0 = Math.floor(fy);
+    const sy1 = Math.min(sh - 1, sy0 + 1);
+    const wy = fy - sy0;
+    for (let x = 0; x < w; x++) {
+      const fx = Math.min(sw - 1, x / SCALE);
+      const sx0 = Math.floor(fx);
+      const sx1 = Math.min(sw - 1, sx0 + 1);
+      const wx = fx - sx0;
+      const b00 = bgS[sy0 * sw + sx0];
+      const b10 = bgS[sy0 * sw + sx1];
+      const b01 = bgS[sy1 * sw + sx0];
+      const b11 = bgS[sy1 * sw + sx1];
+      const bgVal =
+        b00 * (1 - wx) * (1 - wy) +
+        b10 * wx * (1 - wy) +
+        b01 * (1 - wx) * wy +
+        b11 * wx * wy;
+      const k = 250 / Math.max(80, bgVal); // brightness multiplier
+      const i = (y * w + x) * 4;
+      const r = d[i];
+      const g = d[i + 1];
+      const bl = d[i + 2];
+      const L = 0.299 * r + 0.587 * g + 0.114 * bl;
+      // weight 0 (keep original) for dark pixels, 1 (full whiten) for bright
+      let wt: number;
+      if (L <= T_NONE) wt = 0;
+      else if (L >= T_FULL) wt = 1;
+      else wt = (L - T_NONE) / (T_FULL - T_NONE);
+
+      let nr = r * k;
+      let ng = g * k;
+      let nb = bl * k;
+      if (nr > 255) nr = 255;
+      if (ng > 255) ng = 255;
+      if (nb > 255) nb = 255;
+
+      // Blend with original by wt (protects text).
+      let or = r * (1 - wt) + nr * wt;
+      let og = g * (1 - wt) + ng * wt;
+      let ob = bl * (1 - wt) + nb * wt;
+
+      // Pure desaturation for already-bright pixels — kills paper tint
+      // without affecting text/stamps.
+      if (wt >= 1) {
+        const avg = (or + og + ob) / 3;
+        or = avg;
+        og = avg;
+        ob = avg;
+        if (avg >= 232) {
+          or = 255;
+          og = 255;
+          ob = 255;
+        }
+      }
+
+      d[i] = or;
+      d[i + 1] = og;
+      d[i + 2] = ob;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  return canvas;
+}
