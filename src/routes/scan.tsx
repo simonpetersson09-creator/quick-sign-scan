@@ -5,6 +5,7 @@ import {
   canvasContrast,
   canvasLaplacianVariance,
   detectDocumentQuad,
+  detectPaperByThreshold,
   getLastDetectDiagnostics,
   laplacianVariance,
   MIN_DOCUMENT_CONFIDENCE,
