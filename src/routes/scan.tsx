@@ -1448,11 +1448,11 @@ function ScanPage() {
     // Sortera alltid hörnen i exakt ordning TL, TR, BR, BL innan warp.
     const orderedNormQuad = orderQuad(normQuad);
 
-    // Tiny inward safety crop from the detected document edge. Expanding the
-    // quad can pull table/background pixels into the warp and create dark
-    // edge streaks; shrinking by a fraction of a percent removes 1–3px edge
-    // contamination in the final A4 image.
-    const EDGE_MARGIN = -0.002;
+    // Tiny inward safety crop from the detected document edge. The detector
+    // can land just outside the paper (wood/table sliver at the left/bottom),
+    // so we crop a little more than before while staying small enough to keep
+    // footer/header text safe.
+    const EDGE_MARGIN = -0.006;
     const cx = (orderedNormQuad[0].x + orderedNormQuad[1].x + orderedNormQuad[2].x + orderedNormQuad[3].x) / 4;
     const cy = (orderedNormQuad[0].y + orderedNormQuad[1].y + orderedNormQuad[2].y + orderedNormQuad[3].y) / 4;
     const expandedNormQuad = orderedNormQuad.map((p) => ({
