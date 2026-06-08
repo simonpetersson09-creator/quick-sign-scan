@@ -258,7 +258,7 @@ function PremiumSection() {
             ) : (
               <Crown className="h-4 w-4" />
             )}
-            <span className="text-[14px] font-semibold">{t("premium_buy_cta")}</span>
+            <span className="text-[14px] font-semibold">{t("premium_start_cta")}</span>
           </button>
           <button
             type="button"
