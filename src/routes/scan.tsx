@@ -1598,11 +1598,19 @@ function ScanPage() {
         logScanStage("deskew", { skipped: true, reason: "exception" });
       }
 
-      // Destructive whitening is disabled for now. The preview should preserve
-      // every original pixel of text; optional color/gray/BW filters remain
-      // available on the preview screen.
+      // Mild flat-field whitening: shading correction + paper-level white
+      // point (~250). Text strokes are mathematically protected via the
+      // luminance-blend weight inside whitenBackground (T_NONE=110 keeps
+      // dark pixels untouched), so no glyphs are bleached.
       setCaptureStage({ label: t("capStageEnhance"), progress: 0.75 });
-      logScanStage("whiten-background", { applied: false, reason: "text-safe-mode" });
+      try {
+        warped = whitenBackground(warped);
+        logScanCanvas("after-whiten-background", warped, debugEnabled);
+        logScanStage("whiten-background", { applied: true, mode: "flat-field-text-safe" });
+      } catch (e) {
+        console.warn("[scan] whitenBackground failed; keeping warped frame", e);
+        logScanStage("whiten-background", { applied: false, reason: "exception" });
+      }
 
       // Post-capture sharpness gate. If the warped doc is blurry we abandon
       // this capture and let auto-focus retry — better to wait a second
