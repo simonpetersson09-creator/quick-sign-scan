@@ -18,8 +18,6 @@ import {
   computeHiResEdgeTightness,
   warpQuadToRect,
   autoOrientAndDeskewDocument,
-  snapQuadToPaperEdges,
-  whitenBackground,
 } from "@/lib/perspective";
 import { useT } from "@/lib/i18n";
 import { Camera, CameraOff, X, RefreshCw, ArrowLeft, ArrowRight, Zap, ZapOff, Settings } from "lucide-react";
@@ -1526,11 +1524,9 @@ function ScanPage() {
       logScanStage("burst-capture", { bestSharpness: bestScore });
 
       // Subpixel corner refinement on the full-res frame just before warp.
-      // The 280px detect frame can leave corners 2–5px off the true paper
-      // edge; refineQuadCorners shifts each corner toward the local edge
-      // mass within a hard ±5px clamp. Then snapQuadToPaperEdges does a
-      // wider (±28px) side-snap that pulls each entire side onto the
-      // actual paper edge — Microsoft-Lens-style geometry lock.
+      // Keep this conservative: it can only nudge individual corners ±5px.
+      // The wider side-snap pass is intentionally disabled because it could
+      // pull the crop inward on real pages and remove text near the margins.
       const refineSource = bestFrame ?? video;
       let refinedSrcQuad = srcQuad;
       try {
@@ -1542,16 +1538,7 @@ function ScanPage() {
       } catch (e) {
         console.warn("[scan] subpixel refine failed, using raw quad", e);
       }
-      try {
-        const snapped = snapQuadToPaperEdges(refineSource, vw, vh, refinedSrcQuad);
-        logScanStage("edge-snap", {
-          before: formatQuad(refinedSrcQuad),
-          after: formatQuad(snapped),
-        });
-        refinedSrcQuad = snapped;
-      } catch (e) {
-        console.warn("[scan] edge snap failed, using refined quad", e);
-      }
+      logScanStage("edge-snap", { skipped: true, reason: "text-safe-mode" });
 
       let warped = warpQuadToRect(bestFrame ?? video, vw, vh, refinedSrcQuad, outW, outH);
       logScanCanvas("after-perspective-transform", warped, debugEnabled);
@@ -1570,20 +1557,11 @@ function ScanPage() {
         logScanStage("deskew", { skipped: true, reason: "exception" });
       }
 
-      // Smart whitening — flat-field correction that protects text.
-      // Pixels with luminance ≤110 (clearly ink) are left untouched; bright
-      // paper pixels are divided by the local background max and clamped to
-      // pure white. Result: clean white page, faint text preserved, no
-      // shadow gradient.
+      // Destructive whitening is disabled for now. The preview should preserve
+      // every original pixel of text; optional color/gray/BW filters remain
+      // available on the preview screen.
       setCaptureStage({ label: t("capStageEnhance"), progress: 0.75 });
-      try {
-        warped = whitenBackground(warped);
-        logScanCanvas("after-whiten", warped, debugEnabled);
-        logScanStage("whiten-background", { applied: true });
-      } catch (e) {
-        console.warn("[scan] whitenBackground failed; using un-whitened frame", e);
-        logScanStage("whiten-background", { applied: false, reason: "exception" });
-      }
+      logScanStage("whiten-background", { applied: false, reason: "text-safe-mode" });
 
       // Post-capture sharpness gate. If the warped doc is blurry we abandon
       // this capture and let auto-focus retry — better to wait a second
