@@ -227,11 +227,17 @@ function SendPage() {
           },
         })) as SendScanEmailResult;
       } catch (e) {
-        // Input-schema rejection or transport failure — surface a clear code.
+        // Input-schema rejection or transport failure — surface a clear code
+        // AND log the raw status/message so TestFlight issues are diagnosable.
         const msg = e instanceof Error ? e.message : String(e);
+        const anyErr = e as { status?: number; response?: { status?: number } } | null;
+        const status = anyErr?.status ?? anyErr?.response?.status;
+        console.error(
+          `[send] transport error name=${e instanceof Error ? e.name : "unknown"} status=${status ?? "n/a"} msg=${msg}`,
+        );
         const code: SendErrorCode =
           msg === "attachment_too_large" ? "attachment_too_large" : "network_error";
-        result = { ok: false, code, detail: msg };
+        result = { ok: false, code, status, detail: msg };
       }
 
       if (result.ok) {
