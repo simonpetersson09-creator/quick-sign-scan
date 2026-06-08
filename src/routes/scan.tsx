@@ -592,6 +592,7 @@ function ScanPage() {
     const vw = video.videoWidth;
     const vh = video.videoHeight;
     if (!vw || !vh) return;
+    const now = performance.now();
 
     if (!detectCanvas.current) detectCanvas.current = document.createElement("canvas");
     const dc = detectCanvas.current;
