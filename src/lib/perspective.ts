@@ -1474,15 +1474,19 @@ export function detectDocumentQuad(
     // Outer-prioritized confidence: area dominates, then A4 match, then
     // edge support, paper/bg contrast, paper interior, centeredness,
     // then temporal bias.
+    // Restored area-dominant weighting — paperInteriorScore was penalising
+    // text-heavy pages (lumStd high inside) and letting smaller white
+    // sub-quads win, which clipped text. Hough candidates also added
+    // frame-to-frame flicker; both downweighted/disabled below.
     const outerConfidence =
-      0.30 * areaScore +
-      0.17 * a4Score +
-      0.11 * det.debug.edgeScore +
-      0.10 * bgContrastScore +
-      0.10 * paperInteriorScore +
-      0.07 * centerScore +
-      0.08 * det.confidence +
-      0.07 * tempScore;
+      0.38 * areaScore +
+      0.18 * a4Score +
+      0.12 * det.debug.edgeScore +
+      0.06 * bgContrastScore +
+      0.09 * centerScore +
+      0.09 * det.confidence +
+      0.08 * tempScore;
+    void paperInteriorScore;
     if (outerConfidence > bestScore) {
       bestScore = outerConfidence;
       best = det;
