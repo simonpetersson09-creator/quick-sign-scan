@@ -61,7 +61,11 @@ type ErrorType =
   | "unknown";
 
 function isUsableImageDataUrl(value: string | null | undefined): value is string {
-  return typeof value === "string" && /^data:image\/(jpeg|jpg|png|webp);base64,/.test(value) && value.length > 1024;
+  return (
+    typeof value === "string" &&
+    /^data:image\/(jpeg|jpg|png|webp);base64,/.test(value) &&
+    value.length > 1024
+  );
 }
 
 function canvasToSafeImageDataUrl(
