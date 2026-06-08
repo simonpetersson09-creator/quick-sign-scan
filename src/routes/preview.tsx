@@ -54,9 +54,7 @@ function PreviewPage() {
     if (typeof navState.scanActiveIndex === "number") {
       return Math.max(0, Math.min(list.length - 1, navState.scanActiveIndex));
     }
-    return s.imageDataUrl
-      ? Math.max(0, list.indexOf(s.imageDataUrl))
-      : list.length - 1;
+    return s.imageDataUrl ? Math.max(0, list.indexOf(s.imageDataUrl)) : list.length - 1;
   });
   const [filterMode, setFilterMode] = useState<FilterMode>("color");
   // Cache filtered results so flipping pages stays instant: key = `${index}|${mode}`
@@ -67,7 +65,10 @@ function PreviewPage() {
   useEffect(() => {
     const list = scanStore.getPages().length ? scanStore.getPages() : handedOffPages;
     if (handedOffPages.length && !scanStore.getPages().length) {
-      scanStore.set({ pages: handedOffPages, imageDataUrl: handedOffPages[handedOffPages.length - 1] });
+      scanStore.set({
+        pages: handedOffPages,
+        imageDataUrl: handedOffPages[handedOffPages.length - 1],
+      });
       window.history.replaceState(
         { ...window.history.state, scanPages: undefined, scanActiveIndex: undefined },
         "",
@@ -102,9 +103,7 @@ function PreviewPage() {
       const idx = session.imageDataUrl
         ? Math.max(0, list.indexOf(session.imageDataUrl))
         : list.length - 1;
-      setActiveIndex((prev) =>
-        prev >= 0 && prev < list.length ? prev : idx,
-      );
+      setActiveIndex((prev) => (prev >= 0 && prev < list.length ? prev : idx));
     };
     sync();
     const unsub = scanStore.subscribe(sync);
@@ -163,7 +162,7 @@ function PreviewPage() {
     return () => {
       cancelled = true;
     };
-  }, [originalImage, activeIndex, filterMode]);
+  }, [originalImage, activeIndex, filterMode, pages]);
 
   // Invalidate cache when the underlying pages change (delete, reorder).
   useEffect(() => {
@@ -245,16 +244,18 @@ function PreviewPage() {
   if (!pages.length) {
     return <div className="min-h-dvh bg-background" aria-hidden="true" />;
   }
-
-
   return (
     <AppShell title={t("previewTitle")} back="/scan" className="h-dvh overflow-hidden">
       <p className="text-sm text-muted-foreground mt-1 mb-3">
-        {pages.length} {pages.length === 1 ? t("pageSingular") : t("pagePlural")} · {t("previewHint")}
+        {pages.length} {pages.length === 1 ? t("pageSingular") : t("pagePlural")} ·{" "}
+        {t("previewHint")}
       </p>
 
       <div className="flex items-center justify-center">
-        <div className="relative flex items-center justify-center" style={{ width: "min(92vw, 400px)" }}>
+        <div
+          className="relative flex items-center justify-center"
+          style={{ width: "min(92vw, 400px)" }}
+        >
           {pages.length > 1 && (
             <button
               type="button"
