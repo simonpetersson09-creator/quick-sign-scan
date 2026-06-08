@@ -1586,6 +1586,22 @@ const WHITENESS_MAX_CHROMA = 22;
 // luminance gap check rather than replacing it.
 const ENABLE_PAPER_INTERIOR_PRIOR = true;
 
+// Feature flag D — Hough line detection. Finds dominant straight lines on
+// the Canny edge map, classifies them into top/bottom/left/right by angle
+// and position, picks the strongest per side and intersects → 4 corners.
+// Robust when ~20–40% of an edge is occluded, blurred or breaks up: the
+// remaining edge pixels still vote for the same line. This is the same
+// "line-segment + intersection" pattern Office Lens / VisionKit use.
+// Pure addition — the generated quads are evaluated by evaluateEdgeQuad
+// alongside the contour-based candidates, never replace them.
+const ENABLE_HOUGH_LINE_DETECTION = true;
+const HOUGH_THETA_STEP_DEG = 1.5;     // ~120 angle bins over 0..180°
+const HOUGH_RHO_STEP_PX = 2;          // 2px rho quantization
+const HOUGH_TOP_LINES_PER_SIDE = 3;   // pick top-3 per top/bottom/left/right
+const HOUGH_ANGLE_TOL_DEG = 32;       // ±32° from horizontal/vertical accepted
+const HOUGH_MAX_QUADS = 24;           // cap combos forwarded to evaluation
+const HOUGH_MIN_VOTES_FRAC = 0.05;    // min line votes as fraction of min(W,H)
+
 function scaleQuadAroundCentroid(
   quad: [Point, Point, Point, Point],
   factor: number,
