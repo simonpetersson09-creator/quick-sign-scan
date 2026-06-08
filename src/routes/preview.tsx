@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useLocation, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
@@ -26,16 +26,30 @@ export const Route = createFileRoute("/preview")({
 
 function PreviewPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const t = useT();
+  const navState = location.state as typeof location.state & {
+    scanPages?: unknown;
+    scanActiveIndex?: unknown;
+  };
+  const handedOffPages = Array.isArray(navState.scanPages)
+    ? navState.scanPages.filter(
+        (page): page is string => typeof page === "string" && page.startsWith("data:image/"),
+      )
+    : [];
   // Initialize synchronously from the in-memory store so we don't flash the
   // empty state when pages are already present (e.g. just-finished scan).
   const [pages, setPages] = useState<string[]>(() => {
-    return scanStore.getPages();
+    const list = scanStore.getPages();
+    return list.length ? list : handedOffPages;
   });
   const [activeIndex, setActiveIndex] = useState<number>(() => {
     const s = scanStore.get();
-    const list = scanStore.getPages();
+    const list = scanStore.getPages().length ? scanStore.getPages() : handedOffPages;
     if (!list.length) return 0;
+    if (typeof navState.scanActiveIndex === "number") {
+      return Math.max(0, Math.min(list.length - 1, navState.scanActiveIndex));
+    }
     return s.imageDataUrl
       ? Math.max(0, list.indexOf(s.imageDataUrl))
       : list.length - 1;
@@ -47,7 +61,14 @@ function PreviewPage() {
   const [filtering, setFiltering] = useState(false);
 
   useEffect(() => {
-    const list = scanStore.getPages();
+    const list = scanStore.getPages().length ? scanStore.getPages() : handedOffPages;
+    if (handedOffPages.length && !scanStore.getPages().length) {
+      scanStore.set({ pages: handedOffPages, imageDataUrl: handedOffPages[handedOffPages.length - 1] });
+      window.history.replaceState(
+        { ...window.history.state, scanPages: undefined, scanActiveIndex: undefined },
+        "",
+      );
+    }
     const first = list[0];
     console.info("[preview] mounted with pages count", {
       pages: list.length,
@@ -55,7 +76,7 @@ function PreviewPage() {
       firstImageSrcValid: Boolean(first?.startsWith("data:image/") || first?.startsWith("blob:")),
       imageDataUrlExists: Boolean(scanStore.get().imageDataUrl),
     });
-  }, []);
+  }, [handedOffPages]);
 
   // Subscribe to store updates so any late mutation (race with navigation,
   // or external change) reflects here.
