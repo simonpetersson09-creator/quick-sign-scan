@@ -1242,6 +1242,7 @@ export function detectDocumentQuad(
   height: number,
   options: DetectOptions = {},
 ): DocumentDetection | null {
+  resetDetectDiagnostics();
   const total = width * height;
   const rawLum = new Uint8ClampedArray(total);
   const rawHist = new Uint32Array(256);
