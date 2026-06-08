@@ -1259,10 +1259,21 @@ export function detectDocumentQuad(
   const total = width * height;
   const rawLum = new Uint8ClampedArray(total);
   const rawHist = new Uint32Array(256);
+  // Chroma proxy (max(R,G,B) − min(R,G,B)) — cheap saturation surrogate.
+  // White paper has chroma ~0 even when its luminance matches a light
+  // wooden floor; wood typically has chroma 20–80. Lets us separate
+  // paper from background when grayscale contrast alone is too weak.
+  const chroma = ENABLE_WHITENESS_CHANNEL ? new Uint8ClampedArray(total) : null;
   for (let i = 0, j = 0; i < data.length; i += 4, j++) {
-    const l = (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) | 0;
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    const l = (0.299 * r + 0.587 * g + 0.114 * b) | 0;
     rawLum[j] = l;
     rawHist[l]++;
+    if (chroma) {
+      const mx = r > g ? (r > b ? r : b) : (g > b ? g : b);
+      const mn = r < g ? (r < b ? r : b) : (g < b ? g : b);
+      chroma[j] = mx - mn;
+    }
   }
 
   // Adaptive contrast normalization — percentile stretch so dim scenes
@@ -1285,6 +1296,19 @@ export function detectDocumentQuad(
   const brightThreshold = Math.max(70, Math.min(225, otsuThreshold(hist, total) + 8));
   const paperMask = buildBrightPaperMask(lum, width, height, brightThreshold);
   components.push(...edgeComponents(maskBoundary(paperMask, width, height), width, height));
+
+  // Whiteness mask — bright AND low chroma. This pops white paper out of
+  // light wood / textile backgrounds that match its luminance but not its
+  // color. Boundary components feed the same quad search; pure addition,
+  // doesn't change anything when chroma is absent.
+  if (chroma && ENABLE_WHITENESS_CHANNEL) {
+    const whitenessMask = buildWhitenessMask(
+      lum, chroma, width, height,
+      Math.max(60, brightThreshold - 25), // a touch more permissive on L since chroma already gates
+      WHITENESS_MAX_CHROMA,
+    );
+    components.push(...edgeComponents(maskBoundary(whitenessMask, width, height), width, height));
+  }
   const allDetections: DocumentDetection[] = [];
   let candidateCount = 0;
 
