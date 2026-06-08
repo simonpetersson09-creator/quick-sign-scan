@@ -3,11 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Lock, Loader2 } from "lucide-react";
 
 import { useLang } from "@/lib/i18n";
-import {
-  hasUsableAccessCode,
-  isCapacitor,
-  setAccessCode,
-} from "@/lib/access-code";
+import { hasUsableAccessCode, isCapacitor, setAccessCode } from "@/lib/access-code";
 import { verifyAccessCode } from "@/lib/access.functions";
 
 type Strings = {
@@ -24,8 +20,7 @@ type Strings = {
 const STRINGS: Record<"sv" | "en", Strings> = {
   sv: {
     title: "Åtkomstkod krävs",
-    description:
-      "Den här appen är skyddad. Ange din åtkomstkod för att fortsätta.",
+    description: "Den här appen är skyddad. Ange din åtkomstkod för att fortsätta.",
     placeholder: "Åtkomstkod",
     submit: "Lås upp",
     checking: "Kontrollerar…",
@@ -35,8 +30,7 @@ const STRINGS: Record<"sv" | "en", Strings> = {
   },
   en: {
     title: "Access code required",
-    description:
-      "This app is protected. Enter your access code to continue.",
+    description: "This app is protected. Enter your access code to continue.",
     placeholder: "Access code",
     submit: "Unlock",
     checking: "Checking…",
@@ -101,9 +95,7 @@ export function AccessCodeGate({ children }: { children: React.ReactNode }) {
           <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
             <Lock className="h-5 w-5 text-primary" strokeWidth={1.75} />
           </div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">
-            {t.title}
-          </h1>
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">{t.title}</h1>
           <p className="text-sm text-muted-foreground mt-2">{t.description}</p>
         </div>
 
@@ -125,9 +117,7 @@ export function AccessCodeGate({ children }: { children: React.ReactNode }) {
             disabled={busy}
             className="w-full rounded-xl border border-border bg-card px-4 py-3 text-[16px] text-foreground outline-none transition focus:border-primary disabled:opacity-60"
           />
-          {error && (
-            <p className="text-xs text-destructive ml-1">{error}</p>
-          )}
+          {error && <p className="text-xs text-destructive ml-1">{error}</p>}
           <button
             type="submit"
             disabled={busy || code.trim().length === 0}
@@ -142,9 +132,7 @@ export function AccessCodeGate({ children }: { children: React.ReactNode }) {
               <span className="text-[15px] font-semibold">{t.submit}</span>
             )}
           </button>
-          <p className="text-[11px] text-muted-foreground/70 text-center mt-1">
-            {t.footnote}
-          </p>
+          <p className="text-[11px] text-muted-foreground/70 text-center mt-1">{t.footnote}</p>
         </form>
       </div>
     </div>
