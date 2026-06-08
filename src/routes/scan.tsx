@@ -1198,6 +1198,27 @@ function ScanPage() {
         setCaptureStage(null);
         return;
       }
+      // Post-capture contrast gate. A washed-out / blown-out frame with
+      // almost no luma variance is almost certainly a misfire (lens cover,
+      // pointed at a uniform surface, severe over-exposure). Retry rather
+      // than save a blank page. Threshold is intentionally low so any real
+      // document with text or signatures sails through.
+      const postContrast = canvasContrast(warped);
+      logScanStage("post-capture-contrast", {
+        value: postContrast,
+        threshold: 12,
+        retries: captureRetryRef.current,
+      });
+      if (postContrast < 12 && captureRetryRef.current < 3) {
+        captureRetryRef.current++;
+        capturedRef.current = false;
+        stableCount.current = 0;
+        setProgress(0);
+        setStatus("uncertain");
+        setSavedOverlay(null);
+        setCaptureStage(null);
+        return;
+      }
       captureRetryRef.current = 0;
 
       // Komprimera den slutgiltiga sidan som JPEG 82 %. PNG genererade tidigare
