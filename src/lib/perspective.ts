@@ -431,20 +431,22 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
       d[i + 2] = 255;
     }
   }
-  for (let y = 1; y < h - 1; y++) {
-    for (let x = 1; x < w - 1; x++) {
-      const j = y * w + x;
-      if (lum2[j] >= 90) continue;
-      if (
-        lum2[j - 1] > 210 &&
-        lum2[j + 1] > 210 &&
-        lum2[j - w] > 210 &&
-        lum2[j + w] > 210
-      ) {
-        const i = j * 4;
-        d[i] = 255;
-        d[i + 1] = 255;
-        d[i + 2] = 255;
+  if (ENABLE_NEIGHBOUR_DESPECKLE) {
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        const j = y * w + x;
+        if (lum2[j] >= 90) continue;
+        if (
+          lum2[j - 1] > 210 &&
+          lum2[j + 1] > 210 &&
+          lum2[j - w] > 210 &&
+          lum2[j + w] > 210
+        ) {
+          const i = j * 4;
+          d[i] = 255;
+          d[i + 1] = 255;
+          d[i + 2] = 255;
+        }
       }
     }
   }
