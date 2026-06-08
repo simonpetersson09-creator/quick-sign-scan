@@ -180,6 +180,11 @@ function ScanPage() {
     dataUrl: string;
     visible: boolean;
   } | null>(null);
+  const [captureStage, setCaptureStage] = useState<{
+    label: string;
+    progress: number;
+  } | null>(null);
+  const stageTimerRef = useRef<number | null>(null);
   const savedTimer1Ref = useRef<number | null>(null);
   const savedTimer2Ref = useRef<number | null>(null);
   const savedTimer3Ref = useRef<number | null>(null);
