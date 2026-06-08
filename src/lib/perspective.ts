@@ -1487,6 +1487,80 @@ function pointInQuad(p: Point, quad: [Point, Point, Point, Point]): boolean {
   return inside;
 }
 
+// Feature flag: penalize candidates whose OUTSIDE looks like paper too
+// (i.e. quad sits *inside* the actual paper — a text block, table or
+// photo on the page). A real paper edge has bright inside and clearly
+// darker / different outside (desk, floor, etc).
+const ENABLE_INSIDE_PAPER_PENALTY = true;
+// Min luminance gap (inside − outside) for a quad to be accepted as a
+// real paper boundary. Below this we flag it as innerTextBlock.
+const INSIDE_OUTSIDE_MIN_GAP = 10;
+
+function scaleQuadAroundCentroid(
+  quad: [Point, Point, Point, Point],
+  factor: number,
+): [Point, Point, Point, Point] {
+  const cx = (quad[0].x + quad[1].x + quad[2].x + quad[3].x) / 4;
+  const cy = (quad[0].y + quad[1].y + quad[2].y + quad[3].y) / 4;
+  return quad.map((p) => ({
+    x: cx + (p.x - cx) * factor,
+    y: cy + (p.y - cy) * factor,
+  })) as [Point, Point, Point, Point];
+}
+
+// Compare mean luminance inside the quad (shrunk inward) vs in a thin
+// ring just outside the quad. Used to detect "inside paper" candidates:
+// when both samples are bright the quad almost certainly sits on top of
+// the real paper rather than along its edge.
+function insideOutsideLuma(
+  lum: Uint8ClampedArray,
+  width: number,
+  height: number,
+  quad: [Point, Point, Point, Point],
+): { insideMean: number; outsideMean: number; gap: number; outsideSamples: number } {
+  const inner = scaleQuadAroundCentroid(quad, 0.78);
+  const outer = scaleQuadAroundCentroid(quad, 1.22);
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
+  for (const p of outer) {
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  }
+  minX = Math.max(0, Math.floor(minX));
+  minY = Math.max(0, Math.floor(minY));
+  maxX = Math.min(width - 1, Math.ceil(maxX));
+  maxY = Math.min(height - 1, Math.ceil(maxY));
+  const step = Math.max(2, Math.round(Math.min(maxX - minX, maxY - minY) / 40));
+  let insideSum = 0,
+    insideN = 0,
+    outsideSum = 0,
+    outsideN = 0;
+  for (let y = minY; y <= maxY; y += step) {
+    for (let x = minX; x <= maxX; x += step) {
+      const p = { x, y };
+      const inInner = pointInQuad(p, inner);
+      if (inInner) {
+        insideSum += lum[y * width + x];
+        insideN++;
+        continue;
+      }
+      const inOuter = pointInQuad(p, outer);
+      const inQuad = pointInQuad(p, quad);
+      if (inOuter && !inQuad) {
+        outsideSum += lum[y * width + x];
+        outsideN++;
+      }
+    }
+  }
+  const insideMean = insideN ? insideSum / insideN : 0;
+  const outsideMean = outsideN ? outsideSum / outsideN : insideMean;
+  return { insideMean, outsideMean, gap: insideMean - outsideMean, outsideSamples: outsideN };
+
+
 
 // Percentile-based contrast stretch. Finds the 2nd and 98th percentiles of
 // the luminance histogram and linearly remaps that range to [0..255]. This
