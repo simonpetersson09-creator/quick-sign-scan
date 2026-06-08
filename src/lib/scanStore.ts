@@ -155,11 +155,10 @@ export const scanStore = {
     if (!safePages.length) return false;
     const storage = safeSessionStorage();
     let saved = false;
-    if (!storage) return false;
     try {
       const safeActiveIndex = Math.max(0, Math.min(safePages.length - 1, activeIndex));
       const payload = JSON.stringify({ pages: safePages, activeIndex: safeActiveIndex, createdAt: Date.now() });
-      storage.setItem(PREVIEW_HANDOFF_KEY, payload);
+      storage?.setItem(PREVIEW_HANDOFF_KEY, payload);
       // Secondary same-tab handoff. This survives a dev-server/HMR reload or
       // route-chunk reload even when sessionStorage write/read is unavailable.
       window.name = `${PREVIEW_HANDOFF_WINDOW_NAME_PREFIX}${payload}`;
@@ -180,7 +179,7 @@ export const scanStore = {
     const storage = safeSessionStorage();
     const candidates: string[] = [];
     try {
-      const raw = storage.getItem(PREVIEW_HANDOFF_KEY);
+      const raw = storage?.getItem(PREVIEW_HANDOFF_KEY);
       if (raw) candidates.push(raw);
     } catch {}
     try {
@@ -190,17 +189,17 @@ export const scanStore = {
     } catch {}
     for (const raw of candidates) {
       try {
-      const parsed = JSON.parse(raw) as Partial<PreviewHandoff>;
-      const pages = Array.isArray(parsed.pages) ? parsed.pages.filter(isUsablePreviewPage) : [];
-      const createdAt = typeof parsed.createdAt === "number" ? parsed.createdAt : 0;
+        const parsed = JSON.parse(raw) as Partial<PreviewHandoff>;
+        const pages = Array.isArray(parsed.pages) ? parsed.pages.filter(isUsablePreviewPage) : [];
+        const createdAt = typeof parsed.createdAt === "number" ? parsed.createdAt : 0;
         if (!pages.length || Date.now() - createdAt > PREVIEW_HANDOFF_MAX_AGE_MS) continue;
-      const activeIndex =
-        typeof parsed.activeIndex === "number"
-          ? Math.max(0, Math.min(pages.length - 1, parsed.activeIndex))
-          : pages.length - 1;
-      debugScanStore("read preview handoff", { pages: pages.length, activeIndex });
-      return { pages, activeIndex, createdAt };
-    } catch {
+        const activeIndex =
+          typeof parsed.activeIndex === "number"
+            ? Math.max(0, Math.min(pages.length - 1, parsed.activeIndex))
+            : pages.length - 1;
+        debugScanStore("read preview handoff", { pages: pages.length, activeIndex });
+        return { pages, activeIndex, createdAt };
+      } catch {
         // Try the next handoff source.
       }
     }
@@ -209,7 +208,7 @@ export const scanStore = {
       if (window.name.startsWith(PREVIEW_HANDOFF_WINDOW_NAME_PREFIX)) window.name = "";
     } catch {}
     return null;
-    }
+  },
   clearPreviewHandoff: () => {
     try {
       safeSessionStorage()?.removeItem(PREVIEW_HANDOFF_KEY);
