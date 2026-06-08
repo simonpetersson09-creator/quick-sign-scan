@@ -227,11 +227,17 @@ function SendPage() {
           },
         })) as SendScanEmailResult;
       } catch (e) {
-        // Input-schema rejection or transport failure — surface a clear code.
+        // Input-schema rejection or transport failure — surface a clear code
+        // AND log the raw status/message so TestFlight issues are diagnosable.
         const msg = e instanceof Error ? e.message : String(e);
+        const anyErr = e as { status?: number; response?: { status?: number } } | null;
+        const status = anyErr?.status ?? anyErr?.response?.status;
+        console.error(
+          `[send] transport error name=${e instanceof Error ? e.name : "unknown"} status=${status ?? "n/a"} msg=${msg}`,
+        );
         const code: SendErrorCode =
           msg === "attachment_too_large" ? "attachment_too_large" : "network_error";
-        result = { ok: false, code, detail: msg };
+        result = { ok: false, code, status, detail: msg };
       }
 
       if (result.ok) {
@@ -253,8 +259,10 @@ function SendPage() {
           }, 2200);
         }
       } else {
-        console.error(`[send] failed code=${result.code} status=${result.status ?? "n/a"}`);
-        setInfo(t(`err_${result.code}`) ?? t("err_unknown"));
+        console.error(`[send] failed code=${result.code} status=${result.status ?? "n/a"} detail=${result.detail ?? ""}`);
+        const baseMsg = t(`err_${result.code}`) ?? t("err_unknown");
+        // Append HTTP status to the visible message so TestFlight users can report it.
+        setInfo(result.status ? `${baseMsg} (HTTP ${result.status})` : baseMsg);
       }
     } catch (e) {
       console.error(`[send] unexpected error: ${e instanceof Error ? e.name : "unknown"}`);
