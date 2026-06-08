@@ -1559,6 +1559,10 @@ function insideOutsideLuma(
   const insideMean = insideN ? insideSum / insideN : 0;
   const outsideMean = outsideN ? outsideSum / outsideN : insideMean;
   return { insideMean, outsideMean, gap: insideMean - outsideMean, outsideSamples: outsideN };
+}
+
+
+
 
 
 
