@@ -154,6 +154,13 @@ function ScanPage() {
   const HIRES_TIGHT_COOLDOWN_MS = 140;
   const lastHiResTightAtRef = useRef(0);
   const lastHiResTightLogAtRef = useRef(0);
+  // Feature flag: bump the detection frame width from the historical 280px
+  // to give small/far A4 documents more pixels on the short side. Pure
+  // resolution change — no algorithm/threshold changes, no multi-scale.
+  // Set to false to instantly revert to the previous 280px behaviour if
+  // we see regressions (false locks, slower frames, etc.).
+  const ENABLE_DETECT_HIRES = true;
+  const DETECT_WIDTH = ENABLE_DETECT_HIRES ? 360 : 280;
   // Feature flag: candidate-memory across recent frames. Cluster the last N
   // detections by corner similarity (+ areaRatio / a4Ratio) so an ambiguous
   // scene (multiple competing quads frame-to-frame) delays auto-capture
@@ -678,7 +685,7 @@ function ScanPage() {
 
     if (!detectCanvas.current) detectCanvas.current = document.createElement("canvas");
     const dc = detectCanvas.current;
-    const dw = 280;
+    const dw = DETECT_WIDTH;
     const dh = Math.round((vh / vw) * dw);
 
     if (dc.width !== dw || dc.height !== dh) {
