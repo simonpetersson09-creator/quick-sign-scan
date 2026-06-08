@@ -1413,15 +1413,31 @@ export function detectDocumentQuad(
       bgContrastScore = clamp01((io.gap - INSIDE_OUTSIDE_MIN_GAP) / 50);
     }
 
+    // Paper-interior prior — boost quads whose inside actually looks like
+    // a uniform white sheet (low chroma + low luminance variance).
+    // chromaMean: 0–10 ≈ paper, 30+ ≈ colored/textured surface.
+    // lumStd: <12 ≈ clean sheet, >35 ≈ textured floor / printed cover.
+    let paperInteriorScore = 0;
+    if (chroma && ENABLE_PAPER_INTERIOR_PRIOR) {
+      const ics = insideChromaStats(lum, chroma, width, height, det.corners);
+      if (ics.samples >= 6) {
+        const chromaScore = clamp01((30 - ics.chromaMean) / 30);
+        const flatScore = clamp01((35 - ics.lumStd) / 30);
+        paperInteriorScore = chromaScore * flatScore;
+      }
+    }
+
     // Outer-prioritized confidence: area dominates, then A4 match, then
-    // edge support, paper/bg contrast, centeredness, then temporal bias.
+    // edge support, paper/bg contrast, paper interior, centeredness,
+    // then temporal bias.
     const outerConfidence =
-      0.36 * areaScore +
-      0.18 * a4Score +
-      0.12 * det.debug.edgeScore +
+      0.30 * areaScore +
+      0.17 * a4Score +
+      0.11 * det.debug.edgeScore +
       0.10 * bgContrastScore +
-      0.08 * centerScore +
-      0.09 * det.confidence +
+      0.10 * paperInteriorScore +
+      0.07 * centerScore +
+      0.08 * det.confidence +
       0.07 * tempScore;
     if (outerConfidence > bestScore) {
       bestScore = outerConfidence;
