@@ -1029,6 +1029,40 @@ function ScanPage() {
     const tilted = a4Diff > 0.35;
     const looseEdges = edgeTightness > 0 && edgeTightness < 0.45;
 
+    // ===== Capture-gate diagnostics =====
+    // Evaluate every gate the auto-capture branch will use, so we can
+    // surface the *exact* reason capture is being blocked even when the
+    // document frame already looks correct on screen. Pure observation —
+    // no behavior change.
+    const isShakyNow =
+      motionAvailableRef.current && motionMagRef.current > MOTION_STILL_THRESHOLD;
+    const cooldownMs = Math.max(0, armedAtRef.current - performance.now());
+    let captureBlockedBy: string | null = null;
+    if (!isBrightEnough && lowLightFramesRef.current > 15) captureBlockedBy = "light";
+    else if (stableCount.current < HOLD_FRAMES) captureBlockedBy = "stability:framing";
+    else if (!isSharp) captureBlockedBy = "sharpness";
+    else if (stableCount.current < READY_FRAMES) captureBlockedBy = "stability:ready";
+    else if (stableCount.current < STABLE_FRAMES) captureBlockedBy = "stability:stable";
+    else if (cooldownMs > 0) captureBlockedBy = "cooldown";
+    else if (isShakyNow) captureBlockedBy = "motion";
+    // "ambiguous" is filled in below once it's computed.
+    captureGateRef.current = {
+      reason: captureBlockedBy,
+      stable: stableCount.current,
+      stableTarget: STABLE_FRAMES,
+      sharpness: sharpnessRef.current,
+      sharpnessMin: SHARPNESS_LIVE_MIN,
+      brightness: brightnessRef.current,
+      brightnessMin: BRIGHTNESS_MIN,
+      motionMag: motionMagRef.current,
+      motionAvail: motionAvailableRef.current,
+      confidence: detection?.confidence ?? 0,
+      edgeTightness,
+      a4Diff,
+      areaRatio,
+      cooldownMs,
+    };
+
     if (!isBrightEnough && lowLightFramesRef.current > 15) {
       drawOverlay(smoothed, "hold");
       setStatus("lowLight");
@@ -1097,20 +1131,33 @@ function ScanPage() {
         // Re-aim cooldown after a saved page — show "ready" but don't snap yet.
         setStatus("ready");
         stableCount.current = Math.min(stableCount.current, STABLE_FRAMES - 1);
+        if (captureGateRef.current) captureGateRef.current.reason = "cooldown";
       } else if (isShaky) {
         // Phone is moving — keep "ready" but don't auto-capture this frame.
         setStatus("ready");
         stableCount.current = Math.min(stableCount.current, STABLE_FRAMES - 1);
+        if (captureGateRef.current) captureGateRef.current.reason = "motion";
       } else if (ambiguous) {
         // Competing candidates — wait for one to win.
         setStatus("ready");
         stableCount.current = Math.min(stableCount.current, STABLE_FRAMES - 1);
+        if (captureGateRef.current) captureGateRef.current.reason = "ambiguous";
       } else {
         setStatus("capturing");
+        if (captureGateRef.current) captureGateRef.current.reason = null;
         capture(smoothed);
       }
     }
+
+    // Throttled log of capture-gate state (debug only). Fires whenever we
+    // saw a document but didn't actually call capture() this frame.
+    if (debugEnabled && captureGateRef.current?.reason && now - lastGateLogAtRef.current > 750) {
+      lastGateLogAtRef.current = now;
+      // eslint-disable-next-line no-console
+      console.log("[scan] capture-gate", captureGateRef.current);
+    }
   }
+
 
   function drawOverlay(
     quad: [Point, Point, Point, Point] | null,
