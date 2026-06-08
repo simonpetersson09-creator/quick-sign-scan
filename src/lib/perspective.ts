@@ -528,8 +528,8 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
   //     defects like the tall left-margin streak and tiny specks. We only
   //     delete connected dark components that are isolated from other ink,
   //     so normal text, dots over letters, stamps and dense form content stay.
-  {
-    const darkThreshold = 205;
+  if (ENABLE_ARTIFACT_SUPPRESSION) {
+    const darkThreshold = ARTIFACT_DARK_THRESHOLD;
     const finalLum = new Uint8ClampedArray(n);
     for (let i = 0, j = 0; i < d.length; i += 4, j++) {
       finalLum[j] = (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) | 0;
@@ -538,7 +538,7 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
     const visited = new Uint8Array(n);
     const stack = new Int32Array(n);
     const pad = Math.max(14, Math.round(Math.max(w, h) * 0.018));
-    const maxSpeckArea = Math.max(48, Math.round(n * 0.000035));
+    const maxSpeckArea = Math.max(16, Math.round(n * ARTIFACT_SPECK_AREA_FACTOR));
     const marginX = Math.round(w * 0.24);
     const marginY = Math.round(h * 0.18);
     const whitenComponent = (pixels: number[]) => {
