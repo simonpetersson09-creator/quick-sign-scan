@@ -3918,6 +3918,17 @@ export function whitenBackground(canvas: HTMLCanvasElement): HTMLCanvasElement {
           or = 255;
           og = 255;
           ob = 255;
+        }
+      }
+
+      d[i] = or;
+      d[i + 1] = og;
+      d[i + 2] = ob;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  return canvas;
 }
 
 /**
@@ -3936,13 +3947,12 @@ export function boostInkContrast(canvas: HTMLCanvasElement): HTMLCanvasElement {
   const d = img.data;
   const n = w * h;
 
-  // Compute luminance plane.
   const lum = new Uint8ClampedArray(n);
   for (let i = 0, j = 0; i < d.length; i += 4, j++) {
     lum[j] = (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) | 0;
   }
 
-  // Light 3x3 box blur of luminance (separable).
+  // Light 3x3 box blur (separable).
   const tmp = new Uint8ClampedArray(n);
   for (let y = 0; y < h; y++) {
     const row = y * w;
@@ -3961,14 +3971,12 @@ export function boostInkContrast(canvas: HTMLCanvasElement): HTMLCanvasElement {
     }
   }
 
-  // Unsharp: out = orig + amount * (orig - blur), gated to dark pixels.
   const AMOUNT = 0.45;
-  const INK_THRESHOLD = 150; // only touch pixels at or below this luminance
+  const INK_THRESHOLD = 150;
   for (let i = 0, j = 0; i < d.length; i += 4, j++) {
     const L = lum[j];
     if (L > INK_THRESHOLD) continue;
     const diff = L - blur[j];
-    // Smooth ramp: full strength at L<=110, fading to 0 at L>=150.
     const ramp = L <= 110 ? 1 : 1 - (L - 110) / (INK_THRESHOLD - 110);
     const add = diff * AMOUNT * ramp;
     let r0 = d[i] + add;
@@ -3980,16 +3988,6 @@ export function boostInkContrast(canvas: HTMLCanvasElement): HTMLCanvasElement {
     d[i] = r0;
     d[i + 1] = g0;
     d[i + 2] = b0;
-  }
-
-  ctx.putImageData(img, 0, 0);
-  return canvas;
-      }
-
-      d[i] = or;
-      d[i + 1] = og;
-      d[i + 2] = ob;
-    }
   }
 
   ctx.putImageData(img, 0, 0);
