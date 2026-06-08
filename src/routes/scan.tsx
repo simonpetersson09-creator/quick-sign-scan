@@ -162,6 +162,7 @@ function ScanPage() {
   // while giving the GPU/ISP room to breathe.
   const DETECT_INTERVAL_MS = 45;
   const lastDetectAtRef = useRef(0);
+  const lastRejectLogAtRef = useRef(0);
 
   const lastRawQuad = useRef<[Point, Point, Point, Point] | null>(null);
   const smoothQuad = useRef<[Point, Point, Point, Point] | null>(null); // normalized 0..1
