@@ -1259,10 +1259,21 @@ export function detectDocumentQuad(
   const total = width * height;
   const rawLum = new Uint8ClampedArray(total);
   const rawHist = new Uint32Array(256);
+  // Chroma proxy (max(R,G,B) − min(R,G,B)) — cheap saturation surrogate.
+  // White paper has chroma ~0 even when its luminance matches a light
+  // wooden floor; wood typically has chroma 20–80. Lets us separate
+  // paper from background when grayscale contrast alone is too weak.
+  const chroma = ENABLE_WHITENESS_CHANNEL ? new Uint8ClampedArray(total) : null;
   for (let i = 0, j = 0; i < data.length; i += 4, j++) {
-    const l = (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) | 0;
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    const l = (0.299 * r + 0.587 * g + 0.114 * b) | 0;
     rawLum[j] = l;
     rawHist[l]++;
+    if (chroma) {
+      const mx = r > g ? (r > b ? r : b) : (g > b ? g : b);
+      const mn = r < g ? (r < b ? r : b) : (g < b ? g : b);
+      chroma[j] = mx - mn;
+    }
   }
 
   // Adaptive contrast normalization — percentile stretch so dim scenes
@@ -1285,6 +1296,19 @@ export function detectDocumentQuad(
   const brightThreshold = Math.max(70, Math.min(225, otsuThreshold(hist, total) + 8));
   const paperMask = buildBrightPaperMask(lum, width, height, brightThreshold);
   components.push(...edgeComponents(maskBoundary(paperMask, width, height), width, height));
+
+  // Whiteness mask — bright AND low chroma. This pops white paper out of
+  // light wood / textile backgrounds that match its luminance but not its
+  // color. Boundary components feed the same quad search; pure addition,
+  // doesn't change anything when chroma is absent.
+  if (chroma && ENABLE_WHITENESS_CHANNEL) {
+    const whitenessMask = buildWhitenessMask(
+      lum, chroma, width, height,
+      Math.max(60, brightThreshold - 25), // a touch more permissive on L since chroma already gates
+      WHITENESS_MAX_CHROMA,
+    );
+    components.push(...edgeComponents(maskBoundary(whitenessMask, width, height), width, height));
+  }
   const allDetections: DocumentDetection[] = [];
   let candidateCount = 0;
 
@@ -1389,15 +1413,31 @@ export function detectDocumentQuad(
       bgContrastScore = clamp01((io.gap - INSIDE_OUTSIDE_MIN_GAP) / 50);
     }
 
+    // Paper-interior prior — boost quads whose inside actually looks like
+    // a uniform white sheet (low chroma + low luminance variance).
+    // chromaMean: 0–10 ≈ paper, 30+ ≈ colored/textured surface.
+    // lumStd: <12 ≈ clean sheet, >35 ≈ textured floor / printed cover.
+    let paperInteriorScore = 0;
+    if (chroma && ENABLE_PAPER_INTERIOR_PRIOR) {
+      const ics = insideChromaStats(lum, chroma, width, height, det.corners);
+      if (ics.samples >= 6) {
+        const chromaScore = clamp01((30 - ics.chromaMean) / 30);
+        const flatScore = clamp01((35 - ics.lumStd) / 30);
+        paperInteriorScore = chromaScore * flatScore;
+      }
+    }
+
     // Outer-prioritized confidence: area dominates, then A4 match, then
-    // edge support, paper/bg contrast, centeredness, then temporal bias.
+    // edge support, paper/bg contrast, paper interior, centeredness,
+    // then temporal bias.
     const outerConfidence =
-      0.36 * areaScore +
-      0.18 * a4Score +
-      0.12 * det.debug.edgeScore +
+      0.30 * areaScore +
+      0.17 * a4Score +
+      0.11 * det.debug.edgeScore +
       0.10 * bgContrastScore +
-      0.08 * centerScore +
-      0.09 * det.confidence +
+      0.10 * paperInteriorScore +
+      0.07 * centerScore +
+      0.08 * det.confidence +
       0.07 * tempScore;
     if (outerConfidence > bestScore) {
       bestScore = outerConfidence;
@@ -1514,6 +1554,22 @@ const ENABLE_INSIDE_PAPER_PENALTY = true;
 // Min luminance gap (inside − outside) for a quad to be accepted as a
 // real paper boundary. Below this we flag it as innerTextBlock.
 const INSIDE_OUTSIDE_MIN_GAP = 10;
+
+// Feature flag A — use chroma (saturation proxy) as a second segmentation
+// channel. Whitens-out paper that has similar luminance to its background
+// (e.g. white A4 on light wood). Pure addition: extra candidates only.
+const ENABLE_WHITENESS_CHANNEL = true;
+// Max chroma (maxC−minC) for a pixel to count as "paper-white" in the
+// whiteness mask. Real paper: 0–15. White wood/textile under warm light:
+// 20–60. 22 is a safe split that holds across daylight and lamp light.
+const WHITENESS_MAX_CHROMA = 22;
+
+// Feature flag C — paper-interior prior. Boosts candidates whose INSIDE
+// looks like paper (low chroma, low luminance variance) and penalizes
+// candidates whose inside is textured/colored (a book cover, the wood
+// floor itself, a laptop screen). Augments the existing inside/outside
+// luminance gap check rather than replacing it.
+const ENABLE_PAPER_INTERIOR_PRIOR = true;
 
 function scaleQuadAroundCentroid(
   quad: [Point, Point, Point, Point],
@@ -1746,6 +1802,69 @@ function closeEdgeGaps(edges: Uint8Array, width: number, height: number): Uint8A
   // per side — visible as a frame that floats a few mm/cm off the document.
   const dilated = dilateMask(edges, width, height);
   return erodeMask(dilated, width, height);
+}
+
+// Bright AND low-chroma mask. Implements feature flag A (whiteness
+// channel). Same morphology pattern as buildBrightPaperMask so its
+// boundary feeds the same edgeComponents → quad pipeline.
+function buildWhitenessMask(
+  lum: Uint8ClampedArray,
+  chroma: Uint8ClampedArray,
+  width: number,
+  height: number,
+  lumThreshold: number,
+  maxChroma: number,
+): Uint8Array {
+  const mask = new Uint8Array(lum.length);
+  for (let i = 0; i < lum.length; i++) {
+    mask[i] = lum[i] >= lumThreshold && chroma[i] <= maxChroma ? 1 : 0;
+  }
+  let closed: Uint8Array<ArrayBufferLike> = mask;
+  for (let i = 0; i < 3; i++) closed = dilateMask(closed, width, height);
+  for (let i = 0; i < 3; i++) closed = erodeMask(closed, width, height);
+  return closed;
+}
+
+// Inside-quad chroma + luminance variance stats. Used by the paper-
+// interior prior to boost quads whose interior actually looks like a
+// uniform white sheet (low chroma, low lum variance).
+function insideChromaStats(
+  lum: Uint8ClampedArray,
+  chroma: Uint8ClampedArray,
+  width: number,
+  height: number,
+  quad: [Point, Point, Point, Point],
+): { chromaMean: number; lumStd: number; samples: number } {
+  const inner = scaleQuadAroundCentroid(quad, 0.78);
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of inner) {
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  }
+  minX = Math.max(0, Math.floor(minX));
+  minY = Math.max(0, Math.floor(minY));
+  maxX = Math.min(width - 1, Math.ceil(maxX));
+  maxY = Math.min(height - 1, Math.ceil(maxY));
+  const step = Math.max(2, Math.round(Math.min(maxX - minX, maxY - minY) / 40));
+  let cSum = 0, lSum = 0, lSqSum = 0, n = 0;
+  for (let y = minY; y <= maxY; y += step) {
+    for (let x = minX; x <= maxX; x += step) {
+      if (!pointInQuad({ x, y }, inner)) continue;
+      const idx = y * width + x;
+      cSum += chroma[idx];
+      const l = lum[idx];
+      lSum += l;
+      lSqSum += l * l;
+      n++;
+    }
+  }
+  if (n === 0) return { chromaMean: 255, lumStd: 255, samples: 0 };
+  const chromaMean = cSum / n;
+  const lumMean = lSum / n;
+  const lumVar = Math.max(0, lSqSum / n - lumMean * lumMean);
+  return { chromaMean, lumStd: Math.sqrt(lumVar), samples: n };
 }
 
 function buildBrightPaperMask(
