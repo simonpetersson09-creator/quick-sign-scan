@@ -173,6 +173,27 @@ function ScanPage() {
   const lastDetectAtRef = useRef(0);
   const lastRejectLogAtRef = useRef(0);
   const lastAdaptiveLogAtRef = useRef(0);
+  const lastGateLogAtRef = useRef(0);
+  // Capture-gate diagnostics — populated each frame the document frame is
+  // visible. Lets the debug overlay show exactly which gate is blocking
+  // auto-capture (stability, sharpness, light, motion, cooldown, edge,
+  // confidence, ambiguity) without affecting any production behavior.
+  const captureGateRef = useRef<{
+    reason: string | null;
+    stable: number;
+    stableTarget: number;
+    sharpness: number;
+    sharpnessMin: number;
+    brightness: number;
+    brightnessMin: number;
+    motionMag: number;
+    motionAvail: boolean;
+    confidence: number;
+    edgeTightness: number;
+    a4Diff: number;
+    areaRatio: number;
+    cooldownMs: number;
+  } | null>(null);
 
   const lastRawQuad = useRef<[Point, Point, Point, Point] | null>(null);
   const smoothQuad = useRef<[Point, Point, Point, Point] | null>(null); // normalized 0..1
