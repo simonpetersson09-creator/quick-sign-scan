@@ -125,10 +125,19 @@ function ScanPage() {
   // Higher-resolution detection canvas — used for an opportunistic refinement
   // pass when the cheap 280px detection is borderline or near-lock. Improves
   // corner precision for documents that don't fill much of the frame.
-  // Feature flag: multi-scale (520px) detection refinement. Disabled by
-  // default — the extra pass destabilised lock on some devices. Set to
-  // true to A/B test again later.
+  // Feature flag: multi-scale (520px) full detection pass. Disabled — the
+  // extra detect destabilised lock. Kept off; not used.
   const ENABLE_HI_RES_DETECT = false;
+  // Feature flag: gate the prefer-bias toward the previously smoothed quad.
+  // Only bias the detector once we already have a confident, tight lock —
+  // before that, search freely so we don't get stuck on a noisy contour.
+  const ENABLE_PREFER_BIAS_GATE = true;
+  const PREFER_BIAS_MIN_CONF = 0.55;
+  const PREFER_BIAS_MIN_EDGE = 0.45;
+  // Feature flag: live local corner refinement on the full-res video frame,
+  // around the already-detected 280px quad. Never changes the quad shape,
+  // only nudges each corner ±a few px toward the strongest local edge.
+  const ENABLE_LIVE_CORNER_REFINE = false;
   const hiDetectCanvas = useRef<HTMLCanvasElement | null>(null);
   const lastRefineAtRef = useRef(0);
   const HI_DETECT_WIDTH = 520;
