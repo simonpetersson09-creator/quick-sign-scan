@@ -506,15 +506,16 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
         minXY[y * sw + x] = m;
       }
     }
-    // Apply: pixels in regions with no nearby ink (local min > 130) and
-    // current luminance > 175 get bleached to pure white.
+    // Apply: pixels in regions with no nearby ink (local min above gate) and
+    // current luminance above gate get bleached to pure white. Gates tuned
+    // up to spare light-grey text and thin strokes.
     for (let y = 0; y < h; y++) {
       const sy = Math.min(sh - 1, (y / SCALE) | 0);
       for (let x = 0; x < w; x++) {
         const sx = Math.min(sw - 1, (x / SCALE) | 0);
-        if (minXY[sy * sw + sx] <= 130) continue;
+        if (minXY[sy * sw + sx] <= BG_BLOB_LOCAL_MIN_GATE) continue;
         const j = y * w + x;
-        if (lum2[j] < 175) continue;
+        if (lum2[j] < BG_BLOB_LUM_GATE) continue;
         const i = j * 4;
         d[i] = 255;
         d[i + 1] = 255;
