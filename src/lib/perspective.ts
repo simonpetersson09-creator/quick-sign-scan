@@ -1791,12 +1791,23 @@ export type DetectDiagnostics = {
     contrast: number;
   };
   candidateCount: number;
+  adaptiveUsed: null | {
+    areaRatio: number;
+    originalTightness: number;
+    boostedTightness: number;
+    threshold: number;
+    edgeScore: number;
+    a4Score: number;
+    contrast: number;
+    accepted: boolean;
+  };
 };
 
 let lastDetectDiagnostics: DetectDiagnostics = {
   rejects: {},
   bestRejected: null,
   candidateCount: 0,
+  adaptiveUsed: null,
 };
 
 export function getLastDetectDiagnostics(): DetectDiagnostics {
@@ -1804,7 +1815,7 @@ export function getLastDetectDiagnostics(): DetectDiagnostics {
 }
 
 function resetDetectDiagnostics() {
-  lastDetectDiagnostics = { rejects: {}, bestRejected: null, candidateCount: 0 };
+  lastDetectDiagnostics = { rejects: {}, bestRejected: null, candidateCount: 0, adaptiveUsed: null };
 }
 
 function recordReject(
