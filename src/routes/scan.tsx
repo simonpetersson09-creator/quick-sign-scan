@@ -1745,7 +1745,8 @@ function ScanPage() {
     if (savedTimer1Ref.current) window.clearTimeout(savedTimer1Ref.current);
     if (savedTimer2Ref.current) window.clearTimeout(savedTimer2Ref.current);
     if (savedTimer3Ref.current) window.clearTimeout(savedTimer3Ref.current);
-    const pages = scanStore.getPages();
+    const storePages = scanStore.getPages();
+    const pages = storePages.length ? storePages : lastThumbnail ? [lastThumbnail] : [];
     console.info("[scan] scanStore.getPages before Done", {
       pages: pages.length,
       firstPageExists: Boolean(pages[0]),
@@ -1760,7 +1761,14 @@ function ScanPage() {
     }
     stopCamera("done-to-preview");
     scanStore.set({ pages, imageDataUrl: pages[pages.length - 1] });
-    navigate({ to: "/preview" });
+    navigate({
+      to: "/preview",
+      state: (prev) => ({
+        ...prev,
+        scanPages: pages,
+        scanActiveIndex: pages.length - 1,
+      }),
+    });
   }
 
   function startOverScan() {
