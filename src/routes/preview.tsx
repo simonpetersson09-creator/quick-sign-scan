@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useLocation, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
@@ -26,19 +26,35 @@ export const Route = createFileRoute("/preview")({
 
 function PreviewPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const t = useT();
+  const navState = location.state as typeof location.state & {
+    scanPages?: unknown;
+    scanActiveIndex?: unknown;
+  };
+  const handedOffPages = useMemo(
+    () =>
+      Array.isArray(navState.scanPages)
+        ? navState.scanPages.filter(
+            (page): page is string => typeof page === "string" && page.startsWith("data:image/"),
+          )
+        : [],
+    [navState.scanPages],
+  );
   // Initialize synchronously from the in-memory store so we don't flash the
   // empty state when pages are already present (e.g. just-finished scan).
   const [pages, setPages] = useState<string[]>(() => {
-    return scanStore.getPages();
+    const list = scanStore.getPages();
+    return list.length ? list : handedOffPages;
   });
   const [activeIndex, setActiveIndex] = useState<number>(() => {
     const s = scanStore.get();
-    const list = scanStore.getPages();
+    const list = scanStore.getPages().length ? scanStore.getPages() : handedOffPages;
     if (!list.length) return 0;
-    return s.imageDataUrl
-      ? Math.max(0, list.indexOf(s.imageDataUrl))
-      : list.length - 1;
+    if (typeof navState.scanActiveIndex === "number") {
+      return Math.max(0, Math.min(list.length - 1, navState.scanActiveIndex));
+    }
+    return s.imageDataUrl ? Math.max(0, list.indexOf(s.imageDataUrl)) : list.length - 1;
   });
   const [filterMode, setFilterMode] = useState<FilterMode>("color");
   // Cache filtered results so flipping pages stays instant: key = `${index}|${mode}`
@@ -47,7 +63,17 @@ function PreviewPage() {
   const [filtering, setFiltering] = useState(false);
 
   useEffect(() => {
-    const list = scanStore.getPages();
+    const list = scanStore.getPages().length ? scanStore.getPages() : handedOffPages;
+    if (handedOffPages.length && !scanStore.getPages().length) {
+      scanStore.set({
+        pages: handedOffPages,
+        imageDataUrl: handedOffPages[handedOffPages.length - 1],
+      });
+      window.history.replaceState(
+        { ...window.history.state, scanPages: undefined, scanActiveIndex: undefined },
+        "",
+      );
+    }
     const first = list[0];
     console.info("[preview] mounted with pages count", {
       pages: list.length,
@@ -55,7 +81,13 @@ function PreviewPage() {
       firstImageSrcValid: Boolean(first?.startsWith("data:image/") || first?.startsWith("blob:")),
       imageDataUrlExists: Boolean(scanStore.get().imageDataUrl),
     });
-  }, []);
+  }, [handedOffPages]);
+
+  useEffect(() => {
+    if (!pages.length && !handedOffPages.length) {
+      navigate({ to: "/scan", replace: true });
+    }
+  }, [handedOffPages.length, navigate, pages.length]);
 
   // Subscribe to store updates so any late mutation (race with navigation,
   // or external change) reflects here.
@@ -71,9 +103,7 @@ function PreviewPage() {
       const idx = session.imageDataUrl
         ? Math.max(0, list.indexOf(session.imageDataUrl))
         : list.length - 1;
-      setActiveIndex((prev) =>
-        prev >= 0 && prev < list.length ? prev : idx,
-      );
+      setActiveIndex((prev) => (prev >= 0 && prev < list.length ? prev : idx));
     };
     sync();
     const unsub = scanStore.subscribe(sync);
@@ -132,7 +162,7 @@ function PreviewPage() {
     return () => {
       cancelled = true;
     };
-  }, [originalImage, activeIndex, filterMode]);
+  }, [originalImage, activeIndex, filterMode, pages]);
 
   // Invalidate cache when the underlying pages change (delete, reorder).
   useEffect(() => {
@@ -212,39 +242,20 @@ function PreviewPage() {
   );
 
   if (!pages.length) {
-    return (
-      <AppShell title={t("previewTitle")} back="/scan" className="h-dvh overflow-hidden">
-        <div className="flex flex-1 flex-col items-center justify-center text-center pb-16">
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-secondary text-secondary-foreground">
-            <ScanLine className="h-6 w-6" />
-          </div>
-          <h2 className="text-[18px] font-semibold tracking-tight text-foreground">
-            {t("emptyPreviewTitle")}
-          </h2>
-          <p className="mt-2 max-w-[260px] text-sm leading-6 text-muted-foreground">
-            {t("emptyPreviewDesc")}
-          </p>
-        </div>
-        <div className="pb-5">
-          <PrimaryButton onClick={addPage}>
-            <span className="inline-flex items-center justify-center gap-2">
-              <ScanLine className="h-5 w-5" /> {t("scanDocument")}
-            </span>
-          </PrimaryButton>
-        </div>
-      </AppShell>
-    );
+    return <div className="min-h-dvh bg-background" aria-hidden="true" />;
   }
-
-
   return (
     <AppShell title={t("previewTitle")} back="/scan" className="h-dvh overflow-hidden">
       <p className="text-sm text-muted-foreground mt-1 mb-3">
-        {pages.length} {pages.length === 1 ? t("pageSingular") : t("pagePlural")} · {t("previewHint")}
+        {pages.length} {pages.length === 1 ? t("pageSingular") : t("pagePlural")} ·{" "}
+        {t("previewHint")}
       </p>
 
       <div className="flex items-center justify-center">
-        <div className="relative flex items-center justify-center" style={{ width: "min(92vw, 400px)" }}>
+        <div
+          className="relative flex items-center justify-center"
+          style={{ width: "min(92vw, 400px)" }}
+        >
           {pages.length > 1 && (
             <button
               type="button"
