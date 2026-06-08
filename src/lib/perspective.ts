@@ -1474,15 +1474,19 @@ export function detectDocumentQuad(
     // Outer-prioritized confidence: area dominates, then A4 match, then
     // edge support, paper/bg contrast, paper interior, centeredness,
     // then temporal bias.
+    // Restored area-dominant weighting — paperInteriorScore was penalising
+    // text-heavy pages (lumStd high inside) and letting smaller white
+    // sub-quads win, which clipped text. Hough candidates also added
+    // frame-to-frame flicker; both downweighted/disabled below.
     const outerConfidence =
-      0.30 * areaScore +
-      0.17 * a4Score +
-      0.11 * det.debug.edgeScore +
-      0.10 * bgContrastScore +
-      0.10 * paperInteriorScore +
-      0.07 * centerScore +
-      0.08 * det.confidence +
-      0.07 * tempScore;
+      0.38 * areaScore +
+      0.18 * a4Score +
+      0.12 * det.debug.edgeScore +
+      0.06 * bgContrastScore +
+      0.09 * centerScore +
+      0.09 * det.confidence +
+      0.08 * tempScore;
+    void paperInteriorScore;
     if (outerConfidence > bestScore) {
       bestScore = outerConfidence;
       best = det;
@@ -1613,7 +1617,7 @@ const WHITENESS_MAX_CHROMA = 22;
 // candidates whose inside is textured/colored (a book cover, the wood
 // floor itself, a laptop screen). Augments the existing inside/outside
 // luminance gap check rather than replacing it.
-const ENABLE_PAPER_INTERIOR_PRIOR = true;
+const ENABLE_PAPER_INTERIOR_PRIOR = false;
 
 // Feature flag D — Hough line detection. Finds dominant straight lines on
 // the Canny edge map, classifies them into top/bottom/left/right by angle
@@ -1623,7 +1627,7 @@ const ENABLE_PAPER_INTERIOR_PRIOR = true;
 // "line-segment + intersection" pattern Office Lens / VisionKit use.
 // Pure addition — the generated quads are evaluated by evaluateEdgeQuad
 // alongside the contour-based candidates, never replace them.
-const ENABLE_HOUGH_LINE_DETECTION = true;
+const ENABLE_HOUGH_LINE_DETECTION = false;
 const HOUGH_THETA_STEP_DEG = 1.5;     // ~120 angle bins over 0..180°
 const HOUGH_RHO_STEP_PX = 2;          // 2px rho quantization
 const HOUGH_TOP_LINES_PER_SIDE = 3;   // pick top-3 per top/bottom/left/right
