@@ -120,6 +120,13 @@ function ScanPage() {
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
   const detectCanvas = useRef<HTMLCanvasElement | null>(null);
+  // Higher-resolution detection canvas — used for an opportunistic refinement
+  // pass when the cheap 280px detection is borderline or near-lock. Improves
+  // corner precision for documents that don't fill much of the frame.
+  const hiDetectCanvas = useRef<HTMLCanvasElement | null>(null);
+  const lastRefineAtRef = useRef(0);
+  const HI_DETECT_WIDTH = 520;
+  const REFINE_COOLDOWN_MS = 140;
   // Throttle detection to ~22 Hz. The full pipeline (Canny + Sobel + snap)
   // is too heavy to run at 60 fps on mid-range mobile — it starves the UI
   // thread and the camera's continuous autofocus callback, which actually
