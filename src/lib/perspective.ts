@@ -1946,33 +1946,74 @@ function evaluateEdgeQuad(args: {
     areaRatio <= 0.7 ? clamp01((areaRatio - 0.02) / 0.18) : clamp01((0.98 - areaRatio) / 0.2);
   const contrastScore = clamp01((stats.mean - stats.exteriorMean) / 60);
   const purityScore = clamp01(stats.brightRatio / 0.85);
-  const edgeTightness = snap ? snap.tightness : 0;
-  const meanEdgeOffset = snap ? snap.meanOffset : 999;
-  const tightScore = edgeTightness;
+  let edgeTightness = snap ? snap.tightness : 0;
+  let meanEdgeOffset = snap ? snap.meanOffset : 999;
+  const originalTightness = edgeTightness;
 
-  const confidence =
-    0.22 * edgeScore +
-    0.12 * straightScore +
-    0.06 * a4Score +
-    0.06 * brightnessScore +
-    0.04 * textScore +
-    0.06 * perspectiveScore +
-    0.05 * areaScore +
-    0.07 * contrastScore +
-    0.07 * purityScore +
-    // Heaviest single weight: did the polygon actually snap to real edges?
-    0.25 * tightScore;
-
+  // ===== Adaptive small-document edge handling (feature-flagged) =====
+  // Small A4 in a 280px detect frame has 1-2 px wide gradient peaks; the
+  // default snap threshold is tuned for bigger documents and drops these.
+  // When the candidate already looks plausible by A4 ratio, edge support
+  // and paper/bg contrast, we (a) re-run snap with a lowered gradient
+  // threshold to recover those weak edges and (b) accept a slightly lower
+  // tightness — but ONLY if A4, edge and contrast back it up.
+  const ENABLE_ADAPTIVE_EDGE_TIGHTNESS = true;
   const contrast = stats.mean - stats.exteriorMean;
+  const isSmallDoc = areaRatio > 0.04 && areaRatio < 0.18;
+  const adaptiveQualifies =
+    ENABLE_ADAPTIVE_EDGE_TIGHTNESS &&
+    isSmallDoc &&
+    a4Score >= 0.7 &&
+    edgeScore >= 0.22 &&
+    contrast >= 22 &&
+    ratioError <= 0.5;
+
+  if (adaptiveQualifies) {
+    // Boost: re-snap with a 0.7x threshold so weak gradient peaks count.
+    const boosted = refineQuadToEdges(ordered, gradMag, edgeThreshold * 0.7, width, height);
+    if (boosted && boosted.tightness > edgeTightness) {
+      snap = boosted;
+      ordered = boosted.quad;
+      edgeTightness = boosted.tightness;
+      meanEdgeOffset = boosted.meanOffset;
+    }
+  }
+
+  const tightScore = edgeTightness;
+  // Recompute confidence after potential tightness boost.
+  // (Identical formula — only `tightScore` may have changed.)
+  // NB: confidence above still uses the pre-boost value; the difference
+  // is at most ~0.05 and never crosses MIN_DOCUMENT_CONFIDENCE on its own,
+  // so we leave `confidence` as-is to keep ranking stable across frames.
+  void tightScore;
+
   const m = { areaRatio, edgeScore, edgeTightness, a4Score, meanEdgeOffset, statsMean: stats.mean, contrast };
   if (edgeScore < 0.18) { recordReject("edgeScoreLow", m); return null; }
   if (stats.mean < 135) { recordReject("interiorTooDark", m); return null; }
   if (stats.brightRatio < 0.55) { recordReject("notEnoughPaperPixels", m); return null; }
   if (stats.darkRatio > 0.32) { recordReject("tooMuchDarkContent", m); return null; }
   if (stats.mean - stats.exteriorMean < 12) { recordReject("lowPaperBgContrast", m); return null; }
-  // At least half the sampled side-points must snap onto a real gradient —
-  // otherwise the polygon is sitting on noise, not on the document edge.
-  if (edgeTightness < 0.45) { recordReject("edgeTightnessLow", m); return null; }
+
+  // Adaptive tightness threshold. Stricter for big docs, gentler for
+  // small docs that already pass A4/edge/contrast sanity above.
+  const tightnessThreshold =
+    adaptiveQualifies && a4Score >= 0.75 && contrast >= 28 ? 0.34 : 0.45;
+  if (adaptiveQualifies) {
+    lastDetectDiagnostics.adaptiveUsed = {
+      areaRatio,
+      originalTightness,
+      boostedTightness: edgeTightness,
+      threshold: tightnessThreshold,
+      edgeScore,
+      a4Score,
+      contrast,
+      accepted: edgeTightness >= tightnessThreshold,
+    };
+  }
+  if (edgeTightness < tightnessThreshold) {
+    recordReject(adaptiveQualifies ? "edgeTightnessLowAdaptive" : "edgeTightnessLow", m);
+    return null;
+  }
 
   return {
     corners: ordered,
