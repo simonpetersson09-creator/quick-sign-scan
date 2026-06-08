@@ -798,9 +798,7 @@ export function autoOrientAndDeskewDocument(
   // flipped pages upside-down. We disable it: do NOT auto-rotate by
   // 90/180/270 anymore. Only the fine deskew (< a few degrees) is kept
   // below, which is what produces "perfectly straight" A4 output.
-  const bestRotation: (typeof rotations)[number] = 0;
   const orientationCandidates: DocumentAlignmentDiagnostics["orientationCandidates"] = [];
-  // Run analysis purely for diagnostics — never act on it for rotation.
   for (const rotation of rotations) {
     const rotatedSample = rotateCanvas(sample, rotation);
     const analysis = estimateTextSkew(rotatedSample, 7, 0.5);
@@ -817,6 +815,24 @@ export function autoOrientAndDeskewDocument(
   }
   const foundText = orientationCandidates.some((c) => c.hasText);
 
+  // Pick best rotation only when text is found AND it beats 0° decisively.
+  // Conservative gates avoid the historical "page is upside down" failure:
+  //   - winner must have hasText
+  //   - winner.score must beat 0° by ≥1.6× (clear margin)
+  //   - winner.uprightScore ≥ 0.6 (texten ser ut att stå rätt upp)
+  const zero = orientationCandidates.find((c) => c.rotation === 0)!;
+  const sortedByScore = [...orientationCandidates].sort((a, b) => b.score - a.score);
+  const winner = sortedByScore[0];
+  let bestRotation: (typeof rotations)[number] = 0;
+  if (
+    winner &&
+    winner.rotation !== 0 &&
+    winner.hasText &&
+    winner.uprightScore >= 0.6 &&
+    winner.score > Math.max(1e-6, zero.score) * 1.6
+  ) {
+    bestRotation = winner.rotation;
+  }
 
   let oriented = rotateCanvas(canvas, bestRotation);
   const skew = estimateTextSkew(oriented, 7, 0.25);
