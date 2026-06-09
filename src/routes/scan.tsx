@@ -214,6 +214,14 @@ function ScanPage() {
   const HIRES_TIGHT_COOLDOWN_MS = 140;
   const lastHiResTightAtRef = useRef(0);
   const lastHiResTightLogAtRef = useRef(0);
+  // Tracks whether the hi-res tightness pass has produced a result for the
+  // current detection session. Capture gate uses a looser tightness floor
+  // (0.45) until this is true — the 280px live detector systematically
+  // underestimates edge tightness for small/far A4 documents, and the
+  // throttled hi-res pass needs a few frames to weigh in. Reset whenever
+  // the detection session ends (no corners, lock break, camera restart).
+  const hiResTightConfirmedRef = useRef(false);
+  const MIN_EDGE_TIGHTNESS_PRE_HIRES = 0.45;
   // Feature flag: bump the detection frame width from the historical 280px
   // to give small/far A4 documents more pixels on the short side. Pure
   // resolution change — no algorithm/threshold changes, no multi-scale.
@@ -489,6 +497,7 @@ function ScanPage() {
       captureRetryRef.current = 0;
       lockedRef.current = false;
       lockBreakFramesRef.current = 0;
+      hiResTightConfirmedRef.current = false;
       brightnessRef.current = 255;
       lowLightFramesRef.current = 0;
       stableCount.current = 0;
@@ -870,6 +879,10 @@ function ScanPage() {
         })) as [Point, Point, Point, Point];
         const hi = computeHiResEdgeTightness(video, vw, vh, quadFull);
         const origTight = detection.debug.edgeTightness ?? 0;
+        // Mark hi-res as confirmed for this detection session even if hi
+        // didn't beat the 280px value — the 280px tightness is now ratified
+        // by the full-res signal, so capture gate can apply its strict 0.55.
+        if (hi) hiResTightConfirmedRef.current = true;
         if (hi && hi.tightness > origTight) {
           const wasBlockedByTightness =
             !detection.readyForCapture &&
@@ -919,6 +932,7 @@ function ScanPage() {
       missCount.current++;
       lockedRef.current = false;
       lockBreakFramesRef.current = 0;
+      hiResTightConfirmedRef.current = false;
       if (detectCount.current === 0) {
         smoothQuad.current = null;
         lastRawQuad.current = null;
@@ -1071,6 +1085,7 @@ function ScanPage() {
           lockedRef.current = false;
           lockBreakFramesRef.current = 0;
           stableCount.current = 0;
+          hiResTightConfirmedRef.current = false;
         }
       } else {
         lockBreakFramesRef.current = 0;
@@ -1431,7 +1446,14 @@ function ScanPage() {
     // Tight-edge gate: the polygon must actually be snapped onto real
     // document edges. Stops auto-capture from firing when the frame is
     // still floating a few cm off the paper (e.g. on a uniform floor).
-    if (meta.debug.edgeTightness < MIN_EDGE_TIGHTNESS_FOR_CAPTURE) {
+    // Two-stage threshold: until the hi-res tightness pass has weighed in
+    // on this detection session, we use 0.45 (the cheap 280px detector
+    // systematically underestimates tightness for small/far A4). Once
+    // hi-res has run we apply the strict 0.55.
+    const tightnessFloor = hiResTightConfirmedRef.current
+      ? MIN_EDGE_TIGHTNESS_FOR_CAPTURE
+      : MIN_EDGE_TIGHTNESS_PRE_HIRES;
+    if (meta.debug.edgeTightness < tightnessFloor) {
       // Soft regression — hi-res tightness recompute may rescue next frame.
       stableCount.current = Math.max(0, stableCount.current - 2);
       lockedRef.current = false;
@@ -2169,6 +2191,7 @@ function ScanPage() {
     detectionMeta.current = null;
     blurFramesRef.current = 0;
     captureRetryRef.current = 0;
+    hiResTightConfirmedRef.current = false;
     tooFarFramesRef.current = 0;
     sharpnessRef.current = 0;
     lockedRef.current = false;
