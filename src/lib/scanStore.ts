@@ -80,6 +80,8 @@ type PreviewHandoff = {
 const PREVIEW_HANDOFF_KEY = "docscan.preview-handoff.v1";
 const PREVIEW_HANDOFF_WINDOW_NAME_PREFIX = `${PREVIEW_HANDOFF_KEY}:`;
 const PREVIEW_HANDOFF_MAX_AGE_MS = 2 * 60 * 1000;
+const PREVIEW_HANDOFF_DB = "docscan-preview-handoff";
+const PREVIEW_HANDOFF_STORE = "handoff";
 
 const storeGlobal = globalThis as typeof globalThis & {
   __SIGN_GO_SCAN_STORE__?: StoreBag;
@@ -133,6 +135,85 @@ function safeSessionStorage() {
   } catch {
     return null;
   }
+}
+
+function parsePreviewHandoff(raw: string | null | undefined): PreviewHandoff | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<PreviewHandoff>;
+    const pages = Array.isArray(parsed.pages) ? parsed.pages.filter(isUsablePreviewPage) : [];
+    const createdAt = typeof parsed.createdAt === "number" ? parsed.createdAt : 0;
+    if (!pages.length || Date.now() - createdAt > PREVIEW_HANDOFF_MAX_AGE_MS) return null;
+    const activeIndex =
+      typeof parsed.activeIndex === "number"
+        ? Math.max(0, Math.min(pages.length - 1, parsed.activeIndex))
+        : pages.length - 1;
+    return { pages, activeIndex, createdAt };
+  } catch {
+    return null;
+  }
+}
+
+function openPreviewHandoffDb(): Promise<IDBDatabase | null> {
+  if (typeof indexedDB === "undefined") return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const req = indexedDB.open(PREVIEW_HANDOFF_DB, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(PREVIEW_HANDOFF_STORE)) {
+        db.createObjectStore(PREVIEW_HANDOFF_STORE);
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => resolve(null);
+  });
+}
+
+async function savePreviewHandoffToIndexedDb(payload: string) {
+  const db = await openPreviewHandoffDb();
+  if (!db) return false;
+  return new Promise<boolean>((resolve) => {
+    const tx = db.transaction(PREVIEW_HANDOFF_STORE, "readwrite");
+    tx.objectStore(PREVIEW_HANDOFF_STORE).put(payload, PREVIEW_HANDOFF_KEY);
+    tx.oncomplete = () => {
+      db.close();
+      resolve(true);
+    };
+    tx.onerror = () => {
+      db.close();
+      resolve(false);
+    };
+  });
+}
+
+async function readPreviewHandoffFromIndexedDb() {
+  const db = await openPreviewHandoffDb();
+  if (!db) return null;
+  return new Promise<string | null>((resolve) => {
+    const tx = db.transaction(PREVIEW_HANDOFF_STORE, "readonly");
+    const req = tx.objectStore(PREVIEW_HANDOFF_STORE).get(PREVIEW_HANDOFF_KEY);
+    req.onsuccess = () => resolve(typeof req.result === "string" ? req.result : null);
+    req.onerror = () => resolve(null);
+    tx.oncomplete = () => db.close();
+    tx.onerror = () => db.close();
+  });
+}
+
+async function deletePreviewHandoffFromIndexedDb() {
+  const db = await openPreviewHandoffDb();
+  if (!db) return;
+  await new Promise<void>((resolve) => {
+    const tx = db.transaction(PREVIEW_HANDOFF_STORE, "readwrite");
+    tx.objectStore(PREVIEW_HANDOFF_STORE).delete(PREVIEW_HANDOFF_KEY);
+    tx.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    tx.onerror = () => {
+      db.close();
+      resolve();
+    };
+  });
 }
 
 export const scanStore = {
@@ -191,7 +272,23 @@ export const scanStore = {
         error: error instanceof Error ? error.name : "unknown",
       });
     }
+    savePreviewHandoffToIndexedDb(payload).catch(() => {});
     return saved;
+  },
+  savePreviewHandoffAsync: async (pages: string[], activeIndex: number) => {
+    const safePages = pages.filter(isUsablePreviewPage);
+    if (!safePages.length) return false;
+    const savedSync = scanStore.savePreviewHandoff(safePages, activeIndex);
+    const safeActiveIndex = Math.max(0, Math.min(safePages.length - 1, activeIndex));
+    const payload = JSON.stringify({ pages: safePages, activeIndex: safeActiveIndex, createdAt: Date.now() });
+    const savedDb = await savePreviewHandoffToIndexedDb(payload);
+    debugScanStore("preview handoff async save complete", {
+      pages: safePages.length,
+      activeIndex: safeActiveIndex,
+      savedSync,
+      savedDb,
+    });
+    return savedSync || savedDb;
   },
   readPreviewHandoff: (): PreviewHandoff | null => {
     const storage = safeSessionStorage();
@@ -206,19 +303,10 @@ export const scanStore = {
       }
     } catch {}
     for (const raw of candidates) {
-      try {
-        const parsed = JSON.parse(raw) as Partial<PreviewHandoff>;
-        const pages = Array.isArray(parsed.pages) ? parsed.pages.filter(isUsablePreviewPage) : [];
-        const createdAt = typeof parsed.createdAt === "number" ? parsed.createdAt : 0;
-        if (!pages.length || Date.now() - createdAt > PREVIEW_HANDOFF_MAX_AGE_MS) continue;
-        const activeIndex =
-          typeof parsed.activeIndex === "number"
-            ? Math.max(0, Math.min(pages.length - 1, parsed.activeIndex))
-            : pages.length - 1;
-        debugScanStore("read preview handoff", { pages: pages.length, activeIndex });
-        return { pages, activeIndex, createdAt };
-      } catch {
-        // Try the next handoff source.
+      const parsed = parsePreviewHandoff(raw);
+      if (parsed) {
+        debugScanStore("read preview handoff", { pages: parsed.pages.length, activeIndex: parsed.activeIndex });
+        return parsed;
       }
     }
     try {
@@ -227,11 +315,26 @@ export const scanStore = {
     } catch {}
     return null;
   },
+  readPreviewHandoffAsync: async (): Promise<PreviewHandoff | null> => {
+    const sync = scanStore.readPreviewHandoff();
+    if (sync) return sync;
+    const parsed = parsePreviewHandoff(await readPreviewHandoffFromIndexedDb());
+    if (parsed) {
+      debugScanStore("read preview handoff from indexeddb", {
+        pages: parsed.pages.length,
+        activeIndex: parsed.activeIndex,
+      });
+      return parsed;
+    }
+    await deletePreviewHandoffFromIndexedDb();
+    return null;
+  },
   clearPreviewHandoff: () => {
     try {
       safeSessionStorage()?.removeItem(PREVIEW_HANDOFF_KEY);
       if (window.name.startsWith(PREVIEW_HANDOFF_WINDOW_NAME_PREFIX)) window.name = "";
     } catch {}
+    deletePreviewHandoffFromIndexedDb().catch(() => {});
   },
   clear: (reason = "explicit") => {
     debugScanStore("clear called", {
@@ -243,6 +346,7 @@ export const scanStore = {
       safeSessionStorage()?.removeItem(PREVIEW_HANDOFF_KEY);
       if (window.name.startsWith(PREVIEW_HANDOFF_WINDOW_NAME_PREFIX)) window.name = "";
     } catch {}
+    deletePreviewHandoffFromIndexedDb().catch(() => {});
     wipe(reason);
     notify();
   },

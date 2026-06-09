@@ -2169,7 +2169,7 @@ function ScanPage() {
   }
 
 
-  function finishScanning() {
+  async function finishScanning() {
     if (savedTimer1Ref.current) window.clearTimeout(savedTimer1Ref.current);
     if (savedTimer2Ref.current) window.clearTimeout(savedTimer2Ref.current);
     if (savedTimer3Ref.current) window.clearTimeout(savedTimer3Ref.current);
@@ -2191,7 +2191,7 @@ function ScanPage() {
     cameraStartTokenRef.current += 1;
     stopCamera("done-to-preview");
     scanStore.set({ pages, imageDataUrl: pages[pages.length - 1] });
-    scanStore.savePreviewHandoff(pages, pages.length - 1);
+    await scanStore.savePreviewHandoffAsync(pages, pages.length - 1);
     navigate({
       to: "/preview",
       replace: true,
