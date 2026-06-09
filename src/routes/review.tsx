@@ -295,6 +295,7 @@ function ReviewPage() {
 
       {/* Page preview — image-based so iOS Safari shows full page at fit-to-page. */}
       <div className="flex-1 flex flex-col items-center justify-center gap-3 min-h-0">
+        <div className="relative flex items-center justify-center min-h-0 flex-1" style={{ width: "min(92vw, 440px)" }}>
         <div
           ref={containerRef}
           onPointerDown={onPointerDown}
@@ -302,7 +303,7 @@ function ReviewPage() {
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
           className="relative rounded-2xl overflow-hidden border border-border bg-muted/30 touch-none select-none"
-          style={{ width: "min(82vw, 360px)", aspectRatio: "1 / 1.414" }}
+          style={{ height: "100%", width: "auto", aspectRatio: "1 / 1.414", maxWidth: "min(82vw, 360px)" }}
         >
           <div
             className="absolute inset-0 p-3"
