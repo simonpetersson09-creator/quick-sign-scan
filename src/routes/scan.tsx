@@ -1197,7 +1197,8 @@ function ScanPage() {
       motionAvailableRef.current && motionMagRef.current > MOTION_STILL_THRESHOLD;
     const cooldownMs = Math.max(0, armedAtRef.current - performance.now());
     let captureBlockedBy: string | null = null;
-    if (!isBrightEnough && lowLightFramesRef.current > 15) captureBlockedBy = "light";
+    if (visibleOnly) captureBlockedBy = `edge:${reasonNotReady ?? "unknown"}`;
+    else if (!isBrightEnough && lowLightFramesRef.current > 15) captureBlockedBy = "light";
     else if (stableCount.current < HOLD_FRAMES) captureBlockedBy = "stability:framing";
     else if (!isSharp) captureBlockedBy = "sharpness";
     else if (stableCount.current < READY_FRAMES) captureBlockedBy = "stability:ready";
