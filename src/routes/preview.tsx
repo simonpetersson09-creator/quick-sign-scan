@@ -143,9 +143,9 @@ function PreviewPage() {
     const sync = () => {
       const session = scanStore.get();
       const list = scanStore.getPages();
-      setPages(list);
+      setPages((prev) => (list.length ? list : prev.length ? prev : list));
       if (!list.length) {
-        setActiveIndex(0);
+        setActiveIndex((prev) => (pages.length ? prev : 0));
         return;
       }
       const idx = session.imageDataUrl
