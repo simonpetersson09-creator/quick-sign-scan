@@ -303,19 +303,10 @@ export const scanStore = {
       }
     } catch {}
     for (const raw of candidates) {
-      try {
-        const parsed = JSON.parse(raw) as Partial<PreviewHandoff>;
-        const pages = Array.isArray(parsed.pages) ? parsed.pages.filter(isUsablePreviewPage) : [];
-        const createdAt = typeof parsed.createdAt === "number" ? parsed.createdAt : 0;
-        if (!pages.length || Date.now() - createdAt > PREVIEW_HANDOFF_MAX_AGE_MS) continue;
-        const activeIndex =
-          typeof parsed.activeIndex === "number"
-            ? Math.max(0, Math.min(pages.length - 1, parsed.activeIndex))
-            : pages.length - 1;
-        debugScanStore("read preview handoff", { pages: pages.length, activeIndex });
-        return { pages, activeIndex, createdAt };
-      } catch {
-        // Try the next handoff source.
+      const parsed = parsePreviewHandoff(raw);
+      if (parsed) {
+        debugScanStore("read preview handoff", { pages: parsed.pages.length, activeIndex: parsed.activeIndex });
+        return parsed;
       }
     }
     try {
