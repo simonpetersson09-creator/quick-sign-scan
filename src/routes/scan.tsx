@@ -1731,7 +1731,36 @@ function ScanPage() {
           afterPixels: formatQuad(warpQuad),
         });
       }
+
+      // ── Quad equality check ────────────────────────────────────────────
+      // preview / capture / warp i samma pixelrymd. Om overlay-ramen låg
+      // korrekt runt A4 ska previewVsWarpMaxDeltaPx vara ungefär lika med
+      // det inner-crop som INNER_CROP_FRACTION ger (~ kortsida * 0.01).
+      // Allt utöver det betyder att en quad-modifierare har flyttat hörnen.
+      {
+        const previewPx = overlayQuadNorm
+          ? (orderQuad(overlayQuadNorm).map((p) => ({ x: p.x * vw, y: p.y * vh })) as typeof finalSrcQuad)
+          : null;
+        const capturePx = orderQuad(srcQuad);
+        const warpPx = orderQuad(warpQuad);
+        const maxDelta = (
+          a: typeof finalSrcQuad | null,
+          b: typeof finalSrcQuad,
+        ): number | null =>
+          a ? Math.max(...a.map((p, i) => Math.hypot(p.x - b[i].x, p.y - b[i].y))) : null;
+        logScanStage("quad-equality-check", {
+          previewQuadPx: previewPx ? formatQuad(previewPx) : null,
+          captureQuadPx: formatQuad(capturePx),
+          finalWarpQuadPx: formatQuad(warpPx),
+          previewVsCaptureMaxDeltaPx: maxDelta(previewPx, capturePx),
+          previewVsWarpMaxDeltaPx: maxDelta(previewPx, warpPx),
+          captureVsWarpMaxDeltaPx: maxDelta(capturePx, warpPx),
+          innerCropFraction: innerCropEnabled ? INNER_CROP_FRACTION : 0,
+        });
+      }
+
       let warped = warpQuadToRect(bestFrame ?? video, vw, vh, warpQuad, outW, outH);
+
       logScanStage("warp-trace/6-after-warp", {
         canvasSize: { w: warped.width, h: warped.height },
         aspect: warped.width / warped.height,
