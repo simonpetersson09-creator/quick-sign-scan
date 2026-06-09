@@ -109,26 +109,15 @@ function ReviewPage() {
     setPan({ x: 0, y: 0 });
   }, [pageIdx]);
 
-  // Rebuild PDF when signature position changes (after drag release).
-  useEffect(() => {
-    if (!pages.length || !sigDataUrl || !sigPos) return;
-    let cancelled = false;
-    const handle = setTimeout(async () => {
-      const url = await buildPdf(pages, { dataUrl: sigDataUrl, x: sigPos.x, y: sigPos.y });
-      if (cancelled) return;
-      setPdfUrl(url);
-      scanStore.set({ pdfDataUrl: url, signaturePosition: sigPos });
-      try {
-        setSizeBytes(dataUrlToBlob(url).size);
-      } catch {
-        /* noop */
-      }
-    }, 250);
-    return () => {
-      cancelled = true;
-      clearTimeout(handle);
-    };
-  }, [sigPos, sigDataUrl, pages]);
+  // NOTE: Previously this effect rebuilt the entire PDF on every signature
+  // drag (debounced). For a 10-page scan that's a 4–8 MB base64 allocation
+  // per drag-tick — visible as lag and GC pauses. The signature is now a
+  // pure CSS overlay during review; the final PDF is built once at send
+  // time in send.tsx, picking up `signaturePosition` from scanStore. We
+  // still persist the position on drag release (see onSigUp) so send.tsx
+  // reads the latest value.
+
+
 
   function clampPan(nx: number, ny: number, z: number) {
     const rect = containerRef.current?.getBoundingClientRect();
