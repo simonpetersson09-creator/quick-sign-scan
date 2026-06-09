@@ -1443,7 +1443,14 @@ function ScanPage() {
     // Tight-edge gate: the polygon must actually be snapped onto real
     // document edges. Stops auto-capture from firing when the frame is
     // still floating a few cm off the paper (e.g. on a uniform floor).
-    if (meta.debug.edgeTightness < MIN_EDGE_TIGHTNESS_FOR_CAPTURE) {
+    // Two-stage threshold: until the hi-res tightness pass has weighed in
+    // on this detection session, we use 0.45 (the cheap 280px detector
+    // systematically underestimates tightness for small/far A4). Once
+    // hi-res has run we apply the strict 0.55.
+    const tightnessFloor = hiResTightConfirmedRef.current
+      ? MIN_EDGE_TIGHTNESS_FOR_CAPTURE
+      : MIN_EDGE_TIGHTNESS_PRE_HIRES;
+    if (meta.debug.edgeTightness < tightnessFloor) {
       // Soft regression — hi-res tightness recompute may rescue next frame.
       stableCount.current = Math.max(0, stableCount.current - 2);
       lockedRef.current = false;
