@@ -83,6 +83,10 @@ function PreviewPage() {
   const filterCache = useRef<Map<string, string>>(new Map());
   const [displayUrl, setDisplayUrl] = useState<string | null>(null);
   const [filtering, setFiltering] = useState(false);
+  const [debugStages, setDebugStages] = useState<ScanDebugStage[] | null>(
+    () => scanStore.get().debugStages,
+  );
+  const [debugZoom, setDebugZoom] = useState<ScanDebugStage | null>(null);
 
   useEffect(() => {
     const fallbackPages = handedOffPages.length ? handedOffPages : recoveredPages;
