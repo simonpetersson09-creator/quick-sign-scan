@@ -1462,7 +1462,9 @@ function ScanPage() {
     // Multi-frame voting: median of the last N smoothed quads (per corner).
     // En enstaka skakig frame kan inte längre dra warp-hörnen av pappret.
     const votes = recentSmoothQuadsRef.current;
+    const overlayQuadNorm = smoothQuad.current; // exactly what overlay drew
     let votedQuad: [Point, Point, Point, Point] = normQuad;
+    let votingApplied = false;
     if (votes.length >= 3) {
       const orderedVotes = votes.map((v) => orderQuad(v));
       const median = (arr: number[]) => {
@@ -1474,8 +1476,24 @@ function ScanPage() {
         x: median(orderedVotes.map((q) => q[i].x)),
         y: median(orderedVotes.map((q) => q[i].y)),
       })) as [Point, Point, Point, Point];
+      votingApplied = true;
     }
     const orderedNormQuad = orderQuad(votedQuad);
+
+    logScanStage("warp-trace/1-detected-norm", {
+      raw: formatQuad(normQuad),
+      overlayLast: overlayQuadNorm ? formatQuad(overlayQuadNorm) : null,
+      voteWindow: votes.length,
+      votingApplied,
+      votedQuadNorm: formatQuad(votedQuad),
+      overlayVsVotedMaxDelta: overlayQuadNorm
+        ? Math.max(
+            ...orderQuad(overlayQuadNorm).map((p, i) =>
+              Math.hypot(p.x - orderedNormQuad[i].x, p.y - orderedNormQuad[i].y),
+            ),
+          )
+        : null,
+    });
 
     // Text-safe mode: do not grow or shrink the detected crop. Growing shows
     // desk/background; shrinking risks cutting off real text near the edges.
@@ -1608,7 +1626,22 @@ function ScanPage() {
         console.warn("[scan] threshold paper lock failed", e);
       }
 
-      let warped = warpQuadToRect(bestFrame ?? video, vw, vh, refinedSrcQuad, outW, outH);
+      // FINAL trace: this is the exact quad handed to warpQuadToRect.
+      const finalSrcQuad = refinedSrcQuad;
+      logScanStage("warp-trace/5-final-input", {
+        srcPixels: formatQuad(finalSrcQuad),
+        frameSize: { vw, vh },
+        outSize: { outW, outH },
+        usingBurstFrame: Boolean(bestFrame),
+        srcFromOverlayDeltaPx: overlayQuadNorm
+          ? Math.max(
+              ...orderQuad(overlayQuadNorm).map((p, i) =>
+                Math.hypot(p.x * vw - finalSrcQuad[i].x, p.y * vh - finalSrcQuad[i].y),
+              ),
+            )
+          : null,
+      });
+      let warped = warpQuadToRect(bestFrame ?? video, vw, vh, finalSrcQuad, outW, outH);
       logScanCanvas("after-perspective-transform", warped, debugEnabled);
 
       // Rama in resultatet på en ren A4-yta och korrigera små vinklar.
