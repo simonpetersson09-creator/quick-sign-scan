@@ -272,7 +272,23 @@ export const scanStore = {
         error: error instanceof Error ? error.name : "unknown",
       });
     }
+    savePreviewHandoffToIndexedDb(payload).catch(() => {});
     return saved;
+  },
+  savePreviewHandoffAsync: async (pages: string[], activeIndex: number) => {
+    const safePages = pages.filter(isUsablePreviewPage);
+    if (!safePages.length) return false;
+    const savedSync = scanStore.savePreviewHandoff(safePages, activeIndex);
+    const safeActiveIndex = Math.max(0, Math.min(safePages.length - 1, activeIndex));
+    const payload = JSON.stringify({ pages: safePages, activeIndex: safeActiveIndex, createdAt: Date.now() });
+    const savedDb = await savePreviewHandoffToIndexedDb(payload);
+    debugScanStore("preview handoff async save complete", {
+      pages: safePages.length,
+      activeIndex: safeActiveIndex,
+      savedSync,
+      savedDb,
+    });
+    return savedSync || savedDb;
   },
   readPreviewHandoff: (): PreviewHandoff | null => {
     const storage = safeSessionStorage();
