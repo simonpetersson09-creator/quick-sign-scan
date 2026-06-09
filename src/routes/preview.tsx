@@ -135,6 +135,7 @@ function PreviewPage() {
         ? Math.max(0, list.indexOf(session.imageDataUrl))
         : list.length - 1;
       setActiveIndex((prev) => (prev >= 0 && prev < list.length ? prev : idx));
+      setDebugStages(session.debugStages);
     };
     sync();
     const unsub = scanStore.subscribe(sync);
