@@ -3839,13 +3839,19 @@ export function cropToWhiteEdges(
     stripPx?: number;
     minMeanL?: number;
     maxStdL?: number;
+    /** Symmetric cap applied to all sides unless overridden. */
     maxFraction?: number;
+    /** Per-axis caps. Override top/bottom and left/right independently. */
+    maxTopBottom?: number;
+    maxLeftRight?: number;
   } = {},
 ): { canvas: HTMLCanvasElement; cropped: { top: number; right: number; bottom: number; left: number } } {
   const stripPx = options.stripPx ?? 6;
   const minMeanL = options.minMeanL ?? 200;
   const maxStdL = options.maxStdL ?? 28;
-  const maxFraction = options.maxFraction ?? 0.03;
+  const baseFraction = options.maxFraction ?? 0.03;
+  const fracTopBottom = options.maxTopBottom ?? baseFraction;
+  const fracLeftRight = options.maxLeftRight ?? baseFraction;
   const w = canvas.width;
   const h = canvas.height;
   if (w < stripPx * 4 || h < stripPx * 4) {
@@ -3893,10 +3899,10 @@ export function cropToWhiteEdges(
     return { mean, std: Math.sqrt(Math.max(0, variance)) };
   };
 
-  const maxTop = Math.floor(h * maxFraction);
-  const maxBottom = Math.floor(h * maxFraction);
-  const maxLeft = Math.floor(w * maxFraction);
-  const maxRight = Math.floor(w * maxFraction);
+  const maxTop = Math.floor(h * fracTopBottom);
+  const maxBottom = Math.floor(h * fracTopBottom);
+  const maxLeft = Math.floor(w * fracLeftRight);
+  const maxRight = Math.floor(w * fracLeftRight);
   let top = 0;
   let bottom = 0;
   let left = 0;
