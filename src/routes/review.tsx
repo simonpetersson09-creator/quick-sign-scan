@@ -352,6 +352,8 @@ function ReviewPage() {
             </div>
           </div>
         </div>
+        </div>
+
 
         {/* Page nav + zoom controls */}
         <div className="flex items-center gap-2">
