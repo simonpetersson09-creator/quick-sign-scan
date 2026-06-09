@@ -1587,62 +1587,74 @@ function ScanPage() {
       }
       logScanStage("burst-capture", { bestSharpness: bestScore });
 
-      // Subpixel corner refinement on the full-res frame just before warp.
-      // Keep this conservative: it can only nudge individual corners ±5px.
+      // Subpixel corner refinement — kan nudga hörn upp till ±5 px och
+      // därmed avvika från overlay-ramen. AV som default (?refineCorners=1
+      // för experimentation).
+      const refineCornersEnabled = urlParams.get("refineCorners") === "1";
       const refineSource = bestFrame ?? video;
       let refinedSrcQuad = srcQuad;
-      try {
-        refinedSrcQuad = refineQuadCorners(refineSource, vw, vh, srcQuad);
-        logScanStage("subpixel-refine", {
-          before: formatQuad(srcQuad),
-          after: formatQuad(refinedSrcQuad),
-        });
-      } catch (e) {
-        console.warn("[scan] subpixel refine failed, using raw quad", e);
+      if (refineCornersEnabled) {
+        try {
+          refinedSrcQuad = refineQuadCorners(refineSource, vw, vh, srcQuad);
+          logScanStage("subpixel-refine", {
+            applied: true,
+            before: formatQuad(srcQuad),
+            after: formatQuad(refinedSrcQuad),
+          });
+        } catch (e) {
+          console.warn("[scan] subpixel refine failed, using raw quad", e);
+          logScanStage("subpixel-refine", { applied: false, reason: "exception" });
+        }
+      } else {
+        logScanStage("subpixel-refine", { applied: false, reason: "disabled-by-default" });
       }
 
-      // Threshold-based paper lock — Otsu + largest bright connected
-      // component + min-area oriented bounding box. Used to snap the crop
-      // tight to the actual paper edges so the wood/desk background doesn't
-      // appear around the warped page. Only adopted when its centroid is
-      // near the detected quad (sanity check) and its area is within a
-      // plausible range relative to the detected quad.
-      try {
-        const thrQuad = detectPaperByThreshold(refineSource, vw, vh);
-        if (thrQuad) {
-          const cx = (refinedSrcQuad[0].x + refinedSrcQuad[1].x + refinedSrcQuad[2].x + refinedSrcQuad[3].x) / 4;
-          const cy = (refinedSrcQuad[0].y + refinedSrcQuad[1].y + refinedSrcQuad[2].y + refinedSrcQuad[3].y) / 4;
-          const tx = (thrQuad[0].x + thrQuad[1].x + thrQuad[2].x + thrQuad[3].x) / 4;
-          const ty = (thrQuad[0].y + thrQuad[1].y + thrQuad[2].y + thrQuad[3].y) / 4;
-          const centroidDist = Math.hypot(cx - tx, cy - ty) / Math.hypot(vw, vh);
-          // quad areas (shoelace)
-          const quadArea = (q: typeof refinedSrcQuad) => {
-            let s = 0;
-            for (let i = 0; i < 4; i++) {
-              const a = q[i];
-              const b = q[(i + 1) % 4];
-              s += a.x * b.y - b.x * a.y;
-            }
-            return Math.abs(s) / 2;
-          };
-          const aDet = quadArea(refinedSrcQuad);
-          const aThr = quadArea(thrQuad);
-          const areaRatio = aDet > 0 ? aThr / aDet : 0;
-          const accept = centroidDist < 0.18 && areaRatio > 0.55 && areaRatio < 1.6;
-          logScanStage("threshold-paper-lock", {
-            applied: accept,
-            centroidDist,
-            areaRatio,
-            before: formatQuad(refinedSrcQuad),
-            candidate: formatQuad(thrQuad),
-          });
-          if (accept) refinedSrcQuad = thrQuad;
-        } else {
-          logScanStage("threshold-paper-lock", { applied: false, reason: "no-candidate" });
+      // Threshold-paper-lock — kan ERSÄTTA hela quaden med en Otsu-baserad
+      // kandidat upp till 60 % större. Var huvudorsaken till att bakgrund
+      // syntes längs en sida trots korrekt overlay-ram. AV som default
+      // (?paperLock=1 för experimentation).
+      const paperLockEnabled = urlParams.get("paperLock") === "1";
+      if (paperLockEnabled) {
+        try {
+          const thrQuad = detectPaperByThreshold(refineSource, vw, vh);
+          if (thrQuad) {
+            const cx = (refinedSrcQuad[0].x + refinedSrcQuad[1].x + refinedSrcQuad[2].x + refinedSrcQuad[3].x) / 4;
+            const cy = (refinedSrcQuad[0].y + refinedSrcQuad[1].y + refinedSrcQuad[2].y + refinedSrcQuad[3].y) / 4;
+            const tx = (thrQuad[0].x + thrQuad[1].x + thrQuad[2].x + thrQuad[3].x) / 4;
+            const ty = (thrQuad[0].y + thrQuad[1].y + thrQuad[2].y + thrQuad[3].y) / 4;
+            const centroidDist = Math.hypot(cx - tx, cy - ty) / Math.hypot(vw, vh);
+            const quadArea = (q: typeof refinedSrcQuad) => {
+              let s = 0;
+              for (let i = 0; i < 4; i++) {
+                const a = q[i];
+                const b = q[(i + 1) % 4];
+                s += a.x * b.y - b.x * a.y;
+              }
+              return Math.abs(s) / 2;
+            };
+            const aDet = quadArea(refinedSrcQuad);
+            const aThr = quadArea(thrQuad);
+            const areaRatio = aDet > 0 ? aThr / aDet : 0;
+            const accept = centroidDist < 0.18 && areaRatio > 0.55 && areaRatio < 1.6;
+            logScanStage("threshold-paper-lock", {
+              applied: accept,
+              centroidDist,
+              areaRatio,
+              before: formatQuad(refinedSrcQuad),
+              candidate: formatQuad(thrQuad),
+            });
+            if (accept) refinedSrcQuad = thrQuad;
+          } else {
+            logScanStage("threshold-paper-lock", { applied: false, reason: "no-candidate" });
+          }
+        } catch (e) {
+          console.warn("[scan] threshold paper lock failed", e);
+          logScanStage("threshold-paper-lock", { applied: false, reason: "exception" });
         }
-      } catch (e) {
-        console.warn("[scan] threshold paper lock failed", e);
+      } else {
+        logScanStage("threshold-paper-lock", { applied: false, reason: "disabled-by-default" });
       }
+
 
       // snapQuadToPaperEdges disabled per user request
       // try {
