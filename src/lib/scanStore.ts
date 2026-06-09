@@ -216,6 +216,54 @@ async function deletePreviewHandoffFromIndexedDb() {
   });
 }
 
+function createPreviewHandoffPayload(pages: string[], activeIndex: number) {
+  const safePages = pages.filter(isUsablePreviewPage);
+  if (!safePages.length) return null;
+  const safeActiveIndex = Math.max(0, Math.min(safePages.length - 1, activeIndex));
+  const payload = JSON.stringify({ pages: safePages, activeIndex: safeActiveIndex, createdAt: Date.now() });
+  return { safePages, safeActiveIndex, payload };
+}
+
+function savePreviewHandoffSync(pages: string[], activeIndex: number, reason: string) {
+  const handoff = createPreviewHandoffPayload(pages, activeIndex);
+  if (!handoff) return false;
+  const { safePages, safeActiveIndex, payload } = handoff;
+  const storage = safeSessionStorage();
+  let saved = false;
+  try {
+    storage?.setItem(PREVIEW_HANDOFF_KEY, payload);
+    saved = true;
+  } catch (error) {
+    debugScanStore("preview session handoff save failed", {
+      reason,
+      pages: safePages.length,
+      error: error instanceof Error ? error.name : "unknown",
+    });
+  }
+  try {
+    if (typeof window !== "undefined") {
+      // Secondary same-tab handoff. This survives a dev-server/HMR reload or
+      // route-chunk reload even when sessionStorage write/read is unavailable.
+      window.name = `${PREVIEW_HANDOFF_WINDOW_NAME_PREFIX}${payload}`;
+      saved = true;
+    }
+  } catch (error) {
+    debugScanStore("preview handoff save failed", {
+      reason,
+      pages: safePages.length,
+      error: error instanceof Error ? error.name : "unknown",
+    });
+  }
+  savePreviewHandoffToIndexedDb(payload).catch(() => {});
+  debugScanStore("saved preview handoff", {
+    reason,
+    pages: safePages.length,
+    activeIndex: safeActiveIndex,
+    saved,
+  });
+  return saved;
+}
+
 export const scanStore = {
   get: () => bag.state,
   getPages: () => sessionPages(bag.state),
@@ -234,6 +282,10 @@ export const scanStore = {
       pages: nextPages,
       imageDataUrl: dataUrl,
     };
+    // Persist the handoff immediately at capture time, not only when Done is
+    // pressed. Yesterday's recurring blank-preview failure happened when a
+    // dev/HMR reload or route error landed between addPage() and /preview.
+    savePreviewHandoffSync(nextPages, nextPages.length - 1, "addPage");
     notify();
     return bag.state;
   },
@@ -242,49 +294,16 @@ export const scanStore = {
     notify();
   },
   savePreviewHandoff: (pages: string[], activeIndex: number) => {
-    const safePages = pages.filter(isUsablePreviewPage);
-    if (!safePages.length) return false;
-    const storage = safeSessionStorage();
-    const safeActiveIndex = Math.max(0, Math.min(safePages.length - 1, activeIndex));
-    const payload = JSON.stringify({ pages: safePages, activeIndex: safeActiveIndex, createdAt: Date.now() });
-    let saved = false;
-    try {
-      storage?.setItem(PREVIEW_HANDOFF_KEY, payload);
-      saved = true;
-    } catch (error) {
-      debugScanStore("preview session handoff save failed", {
-        pages: safePages.length,
-        error: error instanceof Error ? error.name : "unknown",
-      });
-    }
-    try {
-      // Secondary same-tab handoff. This survives a dev-server/HMR reload or
-      // route-chunk reload even when sessionStorage write/read is unavailable.
-      window.name = `${PREVIEW_HANDOFF_WINDOW_NAME_PREFIX}${payload}`;
-      saved = true;
-      debugScanStore("saved preview handoff", {
-        pages: safePages.length,
-        activeIndex: safeActiveIndex,
-      });
-    } catch (error) {
-      debugScanStore("preview handoff save failed", {
-        pages: safePages.length,
-        error: error instanceof Error ? error.name : "unknown",
-      });
-    }
-    savePreviewHandoffToIndexedDb(payload).catch(() => {});
-    return saved;
+    return savePreviewHandoffSync(pages, activeIndex, "explicit");
   },
   savePreviewHandoffAsync: async (pages: string[], activeIndex: number) => {
-    const safePages = pages.filter(isUsablePreviewPage);
-    if (!safePages.length) return false;
-    const savedSync = scanStore.savePreviewHandoff(safePages, activeIndex);
-    const safeActiveIndex = Math.max(0, Math.min(safePages.length - 1, activeIndex));
-    const payload = JSON.stringify({ pages: safePages, activeIndex: safeActiveIndex, createdAt: Date.now() });
-    const savedDb = await savePreviewHandoffToIndexedDb(payload);
+    const handoff = createPreviewHandoffPayload(pages, activeIndex);
+    if (!handoff) return false;
+    const savedSync = savePreviewHandoffSync(handoff.safePages, handoff.safeActiveIndex, "done-to-preview");
+    const savedDb = await savePreviewHandoffToIndexedDb(handoff.payload);
     debugScanStore("preview handoff async save complete", {
-      pages: safePages.length,
-      activeIndex: safeActiveIndex,
+      pages: handoff.safePages.length,
+      activeIndex: handoff.safeActiveIndex,
       savedSync,
       savedDb,
     });
