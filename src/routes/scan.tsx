@@ -426,7 +426,14 @@ function ScanPage() {
   // also nudges exposureCompensation based on the measured paper luminance
   // (target ~165) so backlit pages get brightened and over-lit pages dimmed.
   function meterTowardsDoc(nx: number, ny: number, docLum: number) {
-    if (lockedRef.current || exposureLockedRef.current) return;
+    // Stop metering as soon as we're past HOLD_FRAMES — further exposure
+    // tweaks during ramp-up cause 2-4 frames of luminance/sharpness swing
+    // that eat stableCount progress and delay the first lock.
+    if (
+      lockedRef.current ||
+      exposureLockedRef.current ||
+      stableCount.current >= HOLD_FRAMES
+    ) return;
     const now = performance.now();
     if (now - lastMeterAtRef.current < METER_INTERVAL_MS) return;
     const track = streamRef.current?.getVideoTracks()[0];
