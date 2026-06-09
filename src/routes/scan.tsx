@@ -1654,21 +1654,35 @@ function ScanPage() {
       // (cleanPaperEdges/enhancePaper/removeShadows är borttagna).
       if (stageTimerRef.current) window.clearTimeout(stageTimerRef.current);
       setCaptureStage({ label: t("capStageEnhance"), progress: 0.5 });
-      // Feature flag: temporarily disable auto-rotation/deskew so we can
-      // verify whether the rotation issue lives before warp, inside warp, or
-      // inside autoOrientAndDeskewDocument. Toggle via either:
-      //   - URL: ?noAutoOrient=1
-      //   - localStorage: docscan.disableAutoOrient = "1"
-      let disableAutoOrient = false;
-      try {
-        const url = new URL(window.location.href);
-        if (url.searchParams.get("noAutoOrient") === "1") disableAutoOrient = true;
-        if (window.localStorage.getItem("docscan.disableAutoOrient") === "1") disableAutoOrient = true;
-      } catch {}
+      // Feature flags for stegvis felsökning av efter-warp-pipelinen.
+      // Toggla via URL (?flag=1) eller localStorage ("docscan.<flag>"="1"):
+      //   rawWarpOnly       → hoppa över ALLT efter warpQuadToRect
+      //   noAutoOrient      → hoppa över autoOrientAndDeskewDocument
+      //   noWhiten          → hoppa över whitenBackground
+      //   noInkBoost        → hoppa över boostInkContrast
+      const readFlag = (name: string): boolean => {
+        try {
+          const url = new URL(window.location.href);
+          if (url.searchParams.get(name) === "1") return true;
+          if (window.localStorage.getItem(`docscan.${name}`) === "1") return true;
+        } catch {}
+        return false;
+      };
+      const rawWarpOnly = readFlag("rawWarpOnly");
+      const disableAutoOrient = rawWarpOnly || readFlag("noAutoOrient");
+      const disableWhiten = rawWarpOnly || readFlag("noWhiten");
+      const disableInkBoost = rawWarpOnly || readFlag("noInkBoost");
+      logScanStage("post-warp-flags", {
+        rawWarpOnly,
+        disableAutoOrient,
+        disableWhiten,
+        disableInkBoost,
+      });
+
       if (disableAutoOrient) {
         logScanStage("warp-trace/7-auto-orient", {
           skipped: true,
-          reason: "feature-flag",
+          reason: rawWarpOnly ? "raw-warp-only" : "feature-flag",
           inputSize: { w: warped.width, h: warped.height },
           outputSize: { w: warped.width, h: warped.height },
         });
@@ -1699,25 +1713,39 @@ function ScanPage() {
       // luminance-blend weight inside whitenBackground (T_NONE=110 keeps
       // dark pixels untouched), so no glyphs are bleached.
       setCaptureStage({ label: t("capStageEnhance"), progress: 0.75 });
-      try {
-        warped = whitenBackground(warped);
-        logScanCanvas("after-whiten-background", warped, debugEnabled);
-        logScanStage("whiten-background", { applied: true, mode: "flat-field-text-safe" });
-      } catch (e) {
-        console.warn("[scan] whitenBackground failed; keeping warped frame", e);
-        logScanStage("whiten-background", { applied: false, reason: "exception" });
+      if (disableWhiten) {
+        logScanStage("whiten-background", {
+          applied: false,
+          reason: rawWarpOnly ? "raw-warp-only" : "feature-flag",
+        });
+      } else {
+        try {
+          warped = whitenBackground(warped);
+          logScanCanvas("after-whiten-background", warped, debugEnabled);
+          logScanStage("whiten-background", { applied: true, mode: "flat-field-text-safe" });
+        } catch (e) {
+          console.warn("[scan] whitenBackground failed; keeping warped frame", e);
+          logScanStage("whiten-background", { applied: false, reason: "exception" });
+        }
       }
 
       // Local ink-contrast boost — mild unsharp mask gated to dark pixels
       // (L<=150). Sharpens thin/light text (footers, body 8–9pt) without
       // amplifying background sensor noise on the now-white paper.
-      try {
-        warped = boostInkContrast(warped);
-        logScanCanvas("after-ink-boost", warped, debugEnabled);
-        logScanStage("ink-boost", { applied: true });
-      } catch (e) {
-        console.warn("[scan] boostInkContrast failed; keeping previous frame", e);
-        logScanStage("ink-boost", { applied: false, reason: "exception" });
+      if (disableInkBoost) {
+        logScanStage("ink-boost", {
+          applied: false,
+          reason: rawWarpOnly ? "raw-warp-only" : "feature-flag",
+        });
+      } else {
+        try {
+          warped = boostInkContrast(warped);
+          logScanCanvas("after-ink-boost", warped, debugEnabled);
+          logScanStage("ink-boost", { applied: true });
+        } catch (e) {
+          console.warn("[scan] boostInkContrast failed; keeping previous frame", e);
+          logScanStage("ink-boost", { applied: false, reason: "exception" });
+        }
       }
 
       // Post-capture sharpness gate. If the warped doc is blurry we abandon
