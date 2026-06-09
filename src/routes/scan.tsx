@@ -1817,7 +1817,7 @@ function ScanPage() {
             stepDeg: 0.25,
             minApplyDeg: 0.3,
             targetWidth: 600,
-            minConfidence: 1.15,
+            minConfidence: 1.08,
           });
           if (result.applied) {
             warped = result.canvas;
