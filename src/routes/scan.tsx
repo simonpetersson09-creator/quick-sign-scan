@@ -125,8 +125,8 @@ export const Route = createFileRoute("/scan")({
 const STABLE_DELTA = 0.035; // normalized 0..1 — tål små handvibrationer
 const DETECT_FRAMES = 3; // mjukare intro innan ramen visas
 const HOLD_FRAMES = 7; // ~0.23s — "Håll stilla" phase
-const READY_FRAMES = 14; // ~0.45s — "Dokument hittat" lock-in
-const STABLE_FRAMES = 22; // ~0.72s total before auto-capture
+const READY_FRAMES = 9; // ~0.30s — "Dokument hittat" lock-in (sänkt från 14)
+const STABLE_FRAMES = 15; // ~0.50s total before auto-capture (sänkt från 22)
 // Adaptive smoothing — mjukare och mindre ryckig rörelse på ramen.
 // Lägre alpha = långsammare följning = lugnare upplevelse.
 const ALPHA_PRE_LOCK = 0.18;
@@ -221,7 +221,7 @@ function ScanPage() {
   // throttled hi-res pass needs a few frames to weigh in. Reset whenever
   // the detection session ends (no corners, lock break, camera restart).
   const hiResTightConfirmedRef = useRef(false);
-  const MIN_EDGE_TIGHTNESS_PRE_HIRES = 0.45;
+  const MIN_EDGE_TIGHTNESS_PRE_HIRES = 0.35;
   // Feature flag: bump the detection frame width from the historical 280px
   // to give small/far A4 documents more pixels on the short side. Pure
   // resolution change — no algorithm/threshold changes, no multi-scale.
@@ -235,7 +235,7 @@ function ScanPage() {
   // instead of locking onto whichever quad happened to win the last frame.
   // Never changes the warp pipeline, min-area, or which quad is drawn —
   // only gates `stableCount` when more than one candidate has real support.
-  const ENABLE_CANDIDATE_MEMORY = true;
+  const ENABLE_CANDIDATE_MEMORY = false;
   const CANDIDATE_HISTORY_MAX = 15;
   const CANDIDATE_CLUSTER_DELTA = 0.05; // normalized corner distance
   const CANDIDATE_AREA_TOL = 0.18;
@@ -260,6 +260,9 @@ function ScanPage() {
   const lastRejectLogAtRef = useRef(0);
   const lastAdaptiveLogAtRef = useRef(0);
   const lastGateLogAtRef = useRef(0);
+  // Per-frame compact debug log (throttled). Always fires while debugEnabled
+  // is on, so we can see the full live-detection picture each ~250 ms.
+  const lastFrameLogAtRef = useRef(0);
   // Capture-gate diagnostics — populated each frame the document frame is
   // visible. Lets the debug overlay show exactly which gate is blocking
   // auto-capture (stability, sharpness, light, motion, cooldown, edge,
@@ -859,15 +862,17 @@ function ScanPage() {
       }
     }
 
-    // Hi-res edge-tightness recompute (Step B). Uses the EXISTING quad —
-    // no new detection, no new corners. Measures how tight each side of
-    // the (already-found) quad sits on a strong gradient in the full-res
-    // video, then swaps in the hi-res value only if it is better. This
-    // helps small/far A4 documents whose edges are sharp in 1920×1080 but
-    // undersampled in the 280px detect frame.
+    // Hi-res edge-tightness recompute. Tidigare körde detta varje frame —
+    // det åt CPU mitt under live-detektionen och bidrog till "trögt"
+    // beteende. Nu gatekeepat till frames där kandidaten redan är nära
+    // capture (stableCount >= READY_FRAMES). Live-loopen är därför snabb
+    // tills användaren faktiskt håller stilla; då lägger vi de extra
+    // cyklerna på att verifiera tightness mot full-res-videoframen och
+    // kan flippa readyForCapture false→true innan auto-capture.
     if (
       ENABLE_HIRES_TIGHTNESS_RECOMPUTE &&
       detection &&
+      stableCount.current >= READY_FRAMES &&
       now - lastHiResTightAtRef.current >= HIRES_TIGHT_COOLDOWN_MS
     ) {
       lastHiResTightAtRef.current = now;
@@ -997,72 +1002,32 @@ function ScanPage() {
     // Normalize to 0..1
     const norm = corners.map((p) => ({ x: p.x / dw, y: p.y / dh })) as [Point, Point, Point, Point];
 
-    // ===== Generous overlay branch (feature-flagged) =====
-    // The detection passed structural gates but NOT the strict capture
-    // gates (edgeTightness / contrast / brightness / etc.). Show the
-    // document frame to the user so they can see it IS being found, and
-    // coach them with a reason. Auto-capture is blocked here by design.
-    if (ENABLE_GENEROUS_OVERLAY && !readyForCapture) {
-      // Gentle EMA so the overlay glides instead of jittering.
-      const smoothed = emaQuad(smoothQuad.current, norm, 0.5);
-      smoothQuad.current = smoothed;
-      lastRawQuad.current = norm;
-      stableCount.current = 0;
-      lockedRef.current = false;
-      lockBreakFramesRef.current = 0;
-      setProgress(0);
-      drawOverlay(smoothed, "hold");
-
-      const areaRatio = detection?.debug.areaRatio ?? 0;
-      const a4Ratio = detection?.a4Ratio ?? Math.SQRT2;
-      const a4Diff = Math.min(
-        Math.abs(a4Ratio - Math.SQRT2),
-        Math.abs(a4Ratio - 1 / Math.SQRT2),
-      );
-      // Map reasonNotReady (+ live metrics) to actionable hint.
-      let nextStatus: Status = "align";
-      if (
-        reasonNotReady === "interiorTooDark" ||
-        reasonNotReady === "lowPaperBgContrast" ||
-        !isBrightEnough
-      ) {
-        nextStatus = "lowLight";
-      } else if (
-        reasonNotReady === "edgeTightnessLow" ||
-        reasonNotReady === "edgeTightnessLowAdaptive" ||
-        reasonNotReady === "edgeScoreLow"
-      ) {
-        // Weak edges almost always mean "document too far away" for A4.
-        if (areaRatio > 0 && areaRatio < 0.22) nextStatus = "tooFar";
-        else if (a4Diff > 0.3) nextStatus = "tilt";
-        else nextStatus = "align";
-      } else if (areaRatio > 0 && areaRatio < 0.22) {
-        nextStatus = "tooFar";
-      } else if (a4Diff > 0.3) {
-        nextStatus = "tilt";
-      } else {
-        nextStatus = "hold";
-      }
-      setStatus(nextStatus);
-
-      if (debugEnabled && now - lastOverlayLogAtRef.current > 750) {
-        lastOverlayLogAtRef.current = now;
-        // eslint-disable-next-line no-console
-        console.log("[scan] detection", {
-          detectedForOverlay,
-          readyForCapture,
-          reasonNotReady,
-          areaRatio,
-          a4Ratio,
-          edgeTightness: detection?.debug.edgeTightness,
-          edgeScore: detection?.debug.edgeScore,
-          a4Score: detection?.debug.a4Score,
-          confidence: detection?.confidence,
-          nextStatus,
-        });
-      }
-      return;
+    // ===== visibleCandidate vs captureCandidate =====
+    // visibleCandidate: detection passed structural gates → overlay får visas
+    //                   och stabilitet får byggas upp.
+    // captureCandidate: detection passed ALL strict gates → auto-capture
+    //                   tillåts trigga.
+    //
+    // Tidigare nollställde generous-overlay-grenen stableCount varje frame
+    // när readyForCapture=false, vilket gjorde att svaga-men-konsekventa
+    // kandidater aldrig kunde nå capture-tröskeln. Nu låter vi
+    // smoothing/stability/sharpness/brightness löpa som vanligt; det
+    // slutgiltiga capture-beslutet längre ner kräver fortfarande
+    // readyForCapture=true.
+    const visibleOnly = ENABLE_GENEROUS_OVERLAY && detectedForOverlay && !readyForCapture;
+    if (visibleOnly && debugEnabled && now - lastOverlayLogAtRef.current > 750) {
+      lastOverlayLogAtRef.current = now;
+      // eslint-disable-next-line no-console
+      console.log("[scan] visible-only", {
+        reasonNotReady,
+        areaRatio: detection?.debug.areaRatio,
+        a4Ratio: detection?.a4Ratio,
+        edgeTightness: detection?.debug.edgeTightness,
+        edgeScore: detection?.debug.edgeScore,
+        confidence: detection?.confidence,
+      });
     }
+
 
 
     // Candidate memory — record this detection so we can spot scenes where
@@ -1235,7 +1200,8 @@ function ScanPage() {
       motionAvailableRef.current && motionMagRef.current > MOTION_STILL_THRESHOLD;
     const cooldownMs = Math.max(0, armedAtRef.current - performance.now());
     let captureBlockedBy: string | null = null;
-    if (!isBrightEnough && lowLightFramesRef.current > 15) captureBlockedBy = "light";
+    if (visibleOnly) captureBlockedBy = `edge:${reasonNotReady ?? "unknown"}`;
+    else if (!isBrightEnough && lowLightFramesRef.current > 15) captureBlockedBy = "light";
     else if (stableCount.current < HOLD_FRAMES) captureBlockedBy = "stability:framing";
     else if (!isSharp) captureBlockedBy = "sharpness";
     else if (stableCount.current < READY_FRAMES) captureBlockedBy = "stability:ready";
@@ -1350,6 +1316,15 @@ function ScanPage() {
         setStatus("ready");
         stableCount.current = Math.max(0, stableCount.current - 1);
         if (captureGateRef.current) captureGateRef.current.reason = "ambiguous";
+      } else if (visibleOnly) {
+        // Stabilitet uppnådd men strikt gate (edge tightness / paper
+        // contrast / etc.) inte godkänd ännu. Visa ramen och vänta —
+        // hi-res-tightness-recompute körs nu också (gated på stableCount)
+        // och kan flippa readyForCapture nästa frame.
+        setStatus("align");
+        stableCount.current = Math.min(stableCount.current, STABLE_FRAMES - 1);
+        if (captureGateRef.current)
+          captureGateRef.current.reason = `edge:${reasonNotReady ?? "unknown"}`;
       } else {
         setStatus("capturing");
         if (captureGateRef.current) captureGateRef.current.reason = null;
@@ -1363,6 +1338,30 @@ function ScanPage() {
       lastGateLogAtRef.current = now;
       // eslint-disable-next-line no-console
       console.log("[scan] capture-gate", captureGateRef.current);
+    }
+
+    // Per-frame compact log. Visar exakt vad live-detektionen ser och vad
+    // som ev. blockerar capture, för felsökning av "trög" eller "ingen
+    // utlösning"-beteende. Throttlad till 250ms för att inte spamma.
+    if (debugEnabled && now - lastFrameLogAtRef.current > 250) {
+      lastFrameLogAtRef.current = now;
+      // eslint-disable-next-line no-console
+      console.log("[scan] frame", {
+        detected: detectedForOverlay,
+        readyForCapture,
+        visibleOnly,
+        reasonNotReady: reasonNotReady ?? null,
+        confidence: +(detection?.confidence ?? 0).toFixed(3),
+        edgeTightness: +edgeTightness.toFixed(3),
+        a4Diff: +a4Diff.toFixed(3),
+        areaRatio: +areaRatio.toFixed(3),
+        sharpness: +sharpness.toFixed(1),
+        brightness: +meanLum.toFixed(1),
+        stable: stableCount.current,
+        stableTarget: STABLE_FRAMES,
+        locked: lockedRef.current,
+        blockedBy: captureGateRef.current?.reason ?? null,
+      });
     }
   }
 
