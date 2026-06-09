@@ -878,6 +878,10 @@ function ScanPage() {
         })) as [Point, Point, Point, Point];
         const hi = computeHiResEdgeTightness(video, vw, vh, quadFull);
         const origTight = detection.debug.edgeTightness ?? 0;
+        // Mark hi-res as confirmed for this detection session even if hi
+        // didn't beat the 280px value — the 280px tightness is now ratified
+        // by the full-res signal, so capture gate can apply its strict 0.55.
+        if (hi) hiResTightConfirmedRef.current = true;
         if (hi && hi.tightness > origTight) {
           const wasBlockedByTightness =
             !detection.readyForCapture &&
