@@ -262,7 +262,7 @@ function ReviewPage() {
   const currentImg = pages[pageIdx];
 
   return (
-    <AppShell title={t("reviewTitle")} back="/sign">
+    <AppShell title={t("reviewTitle")} back={signed ? "/sign" : "/place"}>
       {/* Status row */}
       <div className="mt-1 mb-3 flex flex-wrap items-center justify-center gap-2">
         <StatusChip tone="success" label={t("documentReady")} />
