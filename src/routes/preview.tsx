@@ -5,6 +5,8 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore, type ScanDebugStage } from "@/lib/scanStore";
 import { useT } from "@/lib/i18n";
 import { applyFilter, type FilterMode } from "@/lib/imageFilters";
+import { analyzeDocumentQuality, type QualityReport } from "@/lib/quality";
+import { AlertTriangle } from "lucide-react";
 import {
   ArrowRight,
   Plus,
@@ -87,6 +89,8 @@ function PreviewPage() {
     () => scanStore.get().debugStages,
   );
   const [debugZoom, setDebugZoom] = useState<ScanDebugStage | null>(null);
+  const [qualityByIndex, setQualityByIndex] = useState<Record<number, QualityReport>>({});
+  const [dismissedQuality, setDismissedQuality] = useState<Record<number, boolean>>({});
   const handoffRecoveredRef = useRef(false);
 
   useEffect(() => {
@@ -212,10 +216,31 @@ function PreviewPage() {
     };
   }, [originalImage, activeIndex, filterMode, pages]);
 
-  // Invalidate cache when the underlying pages change (delete, reorder).
+  // Invalidate caches when the underlying pages change (delete, reorder).
   useEffect(() => {
     filterCache.current.clear();
+    setQualityByIndex({});
+    setDismissedQuality({});
   }, [pages]);
+
+  // Run a soft quality check on the warped/enhanced original image of the
+  // active page. Non-blocking: results render as a banner; user can ignore.
+  useEffect(() => {
+    if (!originalImage) return;
+    if (qualityByIndex[activeIndex]) return;
+    let cancelled = false;
+    void analyzeDocumentQuality(originalImage)
+      .then((report) => {
+        if (cancelled) return;
+        setQualityByIndex((prev) => ({ ...prev, [activeIndex]: report }));
+      })
+      .catch(() => {
+        // Silent — quality check is advisory only.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [originalImage, activeIndex, qualityByIndex]);
 
   function logPreviewImageLoad(source: string | null | undefined) {
     console.info("[preview] image element load", {
@@ -473,6 +498,48 @@ function PreviewPage() {
           <div className="text-white/70 text-xs mt-2">Tryck för att stänga</div>
         </div>
       )}
+
+      {(() => {
+        const report = qualityByIndex[activeIndex];
+        if (!report || report.verdict === "ok") return null;
+        if (dismissedQuality[activeIndex]) return null;
+        return (
+          <div className="mt-4 rounded-xl border border-amber-300/60 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800/60 p-3">
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle className="h-4 w-4 mt-0.5 text-amber-600 dark:text-amber-400 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-foreground">
+                  {t("qualityWarnTitle")}
+                </div>
+                <div className="text-[13px] text-foreground/75 mt-0.5">
+                  {t(`verdict_${report.verdict}`)}
+                </div>
+                <div className="mt-2.5 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      deletePage(activeIndex);
+                      navigate({ to: "/scan" });
+                    }}
+                    className="inline-flex items-center rounded-full border border-border bg-card px-3 py-1.5 text-[13px] font-medium text-foreground hover:bg-secondary transition"
+                  >
+                    {t("qualityRescan")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDismissedQuality((prev) => ({ ...prev, [activeIndex]: true }))
+                    }
+                    className="inline-flex items-center rounded-full px-3 py-1.5 text-[13px] font-medium text-foreground/70 hover:text-foreground transition"
+                  >
+                    {t("qualityUseAnyway")}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="flex-1" />
 
