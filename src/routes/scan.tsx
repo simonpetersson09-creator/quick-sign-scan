@@ -1650,9 +1650,35 @@ function ScanPage() {
       scoreCanvas.width = SCORE_W;
       scoreCanvas.height = scoreH;
       const scoreCtx = scoreCanvas.getContext("2d", { willReadFrequently: true })!;
+      // Wait until the <video> element has actually advanced to a new decoded
+      // frame before re-sampling. Without this, three drawImage() calls 50 ms
+      // apart on Safari can snapshot the SAME video frame (the compositor only
+      // updates on its own cadence), making "best of 3" effectively best of 1.
+      // requestVideoFrameCallback fires once per new presented frame; setTimeout
+      // is the fallback for browsers that don't support it (older Safari).
+      const videoEl = video as HTMLVideoElement & {
+        requestVideoFrameCallback?: (cb: (now: number, meta: unknown) => void) => number;
+      };
+      const waitForNextFrame = () =>
+        new Promise<void>((resolve) => {
+          if (typeof videoEl.requestVideoFrameCallback === "function") {
+            let settled = false;
+            const done = () => {
+              if (settled) return;
+              settled = true;
+              resolve();
+            };
+            videoEl.requestVideoFrameCallback(() => done());
+            // Hard ceiling: never block the burst more than 80 ms per attempt.
+            window.setTimeout(done, 80);
+          } else {
+            window.setTimeout(resolve, 50);
+          }
+        });
+
       for (let attempt = 0; attempt < 3; attempt++) {
         if (attempt > 0) {
-          await new Promise((r) => setTimeout(r, 50));
+          await waitForNextFrame();
         }
         scoreCtx.drawImage(
           video,
