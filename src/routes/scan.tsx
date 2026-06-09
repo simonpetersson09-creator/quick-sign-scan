@@ -1353,6 +1353,12 @@ function ScanPage() {
       // eslint-disable-next-line no-console
       console.log("[scan] frame", {
         detected: detectedForOverlay,
+        visibleCandidate: detectedForOverlay,
+        captureCandidate:
+          !!detection &&
+          detection.readyForCapture !== false &&
+          detection.confidence >= MIN_DOCUMENT_CONFIDENCE &&
+          edgeTightness >= MIN_EDGE_TIGHTNESS_FOR_CAPTURE,
         readyForCapture,
         visibleOnly,
         reasonNotReady: reasonNotReady ?? null,
