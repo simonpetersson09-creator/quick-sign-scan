@@ -2896,11 +2896,28 @@ function PlatformInstructions() {
     );
   };
 
-  const keys = isIOS
-    ? ["iosStep1", "iosStep2", "iosStep3", "iosStep4", "iosStep5"]
-    : isAndroid
-      ? ["andStep1", "andStep2", "andStep3", "andStep4"]
-      : ["genStep1", "genStep2", "genStep3", "genStep4", "genStep5"];
+  // On iOS, all browsers use WebKit and permission is granted per-app via iOS Settings.
+  // Chrome/Edge/Firefox on iOS use a per-app Camera toggle (not Safari).
+  const isIOSChrome = isIOS && /CriOS|FxiOS|EdgiOS/.test(ua);
+  const isAndroidChrome = isAndroid; // Android browsers expose the lock-icon flow
+  const isFirefox = !isIOS && !isAndroid && /Firefox\//.test(ua);
+  const isEdge = !isIOS && !isAndroid && /Edg\//.test(ua);
+  const isChrome = !isIOS && !isAndroid && !isFirefox && /Chrome\//.test(ua);
+  const isSafariDesktop = !isIOS && !isAndroid && /Safari\//.test(ua) && !/Chrome\//.test(ua);
+
+  const keys = isIOSChrome
+    ? ["iosChromeStep1", "iosChromeStep2", "iosChromeStep3", "iosChromeStep4"]
+    : isIOS
+      ? ["iosStep1", "iosStep2", "iosStep3", "iosStep4", "iosStep5"]
+      : isAndroidChrome
+        ? ["andStep1", "andStep2", "andStep3", "andStep4"]
+        : isChrome || isEdge
+          ? ["chromeStep1", "chromeStep2", "chromeStep3", "chromeStep4"]
+          : isSafariDesktop
+            ? ["safariStep1", "safariStep2", "safariStep3", "safariStep4"]
+            : isFirefox
+              ? ["firefoxStep1", "firefoxStep2", "firefoxStep3", "firefoxStep4"]
+              : ["genStep1", "genStep2", "genStep3", "genStep4", "genStep5"];
 
   return (
     <ol className="text-[13px] text-white/65 leading-relaxed list-decimal list-inside space-y-1">
