@@ -1587,10 +1587,11 @@ function ScanPage() {
       }
       logScanStage("burst-capture", { bestSharpness: bestScore });
 
-      // Subpixel corner refinement — kan nudga hörn upp till ±5 px och
-      // därmed avvika från overlay-ramen. AV som default (?refineCorners=1
-      // för experimentation).
-      const refineCornersEnabled = urlParams.get("refineCorners") === "1";
+      // Subpixel corner refinement — nudgar hörnen ±5 px till full
+      // videoupplösning. Nu PÅ som default vid capture (live-refine är
+      // fortfarande av; det är bara capture-pathen som körs här).
+      // Stäng av med ?refineCorners=0 för debugging.
+      const refineCornersEnabled = urlParams.get("refineCorners") !== "0";
       const refineSource = bestFrame ?? video;
       let refinedSrcQuad = srcQuad;
       if (refineCornersEnabled) {
