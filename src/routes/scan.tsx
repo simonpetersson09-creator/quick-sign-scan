@@ -1685,7 +1685,7 @@ function ScanPage() {
           "innercrop",
         ) === "0"
       );
-      const INNER_CROP_FRACTION = 0.015;
+      const INNER_CROP_FRACTION = 0.01;
       let warpQuad = finalSrcQuad;
       if (innerCropEnabled && INNER_CROP_FRACTION > 0) {
         const cx =
