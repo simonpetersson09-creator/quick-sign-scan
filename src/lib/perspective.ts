@@ -3020,16 +3020,36 @@ export function computeHiResEdgeTightness(
  * detections that land a few mm off the paper can be pulled exactly onto
  * the edge. Median-based ⇒ robust to text/lines crossing the strip.
  */
+/**
+ * Defensive "snap to paper edges" pass. For each of the 4 sides we search a
+ * narrow band perpendicular to the side for a stronger luminance gradient
+ * than the one the detector already found. We only accept the snap when:
+ *   - enough columns vote for an offset (≥40% of sampled columns)
+ *   - the new edge's median gradient strength is ≥1.3× the on-line strength
+ *   - the suggested shift is within MAX_SHIFT (clamped, never amplified)
+ *
+ * Parameters are scaled to the source's short side so behaviour is stable
+ * across detection resolutions:
+ *   - search radius  ≈ ±2.3% of short side  (≈12 px at 520, ≈25 px at 1080)
+ *   - max shift      ≈ ±1.2% of short side  (≈6  px at 520, ≈13 px at 1080)
+ *
+ * On any failure (per-side or globally) the original quad is returned
+ * unchanged — this pass is allowed to be a no-op, never a regression.
+ */
 export function snapQuadToPaperEdges(
   source: HTMLCanvasElement | HTMLVideoElement,
   srcW: number,
   srcH: number,
   quad: [Point, Point, Point, Point],
 ): [Point, Point, Point, Point] {
-  const BAND = 28;         // ± search window in source pixels (per side)
-  const MIN_GRAD = 14;     // ignore weak gradients (noise, faint text)
+  const shortSide = Math.min(srcW, srcH);
+  const BAND = Math.max(10, Math.round(shortSide * 0.023));      // ± search window
+  const MAX_SHIFT = Math.max(5, Math.round(shortSide * 0.012));  // hard clamp per side
+  const MIN_GRAD = 14;            // ignore weak gradients (noise, faint text)
+  const STRENGTH_RATIO = 1.3;     // new edge must beat current line by this factor
+  const MIN_COL_FRACTION = 0.4;   // ≥40% of sampled columns must agree
+  const SAMPLE_COLS = 20;         // sparse column sampling per side
   const MAX_STRIP_W = 800;
-  const MAX_SHIFT = BAND - 2;
 
   const sides: Array<[Point, Point]> = [
     [quad[0], quad[1]], // top
@@ -3042,15 +3062,10 @@ export function snapQuadToPaperEdges(
   const sctx = strip.getContext("2d", { willReadFrequently: true });
   if (!sctx) return quad;
 
-  // Centre of the quad — used to know the "outside" direction (positive
-  // perpendicular = away from centre). Paper is bright, surroundings darker
-  // (in general), so we accept either polarity but prefer the dominant one.
   const cx = (quad[0].x + quad[1].x + quad[2].x + quad[3].x) / 4;
   const cy = (quad[0].y + quad[1].y + quad[2].y + quad[3].y) / 4;
 
   const offsets: number[] = [];
-  // Perpendicular unit vectors per side (rotated 90° CW relative to p1→p2),
-  // re-oriented so they point AWAY from the centre.
   const normals: Array<{ nx: number; ny: number }> = [];
 
   for (const [p1, p2] of sides) {
@@ -3063,7 +3078,6 @@ export function snapQuadToPaperEdges(
       continue;
     }
     const angle = Math.atan2(dy, dx);
-    // Perpendicular to (dx,dy), pointing outside the quad.
     let nx = -dy / len;
     let ny = dx / len;
     const midX = (p1.x + p2.x) / 2;
@@ -3083,8 +3097,6 @@ export function snapQuadToPaperEdges(
     sctx.setTransform(1, 0, 0, 1, 0, 0);
     sctx.fillStyle = "#000";
     sctx.fillRect(0, 0, stripW, stripH);
-    // Strip layout: row BAND = on the line, row > BAND = outside the quad
-    // (along +normal), row < BAND = inside.
     const scale = stripW / len;
     sctx.translate(0, BAND);
     sctx.scale(scale, 1);
@@ -3104,12 +3116,11 @@ export function snapQuadToPaperEdges(
       lum[j] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
     }
 
-    // For each column, find row with strongest vertical gradient.
-    // We prefer "bright-inside, dark-outside" transitions (paper→table),
-    // so we score signed gradient where row+1 is outside, row-1 inside:
-    //   signed = lum(inside) - lum(outside) ⇒ positive when paper is brighter.
+    // Sparse column sampling: SAMPLE_COLS evenly spaced columns.
     const cols: number[] = [];
-    for (let x = 0; x < stripW; x++) {
+    const onLineStrengths: number[] = [];
+    const stride = Math.max(1, Math.floor(stripW / SAMPLE_COLS));
+    for (let x = Math.floor(stride / 2); x < stripW; x += stride) {
       let bestSigned = 0;
       let bestRow = -1;
       for (let y = 2; y < stripH - 2; y++) {
@@ -3121,23 +3132,55 @@ export function snapQuadToPaperEdges(
           bestRow = y;
         }
       }
+      // On-line strength = signed gradient at the current edge (row = BAND).
+      const onInside = lum[(BAND - 1) * stripW + x];
+      const onOutside = lum[(BAND + 1) * stripW + x];
+      onLineStrengths.push(Math.max(0, onInside - onOutside));
+
       if (bestSigned >= MIN_GRAD && bestRow >= 0) {
-        cols.push(bestRow - BAND); // offset from line; positive = outside
+        cols.push(bestRow - BAND);
       }
     }
 
-    if (cols.length < stripW * 0.15) {
-      // Not enough edge evidence on this side — keep it where it is.
+    if (cols.length < SAMPLE_COLS * MIN_COL_FRACTION) {
       offsets.push(0);
       continue;
     }
-    cols.sort((a, b) => a - b);
-    const median = cols[Math.floor(cols.length / 2)];
-    const clamped = Math.max(-MAX_SHIFT, Math.min(MAX_SHIFT, median));
+
+    const sorted = [...cols].sort((a, b) => a - b);
+    const medianOffset = sorted[Math.floor(sorted.length / 2)];
+
+    // Strength gate: median best gradient must beat median on-line gradient
+    // by STRENGTH_RATIO. Otherwise the detector's edge is already good
+    // enough; snapping risks chasing texture/text instead of the paper edge.
+    const bestStrengths: number[] = [];
+    for (let x = Math.floor(stride / 2), idx = 0; x < stripW && idx < cols.length; x += stride) {
+      // recompute best signed for this column (cheap; already done above)
+      let bestSigned = 0;
+      for (let y = 2; y < stripH - 2; y++) {
+        const inside = lum[(y - 1) * stripW + x];
+        const outside = lum[(y + 1) * stripW + x];
+        const signed = inside - outside;
+        if (signed > bestSigned) bestSigned = signed;
+      }
+      bestStrengths.push(bestSigned);
+      idx++;
+    }
+    const medianBest = bestStrengths.sort((a, b) => a - b)[Math.floor(bestStrengths.length / 2)] ?? 0;
+    const medianOnLine = onLineStrengths.sort((a, b) => a - b)[Math.floor(onLineStrengths.length / 2)] ?? 0;
+
+    if (medianBest < Math.max(MIN_GRAD, medianOnLine * STRENGTH_RATIO)) {
+      // Current edge is already strong; don't move it.
+      offsets.push(0);
+      continue;
+    }
+
+    const clamped = Math.max(-MAX_SHIFT, Math.min(MAX_SHIFT, medianOffset));
     offsets.push(clamped);
   }
 
-  // Shift each side perpendicular by its offset (in source px).
+  // Shift each side perpendicular by its offset (in source px), then
+  // intersect adjacent sides to recover corners.
   type Line = { p: Point; d: Point };
   const lines: Line[] = sides.map(([p1, p2], i) => {
     const n = normals[i];
@@ -3148,7 +3191,6 @@ export function snapQuadToPaperEdges(
     };
   });
 
-  // Intersect adjacent sides: corner k = intersect(side[k-1], side[k]).
   function intersect(a: Line, b: Line): Point | null {
     const denom = a.d.x * b.d.y - a.d.y * b.d.x;
     if (Math.abs(denom) < 1e-6) return null;
@@ -3158,8 +3200,8 @@ export function snapQuadToPaperEdges(
 
   const newCorners: Point[] = [];
   for (let i = 0; i < 4; i++) {
-    const prev = lines[(i + 3) % 4]; // side ending at corner i
-    const next = lines[i];           // side starting at corner i
+    const prev = lines[(i + 3) % 4];
+    const next = lines[i];
     const ip = intersect(prev, next);
     if (!ip || !Number.isFinite(ip.x) || !Number.isFinite(ip.y)) {
       newCorners.push(quad[i]);
@@ -3170,6 +3212,14 @@ export function snapQuadToPaperEdges(
       });
     }
   }
+
+  // Safety: if any corner moved more than 2× MAX_SHIFT (geometric blow-up
+  // from a near-parallel intersection), abort and return the original quad.
+  for (let i = 0; i < 4; i++) {
+    const moved = Math.hypot(newCorners[i].x - quad[i].x, newCorners[i].y - quad[i].y);
+    if (moved > MAX_SHIFT * 2) return quad;
+  }
+
   return newCorners as [Point, Point, Point, Point];
 }
 
