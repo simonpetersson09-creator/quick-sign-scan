@@ -512,7 +512,7 @@ function PreviewPage() {
                   {t("qualityWarnTitle")}
                 </div>
                 <div className="text-[13px] text-foreground/75 mt-0.5">
-                  {t(`verdict_${report.verdict}` as Parameters<typeof t>[0])}
+                  {t(`verdict_${report.verdict}`)}
                 </div>
                 <div className="mt-2.5 flex gap-2">
                   <button
