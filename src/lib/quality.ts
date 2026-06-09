@@ -1,41 +1,83 @@
 // Quality analysis for warped A4 documents.
 // All metrics run on a downscaled grayscale copy for speed.
 
+export type QualityMode = "color" | "gray" | "bw";
+
+export type QualityIssue =
+  | "dark"
+  | "bright"
+  | "low_contrast"
+  | "blurry"
+  | "incomplete";
+
+export type QualityVerdict = "ok" | QualityIssue;
+
 export interface QualityReport {
+  mode: QualityMode;
   brightness: number; // 0..255 mean luminance
   contrast: number; // 0..~128 stddev of luminance
   sharpness: number; // variance of Laplacian
   inkBands: [number, number, number]; // ratio of "ink" pixels in top/mid/bottom thirds
-  // Overall verdict — first failing rule wins
-  verdict:
-    | "ok"
-    | "dark"
-    | "bright"
-    | "low_contrast"
-    | "blurry"
-    | "incomplete";
+  // All failing rules, in priority order. Empty when verdict is "ok".
+  issues: QualityIssue[];
+  // First failing rule, or "ok". Kept for back-compat.
+  verdict: QualityVerdict;
 }
 
 export interface QualityThresholds {
-  minBrightness: number;
-  maxBrightness: number;
-  minContrast: number;
-  minSharpness: number;
-  minBandInk: number;
+  // null disables that check (used for BW where the metric is meaningless).
+  minBrightness: number | null;
+  maxBrightness: number | null;
+  minContrast: number | null;
+  minSharpness: number | null;
+  minBandInk: number | null;
 }
 
-export const DEFAULT_THRESHOLDS: QualityThresholds = {
-  minBrightness: 95,
-  maxBrightness: 240,
-  minContrast: 28,
-  minSharpness: 55,
-  minBandInk: 0.003,
+// Mode-specific presets.
+// Rationale: post-analysis must be measured in the same scale the user sees.
+// - color: raw warped image, ink-on-paper means brightness ~140-220.
+// - gray: whitened/level-stretched, paper saturates near ~210-240.
+// - bw: Sauvola output is bimodal — brightness/contrast metrics are
+//   meaningless, so we only keep sharpness and band-ink coverage.
+export const THRESHOLDS_COLOR: QualityThresholds = {
+  minBrightness: 110,
+  maxBrightness: 235,
+  minContrast: 22,
+  minSharpness: 70,
+  minBandInk: 0.005,
 };
+
+export const THRESHOLDS_GRAY: QualityThresholds = {
+  minBrightness: 150,
+  maxBrightness: 248,
+  minContrast: 30,
+  minSharpness: 70,
+  minBandInk: 0.005,
+};
+
+export const THRESHOLDS_BW: QualityThresholds = {
+  minBrightness: null,
+  maxBrightness: null,
+  minContrast: null,
+  minSharpness: 70,
+  minBandInk: 0.005,
+};
+
+export const DEFAULT_THRESHOLDS_BY_MODE: Record<QualityMode, QualityThresholds> = {
+  color: THRESHOLDS_COLOR,
+  gray: THRESHOLDS_GRAY,
+  bw: THRESHOLDS_BW,
+};
+
+// Back-compat alias — earlier callers imported DEFAULT_THRESHOLDS without a mode.
+export const DEFAULT_THRESHOLDS: QualityThresholds = THRESHOLDS_COLOR;
 
 export async function analyzeDocumentQuality(
   imageDataUrl: string,
-  thresholds: QualityThresholds = DEFAULT_THRESHOLDS,
+  mode: QualityMode = "color",
+  thresholds?: QualityThresholds,
 ): Promise<QualityReport> {
+  const t = thresholds ?? DEFAULT_THRESHOLDS_BY_MODE[mode];
   const img = await loadImage(imageDataUrl);
   // Downscale for fast analysis
   const targetW = 320;
@@ -110,14 +152,20 @@ export async function analyzeDocumentQuality(
     bandCounts[2] / bandTotals[2],
   ];
 
-  let verdict: QualityReport["verdict"] = "ok";
-  if (brightness < thresholds.minBrightness) verdict = "dark";
-  else if (brightness > thresholds.maxBrightness) verdict = "bright";
-  else if (contrast < thresholds.minContrast) verdict = "low_contrast";
-  else if (sharpness < thresholds.minSharpness) verdict = "blurry";
-  else if (inkBands.some((b) => b < thresholds.minBandInk)) verdict = "incomplete";
+  // Collect all failing rules, in fixed priority order.
+  const issues: QualityIssue[] = [];
+  if (t.minBrightness !== null && brightness < t.minBrightness) issues.push("dark");
+  if (t.maxBrightness !== null && brightness > t.maxBrightness) issues.push("bright");
+  if (t.minContrast !== null && contrast < t.minContrast) issues.push("low_contrast");
+  if (t.minSharpness !== null && sharpness < t.minSharpness) issues.push("blurry");
+  if (t.minBandInk !== null) {
+    const minInk = t.minBandInk;
+    if (inkBands.some((b) => b < minInk)) issues.push("incomplete");
+  }
 
-  return { brightness, contrast, sharpness, inkBands, verdict };
+  const verdict: QualityVerdict = issues[0] ?? "ok";
+
+  return { mode, brightness, contrast, sharpness, inkBands, issues, verdict };
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -129,7 +177,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-export const VERDICT_MESSAGE: Record<QualityReport["verdict"], string> = {
+export const VERDICT_MESSAGE: Record<QualityVerdict, string> = {
   ok: "Dokumentet ser bra ut",
   dark: "För mörkt",
   bright: "För ljust — exponeringen är överstyrd",

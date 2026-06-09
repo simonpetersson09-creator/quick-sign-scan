@@ -5,7 +5,12 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore, type ScanDebugStage } from "@/lib/scanStore";
 import { useT } from "@/lib/i18n";
 import { applyFilter, type FilterMode } from "@/lib/imageFilters";
-import { analyzeDocumentQuality, type QualityReport } from "@/lib/quality";
+import {
+  analyzeDocumentQuality,
+  type QualityIssue,
+  type QualityMode,
+  type QualityReport,
+} from "@/lib/quality";
 import { AlertTriangle } from "lucide-react";
 import {
   ArrowRight,
@@ -89,8 +94,8 @@ function PreviewPage() {
     () => scanStore.get().debugStages,
   );
   const [debugZoom, setDebugZoom] = useState<ScanDebugStage | null>(null);
-  const [qualityByIndex, setQualityByIndex] = useState<Record<number, QualityReport>>({});
-  const [dismissedQuality, setDismissedQuality] = useState<Record<number, boolean>>({});
+  const [qualityByKey, setQualityByKey] = useState<Record<string, QualityReport>>({});
+  const [dismissedQuality, setDismissedQuality] = useState<Record<string, boolean>>({});
   const handoffRecoveredRef = useRef(false);
 
   useEffect(() => {
@@ -219,20 +224,24 @@ function PreviewPage() {
   // Invalidate caches when the underlying pages change (delete, reorder).
   useEffect(() => {
     filterCache.current.clear();
-    setQualityByIndex({});
+    setQualityByKey({});
     setDismissedQuality({});
   }, [pages]);
 
-  // Run a soft quality check on the warped/enhanced original image of the
-  // active page. Non-blocking: results render as a banner; user can ignore.
+  // Run a soft quality check on the currently displayed image (per filter
+  // mode). Non-blocking — results render as a banner; user can ignore.
+  const qualityKey = `${activeIndex}|${filterMode}`;
+  const analysisSource = filterMode === "color" ? originalImage : displayUrl;
   useEffect(() => {
-    if (!originalImage) return;
-    if (qualityByIndex[activeIndex]) return;
+    if (!analysisSource) return;
+    if (qualityByKey[qualityKey]) return;
+    if (filtering) return;
     let cancelled = false;
-    void analyzeDocumentQuality(originalImage)
+    const mode: QualityMode = filterMode;
+    void analyzeDocumentQuality(analysisSource, mode)
       .then((report) => {
         if (cancelled) return;
-        setQualityByIndex((prev) => ({ ...prev, [activeIndex]: report }));
+        setQualityByKey((prev) => ({ ...prev, [qualityKey]: report }));
       })
       .catch(() => {
         // Silent — quality check is advisory only.
@@ -240,7 +249,7 @@ function PreviewPage() {
     return () => {
       cancelled = true;
     };
-  }, [originalImage, activeIndex, qualityByIndex]);
+  }, [analysisSource, qualityKey, qualityByKey, filterMode, filtering]);
 
   function logPreviewImageLoad(source: string | null | undefined) {
     console.info("[preview] image element load", {
@@ -500,9 +509,9 @@ function PreviewPage() {
       )}
 
       {(() => {
-        const report = qualityByIndex[activeIndex];
-        if (!report || report.verdict === "ok") return null;
-        if (dismissedQuality[activeIndex]) return null;
+        const report = qualityByKey[qualityKey];
+        if (!report || report.issues.length === 0) return null;
+        if (dismissedQuality[qualityKey]) return null;
         return (
           <div className="mt-4 rounded-xl border border-amber-300/60 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800/60 p-3">
             <div className="flex items-start gap-2.5">
@@ -511,9 +520,16 @@ function PreviewPage() {
                 <div className="text-sm font-semibold text-foreground">
                   {t("qualityWarnTitle")}
                 </div>
-                <div className="text-[13px] text-foreground/75 mt-0.5">
-                  {t(`verdict_${report.verdict}`)}
-                </div>
+                <ul className="mt-0.5 space-y-0.5">
+                  {report.issues.map((issue: QualityIssue) => (
+                    <li
+                      key={issue}
+                      className="text-[13px] text-foreground/75 leading-snug"
+                    >
+                      • {t(`verdict_${issue}`)}
+                    </li>
+                  ))}
+                </ul>
                 <div className="mt-2.5 flex gap-2">
                   <button
                     type="button"
@@ -528,7 +544,7 @@ function PreviewPage() {
                   <button
                     type="button"
                     onClick={() =>
-                      setDismissedQuality((prev) => ({ ...prev, [activeIndex]: true }))
+                      setDismissedQuality((prev) => ({ ...prev, [qualityKey]: true }))
                     }
                     className="inline-flex items-center rounded-full px-3 py-1.5 text-[13px] font-medium text-foreground/70 hover:text-foreground transition"
                   >
