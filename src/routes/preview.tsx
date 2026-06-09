@@ -5,7 +5,12 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore, type ScanDebugStage } from "@/lib/scanStore";
 import { useT } from "@/lib/i18n";
 import { applyFilter, type FilterMode } from "@/lib/imageFilters";
-import { analyzeDocumentQuality, type QualityReport } from "@/lib/quality";
+import {
+  analyzeDocumentQuality,
+  type QualityIssue,
+  type QualityMode,
+  type QualityReport,
+} from "@/lib/quality";
 import { AlertTriangle } from "lucide-react";
 import {
   ArrowRight,
