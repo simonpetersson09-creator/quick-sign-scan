@@ -509,9 +509,9 @@ function PreviewPage() {
       )}
 
       {(() => {
-        const report = qualityByIndex[activeIndex];
-        if (!report || report.verdict === "ok") return null;
-        if (dismissedQuality[activeIndex]) return null;
+        const report = qualityByKey[qualityKey];
+        if (!report || report.issues.length === 0) return null;
+        if (dismissedQuality[qualityKey]) return null;
         return (
           <div className="mt-4 rounded-xl border border-amber-300/60 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800/60 p-3">
             <div className="flex items-start gap-2.5">
@@ -520,9 +520,16 @@ function PreviewPage() {
                 <div className="text-sm font-semibold text-foreground">
                   {t("qualityWarnTitle")}
                 </div>
-                <div className="text-[13px] text-foreground/75 mt-0.5">
-                  {t(`verdict_${report.verdict}`)}
-                </div>
+                <ul className="mt-0.5 space-y-0.5">
+                  {report.issues.map((issue: QualityIssue) => (
+                    <li
+                      key={issue}
+                      className="text-[13px] text-foreground/75 leading-snug"
+                    >
+                      • {t(`verdict_${issue}`)}
+                    </li>
+                  ))}
+                </ul>
                 <div className="mt-2.5 flex gap-2">
                   <button
                     type="button"
@@ -537,7 +544,7 @@ function PreviewPage() {
                   <button
                     type="button"
                     onClick={() =>
-                      setDismissedQuality((prev) => ({ ...prev, [activeIndex]: true }))
+                      setDismissedQuality((prev) => ({ ...prev, [qualityKey]: true }))
                     }
                     className="inline-flex items-center rounded-full px-3 py-1.5 text-[13px] font-medium text-foreground/70 hover:text-foreground transition"
                   >
