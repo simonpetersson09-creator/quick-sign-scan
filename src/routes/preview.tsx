@@ -322,13 +322,18 @@ function PreviewPage() {
           )}
           <div
             className="relative rounded-2xl overflow-hidden border border-border bg-muted/30 p-3"
-            style={{ width: "min(78vw, 340px)", aspectRatio: "1 / 1.4142" }}
+            style={{ width: "min(78vw, 340px)" }}
           >
-            <img
-              src={displayUrl ?? originalImage}
-              alt={t("scannedAlt")}
-              className="w-full h-full object-contain bg-white"
-            />
+            <div
+              className="relative w-full overflow-hidden rounded-lg bg-white"
+              style={{ aspectRatio: "1 / 1.4142" }}
+            >
+              <img
+                src={displayUrl ?? originalImage}
+                alt={t("scannedAlt")}
+                className="absolute inset-0 w-full h-full object-contain"
+              />
+            </div>
             {filtering && (
               <div className="absolute inset-3 flex items-center justify-center bg-white/60 backdrop-blur-sm rounded-xl">
                 <Loader2 className="h-6 w-6 animate-spin text-foreground/70" />
