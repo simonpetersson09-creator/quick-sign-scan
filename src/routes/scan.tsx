@@ -1650,9 +1650,35 @@ function ScanPage() {
       scoreCanvas.width = SCORE_W;
       scoreCanvas.height = scoreH;
       const scoreCtx = scoreCanvas.getContext("2d", { willReadFrequently: true })!;
+      // Wait until the <video> element has actually advanced to a new decoded
+      // frame before re-sampling. Without this, three drawImage() calls 50 ms
+      // apart on Safari can snapshot the SAME video frame (the compositor only
+      // updates on its own cadence), making "best of 3" effectively best of 1.
+      // requestVideoFrameCallback fires once per new presented frame; setTimeout
+      // is the fallback for browsers that don't support it (older Safari).
+      const videoEl = video as HTMLVideoElement & {
+        requestVideoFrameCallback?: (cb: (now: number, meta: unknown) => void) => number;
+      };
+      const waitForNextFrame = () =>
+        new Promise<void>((resolve) => {
+          if (typeof videoEl.requestVideoFrameCallback === "function") {
+            let settled = false;
+            const done = () => {
+              if (settled) return;
+              settled = true;
+              resolve();
+            };
+            videoEl.requestVideoFrameCallback(() => done());
+            // Hard ceiling: never block the burst more than 80 ms per attempt.
+            window.setTimeout(done, 80);
+          } else {
+            window.setTimeout(resolve, 50);
+          }
+        });
+
       for (let attempt = 0; attempt < 3; attempt++) {
         if (attempt > 0) {
-          await new Promise((r) => setTimeout(r, 50));
+          await waitForNextFrame();
         }
         scoreCtx.drawImage(
           video,
@@ -2160,11 +2186,41 @@ function ScanPage() {
     triggerCaptureHaptic();
     const vw = video.videoWidth;
     const vh = video.videoHeight;
-    const canvas = document.createElement("canvas");
+    let canvas = document.createElement("canvas");
     canvas.width = vw;
     canvas.height = vh;
     canvas.getContext("2d")!.drawImage(video, 0, 0, vw, vh);
-    const dataUrl = canvasToSafeImageDataUrl(canvas, 0.82);
+
+    // Even with no detection we still owe the user the document-enhancement
+    // pipeline. Skipping it would mean the manual escape hatch produces a
+    // raw camera screenshot — significantly worse than a normal scan in
+    // every dimension (illumination, sharpness, white balance, file size).
+    // We deliberately skip the perspective warp (no quad to warp to) but
+    // keep the same colour / illumination / sharpening chain that capture()
+    // applies after warpQuadToRect. Errors are non-fatal — the raw frame
+    // is the always-safe fallback.
+    try {
+      canvas = grayWorldWhiteBalance(canvas);
+    } catch (e) {
+      console.warn("[scan] manual fallback: grayWorldWhiteBalance failed", e);
+    }
+    try {
+      canvas = whitenBackground(canvas);
+    } catch (e) {
+      console.warn("[scan] manual fallback: whitenBackground failed", e);
+    }
+    try {
+      canvas = unsharpMaskText(canvas, { amount: 0.4, threshold: 4 });
+    } catch (e) {
+      console.warn("[scan] manual fallback: unsharpMaskText failed", e);
+    }
+    try {
+      canvas = boostInkContrast(canvas);
+    } catch (e) {
+      console.warn("[scan] manual fallback: boostInkContrast failed", e);
+    }
+
+    const dataUrl = canvasToSafeImageDataUrl(canvas, 0.92);
     if (!dataUrl) {
       capturedRef.current = false;
       setStatus("searching");
