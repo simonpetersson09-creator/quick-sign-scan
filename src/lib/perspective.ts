@@ -3707,3 +3707,69 @@ export function grayWorldWhiteBalance(canvas: HTMLCanvasElement): HTMLCanvasElem
   ctx.putImageData(img, 0, 0);
   return canvas;
 }
+
+// ============================================================================
+// Unsharp mask — gentle post-warp sharpening for text
+// ============================================================================
+//
+// Classic unsharp: sharpened = original + amount * (original - blurred).
+// Tuned for document text: small radius (~0.6px equivalent via 3x3 Gaussian),
+// modest amount (~0.4), and a luminance threshold so we don't amplify sensor
+// noise on the now-white paper. Operates on luminance only to avoid colour
+// fringing on ink. Run AFTER whitenBackground.
+export function unsharpMaskText(
+  canvas: HTMLCanvasElement,
+  options: { amount?: number; threshold?: number } = {},
+): HTMLCanvasElement {
+  const amount = options.amount ?? 0.4;
+  const threshold = options.threshold ?? 4; // skip pixels where |orig-blur| < threshold
+  const w = canvas.width;
+  const h = canvas.height;
+  if (w < 3 || h < 3) return canvas;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  const n = w * h;
+
+  // Build luminance plane.
+  const lum = new Uint8ClampedArray(n);
+  for (let i = 0; i < n; i++) {
+    const o = i * 4;
+    lum[i] = (0.299 * d[o] + 0.587 * d[o + 1] + 0.114 * d[o + 2]) | 0;
+  }
+
+  // 3x3 Gaussian blur (kernel: [1 2 1; 2 4 2; 1 2 1] / 16) — separable.
+  const tmp = new Uint8ClampedArray(n);
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    for (let x = 0; x < w; x++) {
+      const xl = x > 0 ? x - 1 : x;
+      const xr = x < w - 1 ? x + 1 : x;
+      tmp[row + x] = ((lum[row + xl] + 2 * lum[row + x] + lum[row + xr]) >> 2) as number;
+    }
+  }
+  const blur = new Uint8ClampedArray(n);
+  for (let x = 0; x < w; x++) {
+    for (let y = 0; y < h; y++) {
+      const yu = y > 0 ? y - 1 : y;
+      const yd = y < h - 1 ? y + 1 : y;
+      blur[y * w + x] = ((tmp[yu * w + x] + 2 * tmp[y * w + x] + tmp[yd * w + x]) >> 2) as number;
+    }
+  }
+
+  // Apply sharpening to each channel, scaled by the luminance high-pass.
+  for (let i = 0; i < n; i++) {
+    const hp = lum[i] - blur[i];
+    if (hp > -threshold && hp < threshold) continue;
+    const boost = amount * hp;
+    const o = i * 4;
+    const r = d[o] + boost;
+    const g = d[o + 1] + boost;
+    const b = d[o + 2] + boost;
+    d[o] = r < 0 ? 0 : r > 255 ? 255 : r;
+    d[o + 1] = g < 0 ? 0 : g > 255 ? 255 : g;
+    d[o + 2] = b < 0 ? 0 : b > 255 ? 255 : b;
+  }
+  ctx.putImageData(img, 0, 0);
+  return canvas;
+}
