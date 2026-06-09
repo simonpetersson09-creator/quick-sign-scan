@@ -21,6 +21,7 @@ import {
   orientQuadForA4Portrait,
   warpQuadToRect,
   whitenBackground,
+  grayWorldWhiteBalance,
   boostInkContrast,
   measureWarpQuadGeometry,
 } from "@/lib/perspective";
@@ -1723,6 +1724,16 @@ function ScanPage() {
           reason: rawWarpOnly ? "raw-warp-only" : "feature-flag",
         });
       } else {
+        try {
+          // Neutralise camera colour cast (warm/cool light) BEFORE flat-field
+          // whitening so the paper isn't baked to a tinted "white".
+          warped = grayWorldWhiteBalance(warped);
+          logScanCanvas("after-gray-world-wb", warped, debugEnabled);
+          logScanStage("gray-world-wb", { applied: true });
+        } catch (e) {
+          console.warn("[scan] grayWorldWhiteBalance failed; continuing", e);
+          logScanStage("gray-world-wb", { applied: false, reason: "exception" });
+        }
         try {
           warped = whitenBackground(warped);
           logScanCanvas("after-whiten-background", warped, debugEnabled);
