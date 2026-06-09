@@ -2537,7 +2537,8 @@ function evaluateContour(
   // A real A4 sheet can project close to square when photographed at an angle,
   // so ratio validation must be broad. Straight edges and bounding-box fill
   // are stronger signals; the final warp always outputs a true A4 rectangle.
-  if (ratioError > 0.55) return null;
+  // Sprint 1 — hård A4-gate (matchar evaluateEdgeQuad). Var 0.55 → 0.35.
+  if (ratioError > 0.35) return null;
   if (perspectiveError > 1.5) return null;
   if (sideDeviation > 0.08) return null;
   if (polygonFill < 0.55 || polygonFill > 1.45) return null;
