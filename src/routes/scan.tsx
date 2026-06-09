@@ -308,6 +308,7 @@ function ScanPage() {
   const blurFramesRef = useRef(0);
   const captureRetryRef = useRef(0);
   const tooFarFramesRef = useRef(0);
+  const tooCloseRejectFramesRef = useRef(0);
   const lockedRef = useRef(false);
   const lockBreakFramesRef = useRef(0);
   const brightnessRef = useRef(255);
@@ -940,9 +941,9 @@ function ScanPage() {
         setProgress(0);
       }
       // Throttled diagnostic log — why didn't *any* candidate pass?
+      const d = getLastDetectDiagnostics();
       if (debugEnabled && now - lastRejectLogAtRef.current > 750) {
         lastRejectLogAtRef.current = now;
-        const d = getLastDetectDiagnostics();
         // eslint-disable-next-line no-console
         console.log("[scan] no-lock", {
           candidates: d.candidateCount,
@@ -950,14 +951,31 @@ function ScanPage() {
           bestRejected: d.bestRejected,
         });
       }
+      // Near-field hint: when candidates exist but are dominated by
+      // "doc fills frame" style rejects, coach the user to back off
+      // a little. Persistence guard prevents flicker.
+      const rj = d.rejects || {};
+      const nearFieldRejects =
+        (rj.touchesFrameEdge || 0) +
+        (rj.fillsEntireFrame || 0) +
+        (rj.areaTooLarge || 0);
+      const bestArea = d.bestRejected?.areaRatio ?? 0;
+      const looksTooClose =
+        (d.candidateCount > 0 && nearFieldRejects >= Math.max(1, d.candidateCount * 0.5)) ||
+        bestArea > 0.88;
+      if (looksTooClose) tooCloseRejectFramesRef.current++;
+      else tooCloseRejectFramesRef.current = 0;
+      const tooCloseHint = tooCloseRejectFramesRef.current > 6;
       setStatus((s) =>
         s === "starting"
           ? s
           : lowLightFramesRef.current > 30
             ? "lowLight"
-            : missCount.current > 45
-              ? "uncertain"
-              : "searching",
+            : tooCloseHint
+              ? "tooClose"
+              : missCount.current > 45
+                ? "uncertain"
+                : "searching",
       );
       return;
     }
@@ -2202,6 +2220,7 @@ function ScanPage() {
     captureRetryRef.current = 0;
     hiResTightConfirmedRef.current = false;
     tooFarFramesRef.current = 0;
+    tooCloseRejectFramesRef.current = 0;
     sharpnessRef.current = 0;
     lockedRef.current = false;
     lockBreakFramesRef.current = 0;
