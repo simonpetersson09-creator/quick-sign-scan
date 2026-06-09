@@ -909,13 +909,15 @@ export function detectDocumentQuad(
     // text-heavy pages (lumStd high inside) and letting smaller white
     // sub-quads win, which clipped text. Hough candidates also added
     // frame-to-frame flicker; both downweighted/disabled below.
+    // Sprint 2 — Hough-kandidater är nu gradient-styrkda så vi vågar lita på
+    // deras egen confidence mer. Vikt 0.09 → 0.14 på det priset av centerScore.
     const outerConfidence =
       0.38 * areaScore +
       0.18 * a4Score +
       0.12 * det.debug.edgeScore +
       0.06 * bgContrastScore +
-      0.09 * centerScore +
-      0.09 * det.confidence +
+      0.04 * centerScore +
+      0.14 * det.confidence +
       0.08 * tempScore;
     void paperInteriorScore;
     if (outerConfidence > bestScore) {
