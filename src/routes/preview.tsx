@@ -2,7 +2,7 @@ import { createFileRoute, useLocation, useNavigate } from "@tanstack/react-route
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
-import { scanStore } from "@/lib/scanStore";
+import { scanStore, type ScanDebugStage } from "@/lib/scanStore";
 import { useT } from "@/lib/i18n";
 import { applyFilter, type FilterMode } from "@/lib/imageFilters";
 import {
