@@ -260,6 +260,9 @@ function ScanPage() {
   const lastRejectLogAtRef = useRef(0);
   const lastAdaptiveLogAtRef = useRef(0);
   const lastGateLogAtRef = useRef(0);
+  // Per-frame compact debug log (throttled). Always fires while debugEnabled
+  // is on, so we can see the full live-detection picture each ~250 ms.
+  const lastFrameLogAtRef = useRef(0);
   // Capture-gate diagnostics — populated each frame the document frame is
   // visible. Lets the debug overlay show exactly which gate is blocking
   // auto-capture (stability, sharpness, light, motion, cooldown, edge,
