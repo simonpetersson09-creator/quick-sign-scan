@@ -1339,6 +1339,30 @@ function ScanPage() {
       // eslint-disable-next-line no-console
       console.log("[scan] capture-gate", captureGateRef.current);
     }
+
+    // Per-frame compact log. Visar exakt vad live-detektionen ser och vad
+    // som ev. blockerar capture, för felsökning av "trög" eller "ingen
+    // utlösning"-beteende. Throttlad till 250ms för att inte spamma.
+    if (debugEnabled && now - lastFrameLogAtRef.current > 250) {
+      lastFrameLogAtRef.current = now;
+      // eslint-disable-next-line no-console
+      console.log("[scan] frame", {
+        detected: detectedForOverlay,
+        readyForCapture,
+        visibleOnly,
+        reasonNotReady: reasonNotReady ?? null,
+        confidence: +(detection?.confidence ?? 0).toFixed(3),
+        edgeTightness: +edgeTightness.toFixed(3),
+        a4Diff: +a4Diff.toFixed(3),
+        areaRatio: +areaRatio.toFixed(3),
+        sharpness: +sharpness.toFixed(1),
+        brightness: +meanLum.toFixed(1),
+        stable: stableCount.current,
+        stableTarget: STABLE_FRAMES,
+        locked: lockedRef.current,
+        blockedBy: captureGateRef.current?.reason ?? null,
+      });
+    }
   }
 
 
