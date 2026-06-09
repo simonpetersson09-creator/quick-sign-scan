@@ -1626,18 +1626,19 @@ function ScanPage() {
         console.warn("[scan] threshold paper lock failed", e);
       }
 
-      try {
-        const beforeSnap = refinedSrcQuad;
-        const snapped = snapQuadToPaperEdges(refineSource, vw, vh, refinedSrcQuad);
-        refinedSrcQuad = snapped;
-        logScanStage("paper-edge-snap", {
-          before: formatQuad(beforeSnap),
-          after: formatQuad(snapped),
-          maxDeltaPx: Math.max(...beforeSnap.map((p, i) => Math.hypot(p.x - snapped[i].x, p.y - snapped[i].y))),
-        });
-      } catch (e) {
-        console.warn("[scan] paper edge snap failed", e);
-      }
+      // snapQuadToPaperEdges disabled per user request
+      // try {
+      //   const beforeSnap = refinedSrcQuad;
+      //   const snapped = snapQuadToPaperEdges(refineSource, vw, vh, refinedSrcQuad);
+      //   refinedSrcQuad = snapped;
+      //   logScanStage("paper-edge-snap", {
+      //     before: formatQuad(beforeSnap),
+      //     after: formatQuad(snapped),
+      //     maxDeltaPx: Math.max(...beforeSnap.map((p, i) => Math.hypot(p.x - snapped[i].x, p.y - snapped[i].y))),
+      //   });
+      // } catch (e) {
+      //   console.warn("[scan] paper edge snap failed", e);
+      // }
 
       // FINAL trace: this is the exact quad handed to warpQuadToRect. If the
       // detected paper is lying sideways in the camera frame, rotate the quad's
