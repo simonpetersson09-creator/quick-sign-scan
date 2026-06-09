@@ -61,6 +61,7 @@ function createInitial(): ScanSession {
     pdfDataUrl: null,
     signatureDataUrl: null,
     signaturePosition: null,
+    debugStages: null,
   };
 }
 
