@@ -859,15 +859,17 @@ function ScanPage() {
       }
     }
 
-    // Hi-res edge-tightness recompute (Step B). Uses the EXISTING quad —
-    // no new detection, no new corners. Measures how tight each side of
-    // the (already-found) quad sits on a strong gradient in the full-res
-    // video, then swaps in the hi-res value only if it is better. This
-    // helps small/far A4 documents whose edges are sharp in 1920×1080 but
-    // undersampled in the 280px detect frame.
+    // Hi-res edge-tightness recompute. Tidigare körde detta varje frame —
+    // det åt CPU mitt under live-detektionen och bidrog till "trögt"
+    // beteende. Nu gatekeepat till frames där kandidaten redan är nära
+    // capture (stableCount >= READY_FRAMES). Live-loopen är därför snabb
+    // tills användaren faktiskt håller stilla; då lägger vi de extra
+    // cyklerna på att verifiera tightness mot full-res-videoframen och
+    // kan flippa readyForCapture false→true innan auto-capture.
     if (
       ENABLE_HIRES_TIGHTNESS_RECOMPUTE &&
       detection &&
+      stableCount.current >= READY_FRAMES &&
       now - lastHiResTightAtRef.current >= HIRES_TIGHT_COOLDOWN_MS
     ) {
       lastHiResTightAtRef.current = now;
