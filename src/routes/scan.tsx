@@ -2496,12 +2496,13 @@ function ScanPage() {
             className="relative overflow-hidden rounded-xl bg-white shadow-2xl"
             style={{
               width: "min(70vw, 280px)",
+              aspectRatio: "1 / 1.4142",
             }}
           >
             <img
               src={savedOverlay.dataUrl}
               alt=""
-              className="block w-full h-auto"
+              className="block w-full h-full object-contain"
             />
           </div>
           <div className="flex flex-col items-center gap-3 text-white w-full max-w-[280px]">
