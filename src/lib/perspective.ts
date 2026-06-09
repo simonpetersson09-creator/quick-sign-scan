@@ -904,32 +904,43 @@ export function measureQuadGeometry(quad: [Point, Point, Point, Point]): QuadGeo
 }
 
 function renderToA4Portrait(source: HTMLCanvasElement): HTMLCanvasElement {
-  // 300 DPI A4 (210 × 297 mm) = 2480 × 3508 px. Matchar capture-upplösningen
-  // så slutsidan är skarp end-to-end utan extra downscale.
-  //
-  // VIKTIGT: Output-orienteringen MÅSTE följa källans orientering. Om vi
-  // alltid tvingar portrait klipps landscape-dokument bort vid sidorna och
-  // ser ut att ha "vridits 90°". Källan här är resultatet av warpQuadToRect,
-  // som redan har korrekt A4-aspekt baserat på den detekterade quaden.
-  const A4_LONG = 3508;
-  const A4_SHORT = 2480;
-  const sourceIsLandscape = source.width > source.height;
-  const outW = sourceIsLandscape ? A4_LONG : A4_SHORT;
-  const outH = sourceIsLandscape ? A4_SHORT : A4_LONG;
+  // A4 portrait @ 300 DPI (210 × 297 mm) = 2480 × 3508 px.
+  // Output är ALLTID stående A4 — det är PDF-sidans orientering. Om
+  // användaren råkar hålla telefonen så att pappret ligger på tvären i
+  // kamerabilden blir warpens canvas landscape; vi roterar då 90° så att
+  // dokumentet ändå hamnar stående i den slutliga PDF:en.
+  const outW = 2480;
+  const outH = 3508;
+
+  // Pre-rotate om källan är landscape så långsidan blir vertikal.
+  let oriented = source;
+  if (source.width > source.height) {
+    const rot = document.createElement("canvas");
+    rot.width = source.height;
+    rot.height = source.width;
+    const rctx = rot.getContext("2d")!;
+    rctx.translate(rot.width / 2, rot.height / 2);
+    rctx.rotate(-Math.PI / 2);
+    rctx.imageSmoothingEnabled = true;
+    rctx.imageSmoothingQuality = "high";
+    rctx.drawImage(source, -source.width / 2, -source.height / 2);
+    oriented = rot;
+  }
+
   const out = document.createElement("canvas");
   out.width = outW;
   out.height = outH;
   const ctx = out.getContext("2d")!;
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, outW, outH);
-  // Cover-skalning för att eliminera vita band från fine-deskew-padding.
-  // Nu när output-aspekten matchar source-aspekten klipps ingenting bort.
-  const scale = Math.max(outW / source.width, outH / source.height);
-  const drawW = source.width * scale;
-  const drawH = source.height * scale;
+  // Cover-skalning eliminerar vita band från fine-deskew-padding. Eftersom
+  // vi nu garanterar att 'oriented' är portrait klipps inget meningsfullt.
+  const scale = Math.max(outW / oriented.width, outH / oriented.height);
+  const drawW = oriented.width * scale;
+  const drawH = oriented.height * scale;
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(source, (outW - drawW) / 2, (outH - drawH) / 2, drawW, drawH);
+  ctx.drawImage(oriented, (outW - drawW) / 2, (outH - drawH) / 2, drawW, drawH);
   return out;
 }
 
