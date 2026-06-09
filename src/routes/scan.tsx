@@ -221,7 +221,7 @@ function ScanPage() {
   // throttled hi-res pass needs a few frames to weigh in. Reset whenever
   // the detection session ends (no corners, lock break, camera restart).
   const hiResTightConfirmedRef = useRef(false);
-  const MIN_EDGE_TIGHTNESS_PRE_HIRES = 0.45;
+  const MIN_EDGE_TIGHTNESS_PRE_HIRES = 0.35;
   // Feature flag: bump the detection frame width from the historical 280px
   // to give small/far A4 documents more pixels on the short side. Pure
   // resolution change — no algorithm/threshold changes, no multi-scale.
