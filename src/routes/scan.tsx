@@ -2220,6 +2220,7 @@ function ScanPage() {
     captureRetryRef.current = 0;
     hiResTightConfirmedRef.current = false;
     tooFarFramesRef.current = 0;
+    tooCloseRejectFramesRef.current = 0;
     sharpnessRef.current = 0;
     lockedRef.current = false;
     lockBreakFramesRef.current = 0;
