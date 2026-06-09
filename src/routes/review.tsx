@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
-import { buildPdf, dataUrlToBlob } from "@/lib/pdf";
+import { dataUrlToBlob } from "@/lib/pdf";
 import { useT } from "@/lib/i18n";
 import {
   ArrowLeft,
@@ -30,7 +30,7 @@ const ZOOM_STEP = 0.5;
 function ReviewPage() {
   const navigate = useNavigate();
   const t = useT();
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
   const [sizeBytes, setSizeBytes] = useState<number | null>(null);
   const [pages, setPages] = useState<string[]>([]);
   const [pageIdx, setPageIdx] = useState(0);
@@ -56,27 +56,26 @@ function ReviewPage() {
     setPageIdx(allPages.length - 1);
     setSigDataUrl(s.signatureDataUrl ?? null);
     setSigPos(s.signaturePosition ?? null);
+    setReady(true);
 
-    let cancelled = false;
-    (async () => {
-      const sig =
-        s.signatureDataUrl && s.signaturePosition
-          ? { dataUrl: s.signatureDataUrl, x: s.signaturePosition.x, y: s.signaturePosition.y }
-          : null;
-      const url = await buildPdf(allPages, sig);
-      if (cancelled) return;
-      setPdfUrl(url);
-      scanStore.set({ pdfDataUrl: url });
-      try {
-        const blob = dataUrlToBlob(url);
-        setSizeBytes(blob.size);
-      } catch {
-        /* noop */
+    // Estimate output size from the underlying page images instead of
+    // building a PDF. The image bytes dominate the final PDF size, so
+    // this is accurate enough for the size chip and avoids allocating
+    // a multi-MB PDF on mount and on every signature drag.
+    try {
+      let bytes = 0;
+      for (const p of allPages) {
+        try {
+          bytes += dataUrlToBlob(p).size;
+        } catch {
+          /* skip non-data-URL pages */
+        }
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
+      // Small fixed overhead for PDF structure + signature PNG.
+      setSizeBytes(bytes + 4096);
+    } catch {
+      setSizeBytes(null);
+    }
   }, [navigate]);
 
   // Diagnostics — logs PDF/page dimensions, viewport, initial scale, scroll pos.
@@ -110,26 +109,15 @@ function ReviewPage() {
     setPan({ x: 0, y: 0 });
   }, [pageIdx]);
 
-  // Rebuild PDF when signature position changes (after drag release).
-  useEffect(() => {
-    if (!pages.length || !sigDataUrl || !sigPos) return;
-    let cancelled = false;
-    const handle = setTimeout(async () => {
-      const url = await buildPdf(pages, { dataUrl: sigDataUrl, x: sigPos.x, y: sigPos.y });
-      if (cancelled) return;
-      setPdfUrl(url);
-      scanStore.set({ pdfDataUrl: url, signaturePosition: sigPos });
-      try {
-        setSizeBytes(dataUrlToBlob(url).size);
-      } catch {
-        /* noop */
-      }
-    }, 250);
-    return () => {
-      cancelled = true;
-      clearTimeout(handle);
-    };
-  }, [sigPos, sigDataUrl, pages]);
+  // NOTE: Previously this effect rebuilt the entire PDF on every signature
+  // drag (debounced). For a 10-page scan that's a 4–8 MB base64 allocation
+  // per drag-tick — visible as lag and GC pauses. The signature is now a
+  // pure CSS overlay during review; the final PDF is built once at send
+  // time in send.tsx, picking up `signaturePosition` from scanStore. We
+  // still persist the position on drag release (see onSigUp) so send.tsx
+  // reads the latest value.
+
+
 
   function clampPan(nx: number, ny: number, z: number) {
     const rect = containerRef.current?.getBoundingClientRect();
@@ -254,7 +242,10 @@ function ReviewPage() {
   }
 
   function proceed() {
-    if (!approved || !pdfUrl) return;
+    if (!approved || !ready || !pages.length) return;
+    // Persist latest signature position before leaving — send.tsx will
+    // build the PDF from scanStore state.
+    if (sigPos) scanStore.set({ signaturePosition: sigPos });
     navigate({ to: "/send" });
   }
 
@@ -412,7 +403,7 @@ function ReviewPage() {
           <span className="text-sm text-foreground/80 leading-snug">{t("approveLabel")}</span>
         </label>
 
-        <PrimaryButton onClick={proceed} disabled={!approved || !pdfUrl}>
+        <PrimaryButton onClick={proceed} disabled={!approved || !ready || !pages.length}>
           <span className="inline-flex items-center justify-center gap-2">
             <Mail className="h-5 w-5" /> {t("continueToEmail")}
           </span>
