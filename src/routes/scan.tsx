@@ -497,6 +497,7 @@ function ScanPage() {
       captureRetryRef.current = 0;
       lockedRef.current = false;
       lockBreakFramesRef.current = 0;
+      hiResTightConfirmedRef.current = false;
       brightnessRef.current = 255;
       lowLightFramesRef.current = 0;
       stableCount.current = 0;
@@ -931,6 +932,7 @@ function ScanPage() {
       missCount.current++;
       lockedRef.current = false;
       lockBreakFramesRef.current = 0;
+      hiResTightConfirmedRef.current = false;
       if (detectCount.current === 0) {
         smoothQuad.current = null;
         lastRawQuad.current = null;
@@ -1083,6 +1085,7 @@ function ScanPage() {
           lockedRef.current = false;
           lockBreakFramesRef.current = 0;
           stableCount.current = 0;
+          hiResTightConfirmedRef.current = false;
         }
       } else {
         lockBreakFramesRef.current = 0;
@@ -2188,6 +2191,7 @@ function ScanPage() {
     detectionMeta.current = null;
     blurFramesRef.current = 0;
     captureRetryRef.current = 0;
+    hiResTightConfirmedRef.current = false;
     tooFarFramesRef.current = 0;
     sharpnessRef.current = 0;
     lockedRef.current = false;
