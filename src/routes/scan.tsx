@@ -1562,11 +1562,22 @@ function ScanPage() {
       // Defeats micro-blur from hand jitter / autofocus hunt right at the
       // moment of capture. Sharpness is scored on a small downsample for speed;
       // only the best frame is kept at full resolution.
+      //
+      // CRITICAL: score the quad bbox only, not the full video frame.
+      // Otherwise a sharp background (desk grain, table edge) can win over
+      // a slightly blurry document and we pick the wrong burst frame.
+      const bboxMinX = Math.max(0, Math.min(...srcQuad.map((p) => p.x)));
+      const bboxMinY = Math.max(0, Math.min(...srcQuad.map((p) => p.y)));
+      const bboxMaxX = Math.min(vw, Math.max(...srcQuad.map((p) => p.x)));
+      const bboxMaxY = Math.min(vh, Math.max(...srcQuad.map((p) => p.y)));
+      const bboxW = Math.max(1, bboxMaxX - bboxMinX);
+      const bboxH = Math.max(1, bboxMaxY - bboxMinY);
+
       let bestFrame: HTMLCanvasElement | null = null;
       let bestScore = -1;
       const scoreCanvas = document.createElement("canvas");
       const SCORE_W = 320;
-      const scoreH = Math.max(1, Math.round((vh / vw) * SCORE_W));
+      const scoreH = Math.max(1, Math.round((bboxH / bboxW) * SCORE_W));
       scoreCanvas.width = SCORE_W;
       scoreCanvas.height = scoreH;
       const scoreCtx = scoreCanvas.getContext("2d", { willReadFrequently: true })!;
@@ -1574,7 +1585,11 @@ function ScanPage() {
         if (attempt > 0) {
           await new Promise((r) => setTimeout(r, 50));
         }
-        scoreCtx.drawImage(video, 0, 0, SCORE_W, scoreH);
+        scoreCtx.drawImage(
+          video,
+          bboxMinX, bboxMinY, bboxW, bboxH,
+          0, 0, SCORE_W, scoreH,
+        );
         const score = canvasLaplacianVariance(scoreCanvas);
         if (score > bestScore) {
           bestScore = score;
@@ -1585,7 +1600,10 @@ function ScanPage() {
           bestFrame = frame;
         }
       }
-      logScanStage("burst-capture", { bestSharpness: bestScore });
+      logScanStage("burst-capture", {
+        bestSharpness: bestScore,
+        scoredBbox: { x: bboxMinX, y: bboxMinY, w: bboxW, h: bboxH },
+      });
 
       // Subpixel corner refinement — nudgar hörnen ±5 px till full
       // videoupplösning. Nu PÅ som default vid capture (live-refine är
@@ -1816,7 +1834,7 @@ function ScanPage() {
 
 
 
-      // Auto-straighten ±3°: finjustera små rotationer som blir kvar efter
+      // Auto-straighten ±5°: finjustera små rotationer som blir kvar efter
       // perspektivwarp pga brusiga hörn. Projektionsvarians på en ~600 px
       // nedsamplad gråskaleversion. Roterar endast om |vinkel| ≥ 0,3° och
       // confidence är hög nog — annars lämnas bilden orörd. Aldrig 90°/180°.
@@ -1829,7 +1847,7 @@ function ScanPage() {
       if (straightenEnabled) {
         try {
           const result = autoStraighten(warped, {
-            maxAngleDeg: 3,
+            maxAngleDeg: 5,
             stepDeg: 0.25,
             minApplyDeg: 0.3,
             targetWidth: 600,
