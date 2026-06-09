@@ -94,8 +94,8 @@ function PreviewPage() {
     () => scanStore.get().debugStages,
   );
   const [debugZoom, setDebugZoom] = useState<ScanDebugStage | null>(null);
-  const [qualityByIndex, setQualityByIndex] = useState<Record<number, QualityReport>>({});
-  const [dismissedQuality, setDismissedQuality] = useState<Record<number, boolean>>({});
+  const [qualityByKey, setQualityByKey] = useState<Record<string, QualityReport>>({});
+  const [dismissedQuality, setDismissedQuality] = useState<Record<string, boolean>>({});
   const handoffRecoveredRef = useRef(false);
 
   useEffect(() => {
