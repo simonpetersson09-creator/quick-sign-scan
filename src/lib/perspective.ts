@@ -244,7 +244,9 @@ export function orientQuadForA4Portrait(
     { name: "rotate-180", quad: rot180 },
   ];
 
-  const maxSide = 720;
+  // Higher-resolution thumbnail (480 vs 240) for stronger upright detection —
+  // single-shot per scan, cost is negligible.
+  const maxSide = 1280;
   const scale = Math.min(1, maxSide / Math.max(srcW, srcH));
   const sampleW = Math.max(1, Math.round(srcW * scale));
   const sampleH = Math.max(1, Math.round(srcH * scale));
@@ -264,18 +266,17 @@ export function orientQuadForA4Portrait(
       Point,
     ];
     const geom = measureWarpQuadGeometry(candidate.quad);
-    // Thumb aspect matches the candidate quad — square-ish (e.g. 240×339 for
-    // portrait, 339×240 for landscape) so text projection isn't biased by
-    // forced stretching.
-    let thumbW = 240;
-    let thumbH = 240;
+    // Thumb aspect matches the candidate quad — bumped to ~480 short edge
+    // so ascender/descender asymmetry is visible to estimateTextSkew.
+    let thumbW = 480;
+    let thumbH = 480;
     if (geom.height >= geom.width) {
       thumbH = Math.round((geom.height / Math.max(1, geom.width)) * thumbW);
     } else {
       thumbW = Math.round((geom.width / Math.max(1, geom.height)) * thumbH);
     }
-    thumbW = Math.max(80, Math.min(360, thumbW));
-    thumbH = Math.max(80, Math.min(360, thumbH));
+    thumbW = Math.max(160, Math.min(720, thumbW));
+    thumbH = Math.max(160, Math.min(720, thumbH));
     const thumb = warpQuadToRect(sample, sampleW, sampleH, scaledQuad, thumbW, thumbH);
     const text = estimateTextSkew(thumb, 5, 1);
     const isPortrait = geom.height >= geom.width;
@@ -294,19 +295,32 @@ export function orientQuadForA4Portrait(
   const portraitOrFallback = portraitCandidates.length > 0 ? portraitCandidates : scored;
   const ranked = [...portraitOrFallback].sort((a, b) => b.score - a.score);
   const winner = ranked[0];
+  const keepCandidate = scored.find((c) => c.name === "keep")!;
 
   let selected = winner;
   let reason: A4PortraitQuadOrientationDiagnostics["reason"];
   if (portraitCandidates.length === 0) {
     reason = "fallback";
+  } else if (winner.hasText && winner.name !== "keep" && keepCandidate.isPortrait) {
+    // Strong keep-bias: only rotate away from "keep" when the winner clearly
+    // beats it. 180° flips are the most common false positive (text rows are
+    // near-symmetric horizontally), so require an even larger margin there.
+    const keepScore = Math.max(1e-6, keepCandidate.score);
+    const margin = winner.score / keepScore;
+    const required = winner.name === "rotate-180" ? 1.25 : 1.15;
+    if (margin >= required) {
+      reason = "text-score";
+    } else {
+      selected = keepCandidate;
+      reason = "keep-portrait";
+    }
   } else if (winner.hasText) {
     reason = winner.name === "keep" ? "keep-portrait" : "text-score";
   } else {
     // No text detected — keep the original ordering if it's portrait,
     // otherwise pick the first portrait candidate.
-    const keep = scored[0];
-    if (keep.isPortrait) {
-      selected = keep;
+    if (keepCandidate.isPortrait) {
+      selected = keepCandidate;
       reason = "keep-portrait";
     } else {
       reason = "landscape-quad";
@@ -3602,4 +3616,94 @@ export function detectPaperByThreshold(
     y: Math.max(0, Math.min(srcH - 1, p.y * invY)),
   })) as [Point, Point, Point, Point];
   return orderQuad(mapped);
+}
+
+// ============================================================================
+// Gray-world white balance
+// ============================================================================
+//
+// Removes a global colour cast (warm tungsten, cool fluorescent, yellowish
+// daylight through curtains) by forcing the average of the brightest ~20% of
+// pixels — which on a paper scan is overwhelmingly the page background — to
+// be neutral grey. Run BEFORE whitenBackground so the flat-field step sees a
+// neutral paper and doesn't bake the cast into the "white" target.
+//
+// Why "bright pixels only" and not classic full-frame gray-world: the page
+// usually fills the frame after warp, but text/ink would pull the average
+// off-neutral if we included every pixel. Sampling only the paper region
+// gives a clean estimate of the illuminant.
+export function grayWorldWhiteBalance(canvas: HTMLCanvasElement): HTMLCanvasElement {
+  const w = canvas.width;
+  const h = canvas.height;
+  if (w === 0 || h === 0) return canvas;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  const n = w * h;
+
+  // First pass: build a luminance histogram to find the brightness threshold
+  // that captures the top ~20% of pixels (= the paper background).
+  const hist = new Uint32Array(256);
+  for (let i = 0; i < n; i++) {
+    const o = i * 4;
+    const y = (0.299 * d[o] + 0.587 * d[o + 1] + 0.114 * d[o + 2]) | 0;
+    hist[y]++;
+  }
+  const targetCount = Math.max(1, Math.floor(n * 0.2));
+  let cum = 0;
+  let threshold = 0;
+  for (let v = 255; v >= 0; v--) {
+    cum += hist[v];
+    if (cum >= targetCount) {
+      threshold = v;
+      break;
+    }
+  }
+
+  // Second pass: average R/G/B over those bright pixels only.
+  let sumR = 0;
+  let sumG = 0;
+  let sumB = 0;
+  let cnt = 0;
+  for (let i = 0; i < n; i++) {
+    const o = i * 4;
+    const r = d[o];
+    const g = d[o + 1];
+    const b = d[o + 2];
+    const y = 0.299 * r + 0.587 * g + 0.114 * b;
+    if (y >= threshold) {
+      sumR += r;
+      sumG += g;
+      sumB += b;
+      cnt++;
+    }
+  }
+  if (cnt === 0) return canvas;
+  const meanR = sumR / cnt;
+  const meanG = sumG / cnt;
+  const meanB = sumB / cnt;
+  // Use the green-channel mean as the neutral target — green is the most
+  // perceptually-linear channel and least affected by chromatic aberration.
+  const target = meanG;
+  const gainR = target / Math.max(1, meanR);
+  const gainG = 1;
+  const gainB = target / Math.max(1, meanB);
+
+  // Clamp gains so a wildly mis-detected illuminant can't shift everything by
+  // more than ±25% (avoids over-correction on near-neutral scenes).
+  const clamp = (g: number) => Math.max(0.75, Math.min(1.25, g));
+  const gR = clamp(gainR);
+  const gB = clamp(gainB);
+  if (Math.abs(gR - 1) < 0.01 && Math.abs(gB - 1) < 0.01) return canvas;
+
+  for (let i = 0; i < n; i++) {
+    const o = i * 4;
+    const r = d[o] * gR;
+    const b = d[o + 2] * gB;
+    d[o] = r > 255 ? 255 : r;
+    d[o + 2] = b > 255 ? 255 : b;
+    // green unchanged (gainG === 1)
+  }
+  ctx.putImageData(img, 0, 0);
+  return canvas;
 }
