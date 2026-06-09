@@ -1313,6 +1313,15 @@ function ScanPage() {
         setStatus("ready");
         stableCount.current = Math.max(0, stableCount.current - 1);
         if (captureGateRef.current) captureGateRef.current.reason = "ambiguous";
+      } else if (visibleOnly) {
+        // Stabilitet uppnådd men strikt gate (edge tightness / paper
+        // contrast / etc.) inte godkänd ännu. Visa ramen och vänta —
+        // hi-res-tightness-recompute körs nu också (gated på stableCount)
+        // och kan flippa readyForCapture nästa frame.
+        setStatus("align");
+        stableCount.current = Math.min(stableCount.current, STABLE_FRAMES - 1);
+        if (captureGateRef.current)
+          captureGateRef.current.reason = `edge:${reasonNotReady ?? "unknown"}`;
       } else {
         setStatus("capturing");
         if (captureGateRef.current) captureGateRef.current.reason = null;
