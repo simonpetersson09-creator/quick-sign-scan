@@ -1714,15 +1714,17 @@ function ScanPage() {
         orientationDiag = d;
       });
 
-      // Bestäm output-storlek från den orienterade quadens egen geometri.
-      // Långsidan låses till 2339 px (200 DPI A4-långsida). Resultatet blir
-      // alltid stående eftersom orientQuadForA4Portrait garanterar att
-      // höjden ≥ bredden. Ingen forced A4-stretch, ingen extra rotation.
+      // Warp-output låst till exakt A4 (1 / √2). Vi VET att källan är ett
+      // A4-ark, så perspektivkorrigeringen ska mappa quaden till en exakt
+      // A4-rektangel. Att försöka utläsa "sann" aspect ur quadens
+      // skärm-pixelavstånd är matematiskt omöjligt utan kameraintrinsics
+      // och producerar systematiskt fel form (förkortning/foreshortening).
       const finalGeom = measureWarpQuadGeometry(finalSrcQuad);
-      const TARGET_LONG = 2339;
-      const aspect = finalGeom.width / Math.max(1, finalGeom.height); // ≤ 1 (portrait)
+      const TARGET_LONG = 2339;   // A4-långsida @ ~200 DPI
+      const TARGET_SHORT = 1654;  // A4-kortsida @ ~200 DPI (2339 / √2)
       outH = TARGET_LONG;
-      outW = Math.max(200, Math.round(outH * aspect));
+      outW = TARGET_SHORT;
+      const aspect = outW / outH;
 
       logScanStage("warp-trace/5-final-input", {
         srcPixels: formatQuad(finalSrcQuad),
