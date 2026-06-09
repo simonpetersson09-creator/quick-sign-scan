@@ -941,9 +941,9 @@ function ScanPage() {
         setProgress(0);
       }
       // Throttled diagnostic log — why didn't *any* candidate pass?
+      const d = getLastDetectDiagnostics();
       if (debugEnabled && now - lastRejectLogAtRef.current > 750) {
         lastRejectLogAtRef.current = now;
-        const d = getLastDetectDiagnostics();
         // eslint-disable-next-line no-console
         console.log("[scan] no-lock", {
           candidates: d.candidateCount,
@@ -951,14 +951,31 @@ function ScanPage() {
           bestRejected: d.bestRejected,
         });
       }
+      // Near-field hint: when candidates exist but are dominated by
+      // "doc fills frame" style rejects, coach the user to back off
+      // a little. Persistence guard prevents flicker.
+      const rj = d.rejects || {};
+      const nearFieldRejects =
+        (rj.touchesFrameEdge || 0) +
+        (rj.fillsEntireFrame || 0) +
+        (rj.areaTooLarge || 0);
+      const bestArea = d.bestRejected?.areaRatio ?? 0;
+      const looksTooClose =
+        (d.candidateCount > 0 && nearFieldRejects >= Math.max(1, d.candidateCount * 0.5)) ||
+        bestArea > 0.88;
+      if (looksTooClose) tooCloseRejectFramesRef.current++;
+      else tooCloseRejectFramesRef.current = 0;
+      const tooCloseHint = tooCloseRejectFramesRef.current > 6;
       setStatus((s) =>
         s === "starting"
           ? s
           : lowLightFramesRef.current > 30
             ? "lowLight"
-            : missCount.current > 45
-              ? "uncertain"
-              : "searching",
+            : tooCloseHint
+              ? "tooClose"
+              : missCount.current > 45
+                ? "uncertain"
+                : "searching",
       );
       return;
     }
