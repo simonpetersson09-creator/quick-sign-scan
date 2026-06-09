@@ -45,22 +45,10 @@ function ReviewPage() {
   const signed = !!sigDataUrl;
 
   useEffect(() => {
-    let s = scanStore.get();
-    let img = s.imageDataUrl;
-    // TEMP DEV BYPASS — expires 2026-06-04 04:06 UTC (~8h). Remove this block after.
-    const REVIEW_PREVIEW_EXPIRY = 1780546012000;
-    if (!img && Date.now() < REVIEW_PREVIEW_EXPIRY) {
-      const dummy =
-        "data:image/svg+xml;utf8," +
-        encodeURIComponent(
-          `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 210 297"><rect width="210" height="297" fill="white"/><text x="105" y="150" font-family="sans-serif" font-size="10" text-anchor="middle" fill="#888">Dummy preview</text></svg>`,
-        );
-      scanStore.set({ imageDataUrl: dummy, pages: [dummy] });
-      s = scanStore.get();
-      img = s.imageDataUrl;
-    }
+    const s = scanStore.get();
+    const img = s.imageDataUrl;
     if (!img) {
-      navigate({ to: "/" });
+      navigate({ to: "/scan", replace: true });
       return;
     }
     const allPages = s.pages.length > 0 ? s.pages : [img];
