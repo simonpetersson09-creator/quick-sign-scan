@@ -3328,8 +3328,8 @@ export function whitenBackground(canvas: HTMLCanvasElement): HTMLCanvasElement {
   // with L <= T_NONE (clearly text) are left exactly as-is; in between we
   // blend smoothly. This is the safety net that guarantees no faint stroke
   // gets bleached.
-  const T_NONE = 118;
-  const T_FULL = 182;
+  const T_NONE = 128;
+  const T_FULL = 178;
   for (let y = 0; y < h; y++) {
     const fy = Math.min(sh - 1, y / SCALE);
     const sy0 = Math.floor(fy);
@@ -3394,6 +3394,52 @@ export function whitenBackground(canvas: HTMLCanvasElement): HTMLCanvasElement {
     }
   }
 
+  // Final paper cleanup: the flat-field step can still leave smooth neutral
+  // mid-gray shadows/folds around the lower edge. Lift only low-detail,
+  // low-saturation pixels; text strokes and antialiased glyph edges have local
+  // contrast and are therefore protected.
+  const postLum = new Uint8ClampedArray(n);
+  for (let i = 0, j = 0; i < d.length; i += 4, j++) {
+    postLum[j] = (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) | 0;
+  }
+  const tmpLum = new Uint8ClampedArray(n);
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    for (let x = 0; x < w; x++) {
+      const xl = x > 0 ? x - 1 : x;
+      const xr = x < w - 1 ? x + 1 : x;
+      tmpLum[row + x] = ((postLum[row + xl] + 2 * postLum[row + x] + postLum[row + xr]) >> 2) as number;
+    }
+  }
+  const blurLum = new Uint8ClampedArray(n);
+  for (let x = 0; x < w; x++) {
+    for (let y = 0; y < h; y++) {
+      const yu = y > 0 ? y - 1 : y;
+      const yd = y < h - 1 ? y + 1 : y;
+      blurLum[y * w + x] = ((tmpLum[yu * w + x] + 2 * tmpLum[y * w + x] + tmpLum[yd * w + x]) >> 2) as number;
+    }
+  }
+  for (let i = 0, j = 0; i < d.length; i += 4, j++) {
+    const L = postLum[j];
+    if (L < 128 || L >= 238) continue;
+    const detail = Math.abs(L - blurLum[j]);
+    if (detail > 7) continue;
+    const r = d[i];
+    const g = d[i + 1];
+    const b = d[i + 2];
+    const maxC = Math.max(r, g, b);
+    const minC = Math.min(r, g, b);
+    const sat = maxC - minC;
+    if (sat > 24) continue;
+    const detailProtect = 1 - detail / 8;
+    const satProtect = 1 - sat / 25;
+    const strength = 0.72 * detailProtect * satProtect;
+    const lift = (255 - L) * strength;
+    d[i] = Math.min(255, r + lift);
+    d[i + 1] = Math.min(255, g + lift);
+    d[i + 2] = Math.min(255, b + lift);
+  }
+
   ctx.putImageData(img, 0, 0);
   return canvas;
 }
@@ -3438,13 +3484,14 @@ export function boostInkContrast(canvas: HTMLCanvasElement): HTMLCanvasElement {
     }
   }
 
-  const AMOUNT = 0.45;
-  const INK_THRESHOLD = 150;
+  const AMOUNT = 0.38;
+  const INK_THRESHOLD = 138;
   for (let i = 0, j = 0; i < d.length; i += 4, j++) {
     const L = lum[j];
     if (L > INK_THRESHOLD) continue;
     const diff = L - blur[j];
-    const ramp = L <= 110 ? 1 : 1 - (L - 110) / (INK_THRESHOLD - 110);
+    if (diff > -4 && diff < 4) continue;
+    const ramp = L <= 108 ? 1 : 1 - (L - 108) / (INK_THRESHOLD - 108);
     const add = diff * AMOUNT * ramp;
     let r0 = d[i] + add;
     let g0 = d[i + 1] + add;
