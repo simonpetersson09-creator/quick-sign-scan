@@ -426,7 +426,14 @@ function ScanPage() {
   // also nudges exposureCompensation based on the measured paper luminance
   // (target ~165) so backlit pages get brightened and over-lit pages dimmed.
   function meterTowardsDoc(nx: number, ny: number, docLum: number) {
-    if (lockedRef.current || exposureLockedRef.current) return;
+    // Stop metering as soon as we're past HOLD_FRAMES — further exposure
+    // tweaks during ramp-up cause 2-4 frames of luminance/sharpness swing
+    // that eat stableCount progress and delay the first lock.
+    if (
+      lockedRef.current ||
+      exposureLockedRef.current ||
+      stableCount.current >= HOLD_FRAMES
+    ) return;
     const now = performance.now();
     if (now - lastMeterAtRef.current < METER_INTERVAL_MS) return;
     const track = streamRef.current?.getVideoTracks()[0];
@@ -1124,12 +1131,14 @@ function ScanPage() {
     const isSharp = sharpness >= SHARPNESS_LIVE_MIN;
     if (!isSharp) {
       blurFramesRef.current++;
-      stableCount.current = Math.min(stableCount.current, READY_FRAMES - 1);
+      // Soft regression: a single blurry frame shouldn't wipe ~0.3s of progress.
+      stableCount.current = Math.max(0, stableCount.current - 2);
     } else {
       blurFramesRef.current = 0;
     }
     if (!isBrightEnough) {
-      stableCount.current = Math.min(stableCount.current, READY_FRAMES - 1);
+      // Soft regression — exposure metering naturally causes 1-2 dim frames.
+      stableCount.current = Math.max(0, stableCount.current - 2);
     }
 
     // Engage lock once we've reached the READY threshold with good conditions.
@@ -1281,7 +1290,9 @@ function ScanPage() {
       } else if (ambiguous) {
         // Competing candidates — wait for one to win.
         setStatus("ready");
-        stableCount.current = Math.min(stableCount.current, STABLE_FRAMES - 1);
+        // Soft regression: ambiguity often resolves within 1-2 frames; don't
+        // wipe ramp-up progress entirely.
+        stableCount.current = Math.max(0, stableCount.current - 2);
         if (captureGateRef.current) captureGateRef.current.reason = "ambiguous";
       } else {
         setStatus("capturing");
@@ -1396,7 +1407,9 @@ function ScanPage() {
     if (capturedRef.current) return;
     const meta = detectionMeta.current;
     if (!meta || meta.confidence < MIN_DOCUMENT_CONFIDENCE) {
-      stableCount.current = 0;
+      // Soft regression — confidence fluctuates frame-to-frame; full reset
+      // makes first lock feel arbitrary.
+      stableCount.current = Math.max(0, stableCount.current - 2);
       lockedRef.current = false;
       setStatus("uncertain");
       return;
@@ -1405,7 +1418,8 @@ function ScanPage() {
     // document edges. Stops auto-capture from firing when the frame is
     // still floating a few cm off the paper (e.g. on a uniform floor).
     if (meta.debug.edgeTightness < MIN_EDGE_TIGHTNESS_FOR_CAPTURE) {
-      stableCount.current = 0;
+      // Soft regression — hi-res tightness recompute may rescue next frame.
+      stableCount.current = Math.max(0, stableCount.current - 2);
       lockedRef.current = false;
       setStatus("align");
       return;
