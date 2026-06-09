@@ -56,27 +56,26 @@ function ReviewPage() {
     setPageIdx(allPages.length - 1);
     setSigDataUrl(s.signatureDataUrl ?? null);
     setSigPos(s.signaturePosition ?? null);
+    setReady(true);
 
-    let cancelled = false;
-    (async () => {
-      const sig =
-        s.signatureDataUrl && s.signaturePosition
-          ? { dataUrl: s.signatureDataUrl, x: s.signaturePosition.x, y: s.signaturePosition.y }
-          : null;
-      const url = await buildPdf(allPages, sig);
-      if (cancelled) return;
-      setPdfUrl(url);
-      scanStore.set({ pdfDataUrl: url });
-      try {
-        const blob = dataUrlToBlob(url);
-        setSizeBytes(blob.size);
-      } catch {
-        /* noop */
+    // Estimate output size from the underlying page images instead of
+    // building a PDF. The image bytes dominate the final PDF size, so
+    // this is accurate enough for the size chip and avoids allocating
+    // a multi-MB PDF on mount and on every signature drag.
+    try {
+      let bytes = 0;
+      for (const p of allPages) {
+        try {
+          bytes += dataUrlToBlob(p).size;
+        } catch {
+          /* skip non-data-URL pages */
+        }
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
+      // Small fixed overhead for PDF structure + signature PNG.
+      setSizeBytes(bytes + 4096);
+    } catch {
+      setSizeBytes(null);
+    }
   }, [navigate]);
 
   // Diagnostics — logs PDF/page dimensions, viewport, initial scale, scroll pos.
