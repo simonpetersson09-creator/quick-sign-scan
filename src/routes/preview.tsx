@@ -304,10 +304,10 @@ function PreviewPage() {
           <ScanLine className="h-10 w-10 text-muted-foreground" strokeWidth={1.75} />
           <div className="space-y-1">
             <h2 className="text-lg font-semibold tracking-tight text-foreground">
-              Ingen skanning att visa
+              {t("previewEmptyTitle")}
             </h2>
             <p className="max-w-[260px] text-sm text-muted-foreground">
-              Bilden kunde inte hämtas. Skanna sidan igen utan att lämna appen under tiden.
+              {t("previewEmptyBody")}
             </p>
           </div>
           <PrimaryButton onClick={() => navigate({ to: "/scan", replace: true })}>

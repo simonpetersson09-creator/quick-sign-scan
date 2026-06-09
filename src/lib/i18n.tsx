@@ -79,6 +79,8 @@ const sv: Dict = {
   // preview
   previewTitle: "Förhandsgranska",
   previewHint: "Kontrollera att dokumentet är skarpt och komplett.",
+  previewEmptyTitle: "Ingen skanning att visa",
+  previewEmptyBody: "Bilden kunde inte hämtas. Skanna sidan igen utan att lämna appen under tiden.",
   scannedAlt: "Skannat dokument",
   filterColor: "Färg",
   filterGray: "Grå",
@@ -319,6 +321,8 @@ const en: Dict = {
   // preview
   previewTitle: "Preview",
   previewHint: "Make sure the document is sharp and complete.",
+  previewEmptyTitle: "No scan to show",
+  previewEmptyBody: "The image could not be loaded. Scan the page again without leaving the app in the meantime.",
   scannedAlt: "Scanned document",
   filterColor: "Color",
   filterGray: "Gray",
