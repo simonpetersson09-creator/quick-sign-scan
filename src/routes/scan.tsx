@@ -235,7 +235,7 @@ function ScanPage() {
   // instead of locking onto whichever quad happened to win the last frame.
   // Never changes the warp pipeline, min-area, or which quad is drawn —
   // only gates `stableCount` when more than one candidate has real support.
-  const ENABLE_CANDIDATE_MEMORY = true;
+  const ENABLE_CANDIDATE_MEMORY = false;
   const CANDIDATE_HISTORY_MAX = 15;
   const CANDIDATE_CLUSTER_DELTA = 0.05; // normalized corner distance
   const CANDIDATE_AREA_TOL = 0.18;
