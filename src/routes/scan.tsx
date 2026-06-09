@@ -1434,6 +1434,7 @@ function ScanPage() {
       return;
     }
     capturedRef.current = true;
+    resetStageDump();
     triggerCaptureHaptic();
     const vw = video.videoWidth;
     const vh = video.videoHeight;
@@ -2033,6 +2034,7 @@ function ScanPage() {
           debug: meta.debug,
         },
       });
+      flushStageDumpToStore();
       finishPageCapture(dataUrl, scanStore.getPages().length || session.pages.length);
     } catch (e) {
       console.error("[scan] capture warp failed, falling back to raw frame", e);
@@ -2738,12 +2740,66 @@ function logScanStage(stage: string, payload: unknown) {
   console.log(`[scan:${stage}]`, payload);
 }
 
+// Per-capture stage thumbnails. Populated by logScanCanvas when ?stagedump=1
+// is on (URL query or localStorage "docscan.stagedump"="1"). Flushed to
+// scanStore on a successful capture, then read by /preview to render a
+// debug strip so we can visually see where artefacts appear.
+const stageDumpBuffer: { name: string; width: number; height: number; dataUrl: string }[] = [];
+
+function isStageDumpEnabled(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    if (/[?&]stagedump=1\b/.test(window.location.search)) return true;
+    if (window.localStorage.getItem("docscan.stagedump") === "1") return true;
+  } catch {}
+  return false;
+}
+
+function resetStageDump() {
+  stageDumpBuffer.length = 0;
+}
+
+function flushStageDumpToStore() {
+  if (!isStageDumpEnabled() || stageDumpBuffer.length === 0) return;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const stages = stageDumpBuffer.map((s) => ({ ...s }));
+  resetStageDump();
+  // Lazy import to avoid circular type dependencies.
+  import("@/lib/scanStore").then(({ scanStore }) => {
+    scanStore.set({ debugStages: stages });
+  });
+}
+
 function logScanCanvas(stage: string, canvas: HTMLCanvasElement, includeImage: boolean) {
   const payload: { width: number; height: number; dataUrl?: string } = {
     width: canvas.width,
     height: canvas.height,
   };
-  if (includeImage) payload.dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+  const dumpEnabled = isStageDumpEnabled();
+  if (includeImage || dumpEnabled) {
+    // Downscale long side to 600 px to keep buffer light.
+    const maxSide = 600;
+    const scale = Math.min(1, maxSide / Math.max(canvas.width, canvas.height));
+    let dataUrl: string;
+    if (scale < 1) {
+      const c = document.createElement("canvas");
+      c.width = Math.round(canvas.width * scale);
+      c.height = Math.round(canvas.height * scale);
+      c.getContext("2d")!.drawImage(canvas, 0, 0, c.width, c.height);
+      dataUrl = c.toDataURL("image/jpeg", 0.8);
+    } else {
+      dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+    }
+    if (includeImage) payload.dataUrl = dataUrl;
+    if (dumpEnabled) {
+      stageDumpBuffer.push({
+        name: stage,
+        width: canvas.width,
+        height: canvas.height,
+        dataUrl,
+      });
+    }
+  }
   logScanStage(stage, payload);
 }
 

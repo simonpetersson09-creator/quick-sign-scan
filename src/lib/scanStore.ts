@@ -9,6 +9,13 @@
 
 type Listener = () => void;
 
+export interface ScanDebugStage {
+  name: string;
+  width: number;
+  height: number;
+  dataUrl: string;
+}
+
 export interface ScanSession {
   imageDataUrl: string | null;
   sourceDataUrl: string | null;
@@ -41,6 +48,8 @@ export interface ScanSession {
   pdfDataUrl: string | null;
   signatureDataUrl: string | null;
   signaturePosition: { x: number; y: number } | null; // normalized 0..1
+  /** Per-stage thumbnails from the last capture, when ?stagedump=1 is on. */
+  debugStages: ScanDebugStage[] | null;
 }
 
 function createInitial(): ScanSession {
@@ -52,6 +61,7 @@ function createInitial(): ScanSession {
     pdfDataUrl: null,
     signatureDataUrl: null,
     signaturePosition: null,
+    debugStages: null,
   };
 }
 
