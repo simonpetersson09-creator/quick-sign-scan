@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
-import { buildPdf, dataUrlToBlob } from "@/lib/pdf";
+import { dataUrlToBlob } from "@/lib/pdf";
 import { useT } from "@/lib/i18n";
 import {
   ArrowLeft,
