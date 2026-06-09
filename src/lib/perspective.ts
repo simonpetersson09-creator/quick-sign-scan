@@ -889,6 +889,15 @@ export function autoOrientAndDeskewDocument(
 
 export function measureQuadGeometry(quad: [Point, Point, Point, Point]): QuadGeometryDiagnostics {
   const ordered = orderQuad(quad);
+  return measureWarpQuadGeometry(ordered);
+}
+
+// Measures the quad exactly in the corner order it will be handed to
+// warpQuadToRect. This is critical for orientation: cyclically rotating the
+// corners changes whether the warp output is portrait or landscape, but
+// orderQuad() would undo that rotation and hide the real output geometry.
+export function measureWarpQuadGeometry(quad: [Point, Point, Point, Point]): QuadGeometryDiagnostics {
+  const ordered = quad;
   const topAngle = segmentAngle(ordered[0], ordered[1]);
   const bottomAngle = segmentAngle(ordered[3], ordered[2]);
   const leftRaw = segmentAngle(ordered[0], ordered[3]);
@@ -965,7 +974,7 @@ export function orientQuadForA4Portrait(
       Point,
       Point,
     ];
-    const geom = measureQuadGeometry(candidate.quad);
+    const geom = measureWarpQuadGeometry(candidate.quad);
     // Thumb aspect matches the candidate quad — square-ish (e.g. 240×339 for
     // portrait, 339×240 for landscape) so text projection isn't biased by
     // forced stretching.
@@ -4002,8 +4011,8 @@ export function whitenBackground(canvas: HTMLCanvasElement): HTMLCanvasElement {
   // with L <= T_NONE (clearly text) are left exactly as-is; in between we
   // blend smoothly. This is the safety net that guarantees no faint stroke
   // gets bleached.
-  const T_NONE = 110;
-  const T_FULL = 175;
+  const T_NONE = 118;
+  const T_FULL = 182;
   for (let y = 0; y < h; y++) {
     const fy = Math.min(sh - 1, y / SCALE);
     const sy0 = Math.floor(fy);
@@ -4023,7 +4032,7 @@ export function whitenBackground(canvas: HTMLCanvasElement): HTMLCanvasElement {
         b10 * wx * (1 - wy) +
         b01 * (1 - wx) * wy +
         b11 * wx * wy;
-      const k = 250 / Math.max(80, bgVal); // brightness multiplier
+      const k = 255 / Math.max(72, bgVal); // brightness multiplier
       const i = (y * w + x) * 4;
       const r = d[i];
       const g = d[i + 1];
@@ -4051,10 +4060,11 @@ export function whitenBackground(canvas: HTMLCanvasElement): HTMLCanvasElement {
       // without affecting text/stamps.
       if (wt >= 1) {
         const avg = (or + og + ob) / 3;
-        or = avg;
-        og = avg;
-        ob = avg;
-        if (avg >= 232) {
+        const lifted = avg + (255 - avg) * 0.42;
+        or = lifted;
+        og = lifted;
+        ob = lifted;
+        if (lifted >= 218) {
           or = 255;
           og = 255;
           ob = 255;

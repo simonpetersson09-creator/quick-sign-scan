@@ -17,11 +17,13 @@ import {
   maxCornerDelta,
   refineQuadCorners,
   computeHiResEdgeTightness,
+  snapQuadToPaperEdges,
   orientQuadForA4Portrait,
   warpQuadToRect,
   autoOrientAndDeskewDocument,
   whitenBackground,
   boostInkContrast,
+  measureWarpQuadGeometry,
 } from "@/lib/perspective";
 import { useT } from "@/lib/i18n";
 import { Camera, CameraOff, X, RefreshCw, ArrowLeft, ArrowRight, Zap, ZapOff, Settings } from "lucide-react";
@@ -1625,6 +1627,19 @@ function ScanPage() {
         console.warn("[scan] threshold paper lock failed", e);
       }
 
+      try {
+        const beforeSnap = refinedSrcQuad;
+        const snapped = snapQuadToPaperEdges(refineSource, vw, vh, refinedSrcQuad);
+        refinedSrcQuad = snapped;
+        logScanStage("paper-edge-snap", {
+          before: formatQuad(beforeSnap),
+          after: formatQuad(snapped),
+          maxDeltaPx: Math.max(...beforeSnap.map((p, i) => Math.hypot(p.x - snapped[i].x, p.y - snapped[i].y))),
+        });
+      } catch (e) {
+        console.warn("[scan] paper edge snap failed", e);
+      }
+
       // FINAL trace: this is the exact quad handed to warpQuadToRect. If the
       // detected paper is lying sideways in the camera frame, rotate the quad's
       // corner order here (not the finished canvas) so the warp maps directly
@@ -1638,7 +1653,7 @@ function ScanPage() {
       // Långsidan låses till 2339 px (200 DPI A4-långsida). Resultatet blir
       // alltid stående eftersom orientQuadForA4Portrait garanterar att
       // höjden ≥ bredden. Ingen forced A4-stretch, ingen extra rotation.
-      const finalGeom = measureQuadGeometry(finalSrcQuad);
+      const finalGeom = measureWarpQuadGeometry(finalSrcQuad);
       const TARGET_LONG = 2339;
       const aspect = finalGeom.width / Math.max(1, finalGeom.height); // ≤ 1 (portrait)
       outH = TARGET_LONG;
