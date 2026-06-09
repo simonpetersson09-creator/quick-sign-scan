@@ -1466,13 +1466,20 @@ function ScanPage() {
     }
 
     // Sortera alltid hörnen i exakt ordning TL, TR, BR, BL innan warp.
-    // Multi-frame voting: median of the last N smoothed quads (per corner).
-    // En enstaka skakig frame kan inte längre dra warp-hörnen av pappret.
+    //
+    // Sanningskälla för warp = overlayQuadNorm (smoothQuad.current), dvs
+    // exakt den ram användaren ser i preview. Multi-frame median voting kan
+    // ge en quad som avviker från overlayen och har därför stängts av som
+    // default — slå på med ?voting=1 för experimentation.
+    const urlParams = new URLSearchParams(
+      typeof window !== "undefined" ? window.location.search : "",
+    );
+    const votingEnabled = urlParams.get("voting") === "1";
     const votes = recentSmoothQuadsRef.current;
     const overlayQuadNorm = smoothQuad.current; // exactly what overlay drew
     let votedQuad: [Point, Point, Point, Point] = normQuad;
     let votingApplied = false;
-    if (votes.length >= 3) {
+    if (votingEnabled && votes.length >= 3) {
       const orderedVotes = votes.map((v) => orderQuad(v));
       const median = (arr: number[]) => {
         const s = [...arr].sort((a, b) => a - b);
@@ -1485,15 +1492,20 @@ function ScanPage() {
       })) as [Point, Point, Point, Point];
       votingApplied = true;
     }
-    const orderedNormQuad = orderQuad(votedQuad);
+    // WYSIWYG: använd overlay quad som källa när den finns. Annars fall back
+    // till voted/detected quad.
+    const sourceQuadNorm: [Point, Point, Point, Point] = overlayQuadNorm ?? votedQuad;
+    const orderedNormQuad = orderQuad(sourceQuadNorm);
 
     logScanStage("warp-trace/1-detected-norm", {
       raw: formatQuad(normQuad),
       overlayLast: overlayQuadNorm ? formatQuad(overlayQuadNorm) : null,
       voteWindow: votes.length,
+      votingEnabled,
       votingApplied,
       votedQuadNorm: formatQuad(votedQuad),
-      overlayVsVotedMaxDelta: overlayQuadNorm
+      sourceUsed: overlayQuadNorm ? "overlay" : votingApplied ? "voted" : "raw",
+      overlayVsSourceMaxDelta: overlayQuadNorm
         ? Math.max(
             ...orderQuad(overlayQuadNorm).map((p, i) =>
               Math.hypot(p.x - orderedNormQuad[i].x, p.y - orderedNormQuad[i].y),
@@ -1501,6 +1513,7 @@ function ScanPage() {
           )
         : null,
     });
+
 
     // Text-safe mode: do not grow or shrink the detected crop. Growing shows
     // desk/background; shrinking risks cutting off real text near the edges.
