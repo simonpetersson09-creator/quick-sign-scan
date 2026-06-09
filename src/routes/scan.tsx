@@ -1811,7 +1811,7 @@ function ScanPage() {
             stripPx: 6,
             minMeanL: 200,
             maxStdL: 28,
-            maxTopBottom: 0.08,
+            maxTopBottom: 0.02,
             maxLeftRight: 0.02,
           });
           // Skala tillbaka till exakt A4 så aspect inte driftar och preview

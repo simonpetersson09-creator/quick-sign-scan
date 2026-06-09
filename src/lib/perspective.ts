@@ -3260,7 +3260,13 @@ export function snapQuadToPaperEdges(
       continue;
     }
 
-    const clamped = Math.max(-MAX_SHIFT, Math.min(MAX_SHIFT, medianOffset));
+    // Asymmetric snap: only allow the side to move *outward* (away from the
+    // quad centroid). Inward snap is unsafe because a row of text just inside
+    // the paper edge looks like a strong bright→dark transition and would
+    // pull the frame in, cropping the last text line. Outward snap is safe:
+    // worst case we include a sliver of background, which is then trimmed by
+    // cropToWhiteEdges. Positive medianOffset = outward (see strip mapping).
+    const clamped = Math.max(0, Math.min(MAX_SHIFT, medianOffset));
     offsets.push(clamped);
   }
 
