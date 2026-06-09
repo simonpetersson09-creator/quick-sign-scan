@@ -388,6 +388,56 @@ function PreviewPage() {
         })}
       </div>
 
+      {debugStages && debugStages.length > 0 && (
+        <div className="mt-4 rounded-xl border border-dashed border-border bg-card/60 p-2">
+          <div className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Pipeline-steg ({debugStages.length}) · tryck för full storlek
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {debugStages.map((s, i) => (
+              <button
+                key={`${s.name}-${i}`}
+                type="button"
+                onClick={() => setDebugZoom(s)}
+                className="shrink-0 w-24 text-left"
+              >
+                <div
+                  className="w-24 rounded-md overflow-hidden border border-border bg-white"
+                  style={{ aspectRatio: `${s.width} / ${s.height}` }}
+                >
+                  <img
+                    src={s.dataUrl}
+                    alt={s.name}
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <div className="mt-1 text-[10px] leading-tight text-foreground/80 truncate">
+                  {i + 1}. {s.name}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {debugZoom && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 p-4"
+          onClick={() => setDebugZoom(null)}
+          role="dialog"
+        >
+          <div className="text-white text-sm mb-2 font-mono">
+            {debugZoom.name} · {debugZoom.width}×{debugZoom.height}
+          </div>
+          <img
+            src={debugZoom.dataUrl}
+            alt={debugZoom.name}
+            className="max-w-full max-h-[80vh] object-contain bg-white"
+          />
+          <div className="text-white/70 text-xs mt-2">Tryck för att stänga</div>
+        </div>
+      )}
+
       <div className="flex-1" />
 
       <div className="flex flex-col gap-3 pt-5">
