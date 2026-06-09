@@ -798,8 +798,16 @@ function ScanPage() {
     const prevConfidentEnough =
       !ENABLE_PREFER_BIAS_GATE ||
       (prevMeta !== null &&
-        prevMeta.confidence >= PREFER_BIAS_MIN_CONF &&
-        prevMeta.debug.edgeTightness >= PREFER_BIAS_MIN_EDGE);
+        (
+          (prevMeta.confidence >= PREFER_BIAS_MIN_CONF &&
+            prevMeta.debug.edgeTightness >= PREFER_BIAS_MIN_EDGE) ||
+          // Early tier: weaker quality OK if the quad has already survived
+          // a few consecutive frames — gives the detector a temporal anchor
+          // during ramp-up without trusting one-off noisy contours.
+          (stableCount.current >= PREFER_BIAS_EARLY_MIN_STABLE &&
+            prevMeta.confidence >= PREFER_BIAS_EARLY_MIN_CONF &&
+            prevMeta.debug.edgeTightness >= PREFER_BIAS_EARLY_MIN_EDGE)
+        ));
     const preferQuad =
       prevSmooth && prevConfidentEnough
         ? (prevSmooth.map((p) => ({ x: p.x * dw, y: p.y * dh })) as [Point, Point, Point, Point])
