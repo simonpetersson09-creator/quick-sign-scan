@@ -293,7 +293,7 @@ const en: Dict = {
   statusMoveBack: "Move the phone slightly further from the document.",
   statusLowLight: "More light gives better detection.",
   statusTooFar: "Move closer to the document",
-  statusTooClose: "Fit the whole sheet in view",
+  statusTooClose: "Hold the phone a little further back",
   statusTilt: "Align the document more squarely",
   statusReady: "Document found",
   statusCapturing: "Processing image…",
