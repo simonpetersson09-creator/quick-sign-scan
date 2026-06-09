@@ -499,6 +499,48 @@ function PreviewPage() {
         </div>
       )}
 
+      {(() => {
+        const report = qualityByIndex[activeIndex];
+        if (!report || report.verdict === "ok") return null;
+        if (dismissedQuality[activeIndex]) return null;
+        return (
+          <div className="mt-4 rounded-xl border border-amber-300/60 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800/60 p-3">
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle className="h-4 w-4 mt-0.5 text-amber-600 dark:text-amber-400 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-foreground">
+                  {t("qualityWarnTitle")}
+                </div>
+                <div className="text-[13px] text-foreground/75 mt-0.5">
+                  {t(`verdict_${report.verdict}` as Parameters<typeof t>[0])}
+                </div>
+                <div className="mt-2.5 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      deletePage(activeIndex);
+                      navigate({ to: "/scan" });
+                    }}
+                    className="inline-flex items-center rounded-full border border-border bg-card px-3 py-1.5 text-[13px] font-medium text-foreground hover:bg-secondary transition"
+                  >
+                    {t("qualityRescan")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDismissedQuality((prev) => ({ ...prev, [activeIndex]: true }))
+                    }
+                    className="inline-flex items-center rounded-full px-3 py-1.5 text-[13px] font-medium text-foreground/70 hover:text-foreground transition"
+                  >
+                    {t("qualityUseAnyway")}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       <div className="flex-1" />
 
       <div className="flex flex-col gap-3 pt-5">
