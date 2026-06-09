@@ -1657,19 +1657,34 @@ function ScanPage() {
       }
 
 
-      // snapQuadToPaperEdges disabled per user request
-      // try {
-      //   const beforeSnap = refinedSrcQuad;
-      //   const snapped = snapQuadToPaperEdges(refineSource, vw, vh, refinedSrcQuad);
-      //   refinedSrcQuad = snapped;
-      //   logScanStage("paper-edge-snap", {
-      //     before: formatQuad(beforeSnap),
-      //     after: formatQuad(snapped),
-      //     maxDeltaPx: Math.max(...beforeSnap.map((p, i) => Math.hypot(p.x - snapped[i].x, p.y - snapped[i].y))),
-      //   });
-      // } catch (e) {
-      //   console.warn("[scan] paper edge snap failed", e);
-      // }
+      // Snap quad to paper edges — defensive: per-side strength gate (1.3×),
+      // ±~2.3% short-side search, ±~1.2% short-side max shift, abort on
+      // geometric blow-up. Disable via ?noSnapQuad=1.
+      const snapQuadEnabled = (() => {
+        try {
+          if (typeof window === "undefined") return true;
+          const sp = new URLSearchParams(window.location.search);
+          return sp.get("noSnapQuad") !== "1";
+        } catch { return true; }
+      })();
+      if (snapQuadEnabled) {
+        try {
+          const beforeSnap = refinedSrcQuad;
+          const snapped = snapQuadToPaperEdges(refineSource, vw, vh, refinedSrcQuad);
+          refinedSrcQuad = snapped;
+          logScanStage("paper-edge-snap", {
+            applied: true,
+            before: formatQuad(beforeSnap),
+            after: formatQuad(snapped),
+            maxDeltaPx: Math.max(...beforeSnap.map((p, i) => Math.hypot(p.x - snapped[i].x, p.y - snapped[i].y))),
+          });
+        } catch (e) {
+          console.warn("[scan] paper edge snap failed", e);
+          logScanStage("paper-edge-snap", { applied: false, reason: "exception" });
+        }
+      } else {
+        logScanStage("paper-edge-snap", { applied: false, reason: "disabled-by-flag" });
+      }
 
       // FINAL trace: this is the exact quad handed to warpQuadToRect. If the
       // detected paper is lying sideways in the camera frame, rotate the quad's
