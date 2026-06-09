@@ -242,7 +242,10 @@ function ReviewPage() {
   }
 
   function proceed() {
-    if (!approved || !pdfUrl) return;
+    if (!approved || !ready || !pages.length) return;
+    // Persist latest signature position before leaving — send.tsx will
+    // build the PDF from scanStore state.
+    if (sigPos) scanStore.set({ signaturePosition: sigPos });
     navigate({ to: "/send" });
   }
 
