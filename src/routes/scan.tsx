@@ -1816,7 +1816,7 @@ function ScanPage() {
 
 
 
-      // Auto-straighten ±3°: finjustera små rotationer som blir kvar efter
+      // Auto-straighten ±5°: finjustera små rotationer som blir kvar efter
       // perspektivwarp pga brusiga hörn. Projektionsvarians på en ~600 px
       // nedsamplad gråskaleversion. Roterar endast om |vinkel| ≥ 0,3° och
       // confidence är hög nog — annars lämnas bilden orörd. Aldrig 90°/180°.
@@ -1829,7 +1829,7 @@ function ScanPage() {
       if (straightenEnabled) {
         try {
           const result = autoStraighten(warped, {
-            maxAngleDeg: 3,
+            maxAngleDeg: 5,
             stepDeg: 0.25,
             minApplyDeg: 0.3,
             targetWidth: 600,
