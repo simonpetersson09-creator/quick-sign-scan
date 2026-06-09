@@ -17,6 +17,7 @@ import {
   maxCornerDelta,
   refineQuadCorners,
   computeHiResEdgeTightness,
+  orientQuadForA4Portrait,
   warpQuadToRect,
   autoOrientAndDeskewDocument,
   whitenBackground,
@@ -1626,12 +1627,19 @@ function ScanPage() {
         console.warn("[scan] threshold paper lock failed", e);
       }
 
-      // FINAL trace: this is the exact quad handed to warpQuadToRect.
-      const finalSrcQuad = refinedSrcQuad;
+      // FINAL trace: this is the exact quad handed to warpQuadToRect. If the
+      // detected paper is lying sideways in the camera frame, rotate the quad's
+      // corner order here (not the finished canvas) so the warp maps directly
+      // onto a standing A4 page.
+      let orientationDiag: unknown = null;
+      const finalSrcQuad = orientQuadForA4Portrait(refineSource, vw, vh, refinedSrcQuad, (d) => {
+        orientationDiag = d;
+      });
       logScanStage("warp-trace/5-final-input", {
         srcPixels: formatQuad(finalSrcQuad),
         frameSize: { vw, vh },
         outSize: { outW, outH },
+        portraitOrientation: orientationDiag,
         usingBurstFrame: Boolean(bestFrame),
         srcFromOverlayDeltaPx: overlayQuadNorm
           ? Math.max(
