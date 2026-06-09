@@ -120,6 +120,22 @@ function PreviewPage() {
     });
   }, [handedOffPages, navState.scanActiveIndex, recoveredActiveIndex, recoveredPages]);
 
+  useEffect(() => {
+    if (pages.length) return;
+    let cancelled = false;
+    void scanStore.readPreviewHandoffAsync().then((handoff) => {
+      if (cancelled || !handoff?.pages.length || scanStore.getPages().length) return;
+      const safeActive = Math.max(0, Math.min(handoff.pages.length - 1, handoff.activeIndex));
+      scanStore.set({ pages: handoff.pages, imageDataUrl: handoff.pages[safeActive] });
+      setPages(handoff.pages);
+      setActiveIndex(safeActive);
+      scanStore.clearPreviewHandoff();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [pages.length]);
+
   // Subscribe to store updates so any late mutation (race with navigation,
   // or external change) reflects here.
   useEffect(() => {
