@@ -807,7 +807,7 @@ export function detectDocumentQuad(
   // dominant in the edge image — the case where contour-based extraction
   // tends to lock onto a sub-rectangle inside the page.
   if (ENABLE_HOUGH_LINE_DETECTION) {
-    const houghQuads = houghLineQuadCandidates(connectedEdges, width, height);
+    const houghQuads = houghLineQuadCandidates(connectedEdges, gradMag, width, height);
     for (const q of houghQuads) {
       candidateCount++;
       const detection = evaluateEdgeQuad({
