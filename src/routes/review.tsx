@@ -45,38 +45,63 @@ function ReviewPage() {
   const signed = !!sigDataUrl;
 
   useEffect(() => {
+    let cancelled = false;
+
+    function adopt(allPages: string[], activeUrl: string | null, sig: { dataUrl: string | null; pos: { x: number; y: number } | null }) {
+      setPages(allPages);
+      const idx = activeUrl ? Math.max(0, allPages.indexOf(activeUrl)) : allPages.length - 1;
+      setPageIdx(idx >= 0 ? idx : allPages.length - 1);
+      setSigDataUrl(sig.dataUrl);
+      setSigPos(sig.pos);
+      setReady(true);
+
+      try {
+        let bytes = 0;
+        for (const p of allPages) {
+          try {
+            bytes += dataUrlToBlob(p).size;
+          } catch {
+            /* skip non-data-URL pages */
+          }
+        }
+        setSizeBytes(bytes + 4096);
+      } catch {
+        setSizeBytes(null);
+      }
+    }
+
     const s = scanStore.get();
+    const sig = { dataUrl: s.signatureDataUrl ?? null, pos: s.signaturePosition ?? null };
     const img = s.imageDataUrl;
-    if (!img) {
-      navigate({ to: "/scan", replace: true });
+    const allPages = s.pages.length > 0 ? s.pages : img ? [img] : [];
+    if (allPages.length > 0) {
+      adopt(allPages, img, sig);
       return;
     }
-    const allPages = s.pages.length > 0 ? s.pages : [img];
-    setPages(allPages);
-    setPageIdx(allPages.length - 1);
-    setSigDataUrl(s.signatureDataUrl ?? null);
-    setSigPos(s.signaturePosition ?? null);
-    setReady(true);
 
-    // Estimate output size from the underlying page images instead of
-    // building a PDF. The image bytes dominate the final PDF size, so
-    // this is accurate enough for the size chip and avoids allocating
-    // a multi-MB PDF on mount and on every signature drag.
-    try {
-      let bytes = 0;
-      for (const p of allPages) {
-        try {
-          bytes += dataUrlToBlob(p).size;
-        } catch {
-          /* skip non-data-URL pages */
-        }
-      }
-      // Small fixed overhead for PDF structure + signature PNG.
-      setSizeBytes(bytes + 4096);
-    } catch {
-      setSizeBytes(null);
+    // In-memory store empty (HMR reload, route-chunk reload, BFCache). Recover
+    // from the same-tab preview handoff before bouncing to scan — otherwise
+    // pressing "Klar" on /sign can drop the user back to the camera.
+    const sync = scanStore.readPreviewHandoff();
+    if (sync?.pages.length) {
+      adopt(sync.pages, sync.pages[Math.max(0, Math.min(sync.pages.length - 1, sync.activeIndex))], sig);
+      return;
     }
+
+    void scanStore.readPreviewHandoffAsync().then((handoff) => {
+      if (cancelled) return;
+      if (handoff?.pages.length) {
+        adopt(handoff.pages, handoff.pages[Math.max(0, Math.min(handoff.pages.length - 1, handoff.activeIndex))], sig);
+        return;
+      }
+      navigate({ to: "/scan", replace: true });
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [navigate]);
+
 
   // Diagnostics — logs PDF/page dimensions, viewport, initial scale, scroll pos.
   useEffect(() => {
