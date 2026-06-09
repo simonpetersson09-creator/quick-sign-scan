@@ -1587,10 +1587,11 @@ function ScanPage() {
       }
       logScanStage("burst-capture", { bestSharpness: bestScore });
 
-      // Subpixel corner refinement — kan nudga hörn upp till ±5 px och
-      // därmed avvika från overlay-ramen. AV som default (?refineCorners=1
-      // för experimentation).
-      const refineCornersEnabled = urlParams.get("refineCorners") === "1";
+      // Subpixel corner refinement — nudgar hörnen ±5 px till full
+      // videoupplösning. Nu PÅ som default vid capture (live-refine är
+      // fortfarande av; det är bara capture-pathen som körs här).
+      // Stäng av med ?refineCorners=0 för debugging.
+      const refineCornersEnabled = urlParams.get("refineCorners") !== "0";
       const refineSource = bestFrame ?? video;
       let refinedSrcQuad = srcQuad;
       if (refineCornersEnabled) {
@@ -1817,7 +1818,7 @@ function ScanPage() {
             stepDeg: 0.25,
             minApplyDeg: 0.3,
             targetWidth: 600,
-            minConfidence: 1.15,
+            minConfidence: 1.08,
           });
           if (result.applied) {
             warped = result.canvas;
@@ -1848,7 +1849,7 @@ function ScanPage() {
       // Toggla via URL (?flag=1) eller localStorage ("docscan.<flag>"="1"):
       //   rawWarpOnly       → hoppa över ALLT efter warpQuadToRect
       //   noWhiten          → hoppa över whitenBackground
-      //   enableInkBoost    → slå PÅ unsharp mask (av som standard — kan ge grå halor)
+      //   enableInkBoost    → (default PÅ) lokal unsharp mask på bläckpixlar (L≤150)
       //   noInkBoost        → tvinga av boostInkContrast
       const readFlag = (name: string): boolean => {
         try {
@@ -1860,8 +1861,8 @@ function ScanPage() {
       };
       const rawWarpOnly = readFlag("rawWarpOnly");
       const disableWhiten = rawWarpOnly || readFlag("noWhiten");
-      const enableInkBoost = readFlag("enableInkBoost");
-      const disableInkBoost = rawWarpOnly || readFlag("noInkBoost") || !enableInkBoost;
+      const enableInkBoost = !readFlag("noInkBoost"); // default PÅ
+      const disableInkBoost = rawWarpOnly || !enableInkBoost;
       logScanStage("post-warp-flags", {
         rawWarpOnly,
         disableWhiten,
