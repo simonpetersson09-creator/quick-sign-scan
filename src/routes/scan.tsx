@@ -23,6 +23,7 @@ import {
   whitenBackground,
   grayWorldWhiteBalance,
   boostInkContrast,
+  unsharpMaskText,
   measureWarpQuadGeometry,
 } from "@/lib/perspective";
 import { useT } from "@/lib/i18n";
@@ -1768,6 +1769,16 @@ function ScanPage() {
         } catch (e) {
           console.warn("[scan] whitenBackground failed; keeping warped frame", e);
           logScanStage("whiten-background", { applied: false, reason: "exception" });
+        }
+        // Gentle unsharp mask on luminance — sharpens text without colour
+        // fringing or noise amplification on the now-white paper.
+        try {
+          warped = unsharpMaskText(warped, { amount: 0.4, threshold: 4 });
+          logScanCanvas("after-unsharp-mask", warped, debugEnabled);
+          logScanStage("unsharp-mask", { applied: true, amount: 0.4, threshold: 4 });
+        } catch (e) {
+          console.warn("[scan] unsharpMaskText failed; continuing", e);
+          logScanStage("unsharp-mask", { applied: false, reason: "exception" });
         }
       }
 
