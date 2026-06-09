@@ -387,6 +387,9 @@ const en: Dict = {
   verdict_low_contrast: "Not enough contrast",
   verdict_blurry: "The image is blurry",
   verdict_incomplete: "The document seems incomplete",
+  qualityWarnTitle: "Image quality may be low",
+  qualityRescan: "Rescan",
+  qualityUseAnyway: "Use anyway",
 
   // place
   placeTitle: "Place signature",
