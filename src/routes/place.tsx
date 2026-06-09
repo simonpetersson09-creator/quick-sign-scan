@@ -26,16 +26,49 @@ function PlacePage() {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
+    function adopt(list: string[], activeUrl: string | null) {
+      const idx = activeUrl ? Math.max(0, list.indexOf(activeUrl)) : 0;
+      const safe = idx >= 0 ? idx : 0;
+      setPages(list);
+      setPageIndex(safe);
+      scanStore.set({
+        pages: list,
+        imageDataUrl: list[safe],
+        signaturePosition: { x: 0.5, y: 0.86 },
+      });
+    }
+
     const s = scanStore.get();
     const list = s.pages && s.pages.length > 0 ? s.pages : s.imageDataUrl ? [s.imageDataUrl] : [];
-    if (list.length === 0) {
-      navigate({ to: "/" });
+    if (list.length > 0) {
+      adopt(list, s.imageDataUrl);
       return;
     }
-    const idx = s.imageDataUrl ? Math.max(0, list.indexOf(s.imageDataUrl)) : 0;
-    setPages(list);
-    setPageIndex(idx);
-    scanStore.set({ imageDataUrl: list[idx], signaturePosition: { x: 0.5, y: 0.86 } });
+
+    // In-memory store is empty (HMR reload, route-chunk reload, BFCache, etc).
+    // Recover from the same-tab preview handoff before bouncing to home —
+    // otherwise pressing "Use document" on /preview can drop the user back to
+    // the start page and the document looks like it has vanished.
+    const sync = scanStore.readPreviewHandoff();
+    if (sync?.pages.length) {
+      adopt(sync.pages, sync.pages[Math.max(0, Math.min(sync.pages.length - 1, sync.activeIndex))]);
+      return;
+    }
+
+    void scanStore.readPreviewHandoffAsync().then((handoff) => {
+      if (cancelled) return;
+      if (handoff?.pages.length) {
+        adopt(handoff.pages, handoff.pages[Math.max(0, Math.min(handoff.pages.length - 1, handoff.activeIndex))]);
+        return;
+      }
+      navigate({ to: "/scan", replace: true });
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [navigate]);
 
   const image = pages[pageIndex] ?? null;
