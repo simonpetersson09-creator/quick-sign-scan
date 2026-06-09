@@ -3887,3 +3887,154 @@ export function cropToWhiteEdges(
   octx.drawImage(canvas, left, top, nw, nh, 0, 0, nw, nh);
   return { canvas: out, cropped: { top, right, bottom, left } };
 }
+
+// ============================================================================
+// Auto-straighten — fine rotation correction within ±3°
+// ============================================================================
+//
+// Estimates a small skew angle using a horizontal-projection-variance
+// (projection profile) score on a downsampled grayscale copy. Text-rich
+// documents produce sharp dark/bright row alternation when rows are aligned
+// with text baselines, which maximises the variance of the row-darkness
+// histogram.
+//
+// Only applies the rotation when:
+//   - |best angle| >= minApplyDeg (default 0.3°)
+//   - confidence (best score / second-best non-adjacent score) is high
+//     enough — avoids rotating photos / diagrams with no clear text rows.
+//
+// Hard-capped at ±maxAngleDeg (default 3°). Never performs 90°/180° flips.
+// Rotates the full-resolution canvas with bilinear sampling, expanding the
+// canvas and filling new corners with white.
+export function autoStraighten(
+  canvas: HTMLCanvasElement,
+  options: {
+    maxAngleDeg?: number;
+    stepDeg?: number;
+    minApplyDeg?: number;
+    targetWidth?: number;
+    minConfidence?: number;
+  } = {},
+): { canvas: HTMLCanvasElement; angleDeg: number; applied: boolean; confidence: number; reason?: string } {
+  const maxAngleDeg = options.maxAngleDeg ?? 3;
+  const stepDeg = options.stepDeg ?? 0.25;
+  const minApplyDeg = options.minApplyDeg ?? 0.3;
+  const targetWidth = options.targetWidth ?? 600;
+  const minConfidence = options.minConfidence ?? 1.15;
+
+  const W = canvas.width;
+  const H = canvas.height;
+  if (W < 32 || H < 32) {
+    return { canvas, angleDeg: 0, applied: false, confidence: 0, reason: "too-small" };
+  }
+
+  // Downsample to ~targetWidth wide grayscale.
+  const scale = Math.min(1, targetWidth / W);
+  const dw = Math.max(32, Math.round(W * scale));
+  const dh = Math.max(32, Math.round(H * scale));
+  const tmp = document.createElement("canvas");
+  tmp.width = dw;
+  tmp.height = dh;
+  const tctx = tmp.getContext("2d", { willReadFrequently: true })!;
+  tctx.drawImage(canvas, 0, 0, dw, dh);
+  const img = tctx.getImageData(0, 0, dw, dh);
+  const d = img.data;
+  const n = dw * dh;
+  // Darkness plane: 255 - luminance, so dark text => high values.
+  const dark = new Float32Array(n);
+  let meanDark = 0;
+  for (let i = 0; i < n; i++) {
+    const o = i * 4;
+    const l = 0.299 * d[o] + 0.587 * d[o + 1] + 0.114 * d[o + 2];
+    const v = 255 - l;
+    dark[i] = v;
+    meanDark += v;
+  }
+  meanDark /= n;
+  // Subtract mean so uniform background contributes 0 variance.
+  for (let i = 0; i < n; i++) dark[i] -= meanDark;
+
+  // For each candidate angle, project pixels onto rotated rows and compute
+  // variance of the row sums. We don't physically rotate; we bin each pixel
+  // into its rotated-row index.
+  const cx = dw / 2;
+  const cy = dh / 2;
+  const scoreAt = (angleDeg: number): number => {
+    const a = (angleDeg * Math.PI) / 180;
+    const sinA = Math.sin(a);
+    const cosA = Math.cos(a);
+    // Rotated row y' range. Use padded length to fit all pixels.
+    const padH = Math.ceil(Math.abs(dw * sinA) + Math.abs(dh * cosA)) + 2;
+    const offset = padH / 2;
+    const rows = new Float32Array(padH);
+    for (let y = 0; y < dh; y++) {
+      const dy = y - cy;
+      const baseY = dy * cosA + offset;
+      const rowBase = y * dw;
+      for (let x = 0; x < dw; x++) {
+        const dx = x - cx;
+        const yp = baseY - dx * sinA;
+        const yi = yp | 0;
+        if (yi >= 0 && yi < padH) rows[yi] += dark[rowBase + x];
+      }
+    }
+    // Variance of row sums.
+    let mean = 0;
+    for (let i = 0; i < padH; i++) mean += rows[i];
+    mean /= padH;
+    let varSum = 0;
+    for (let i = 0; i < padH; i++) {
+      const v = rows[i] - mean;
+      varSum += v * v;
+    }
+    return varSum / padH;
+  };
+
+  const angles: number[] = [];
+  for (let a = -maxAngleDeg; a <= maxAngleDeg + 1e-6; a += stepDeg) {
+    angles.push(Math.round(a * 1000) / 1000);
+  }
+  const scores = angles.map(scoreAt);
+  let bestIdx = 0;
+  for (let i = 1; i < scores.length; i++) if (scores[i] > scores[bestIdx]) bestIdx = i;
+  const bestAngle = angles[bestIdx];
+  const bestScore = scores[bestIdx];
+
+  // Second-best score outside ±1 step of the peak (so we measure peak vs
+  // unrelated plateau, not the immediate neighbour).
+  let secondBest = 0;
+  for (let i = 0; i < scores.length; i++) {
+    if (Math.abs(i - bestIdx) <= 1) continue;
+    if (scores[i] > secondBest) secondBest = scores[i];
+  }
+  const confidence = secondBest > 0 ? bestScore / secondBest : Infinity;
+
+  if (Math.abs(bestAngle) < minApplyDeg) {
+    return { canvas, angleDeg: bestAngle, applied: false, confidence, reason: "below-min-angle" };
+  }
+  if (confidence < minConfidence) {
+    return { canvas, angleDeg: bestAngle, applied: false, confidence, reason: "low-confidence" };
+  }
+  if (Math.abs(bestAngle) > maxAngleDeg) {
+    return { canvas, angleDeg: bestAngle, applied: false, confidence, reason: "above-max-angle" };
+  }
+
+  // Rotate the full-res canvas by -bestAngle (to undo the detected skew).
+  const rad = (-bestAngle * Math.PI) / 180;
+  const sinA = Math.abs(Math.sin(rad));
+  const cosA = Math.abs(Math.cos(rad));
+  const newW = Math.ceil(W * cosA + H * sinA);
+  const newH = Math.ceil(W * sinA + H * cosA);
+  const out = document.createElement("canvas");
+  out.width = newW;
+  out.height = newH;
+  const octx = out.getContext("2d")!;
+  octx.fillStyle = "#ffffff";
+  octx.fillRect(0, 0, newW, newH);
+  octx.imageSmoothingEnabled = true;
+  octx.imageSmoothingQuality = "high";
+  octx.translate(newW / 2, newH / 2);
+  octx.rotate(rad);
+  octx.drawImage(canvas, -W / 2, -H / 2);
+  return { canvas: out, angleDeg: bestAngle, applied: true, confidence };
+}
