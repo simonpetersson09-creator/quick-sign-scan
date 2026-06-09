@@ -190,7 +190,12 @@ function ScanPage() {
   //   - Early tier (EARLY_*): looser thresholds that engage during ramp-up
   //     so Hough/contour get a temporal anchor before first lock, gated on
   //     stableCount so a single noisy frame can't seed a wrong bias.
-  const ENABLE_PREFER_BIAS_GATE = true;
+  // Prefer-bias gate stängdes av: gaten kördes varje frame och beräknade
+  // confidence/edge-trösklar bara för att avgöra om bias mot förra quaden
+  // skulle användas. Live-loopen behöver vara så lätt som möjligt — bias
+  // mot förra smoothQuad är nu alltid på (lätt vinst på spårningsstabilitet)
+  // och de strikta kvalitetskontrollerna sker bara nära capture.
+  const ENABLE_PREFER_BIAS_GATE = false;
   const PREFER_BIAS_MIN_CONF = 0.55;
   const PREFER_BIAS_MIN_EDGE = 0.45;
   const PREFER_BIAS_EARLY_MIN_CONF = 0.25;
@@ -1348,6 +1353,12 @@ function ScanPage() {
       // eslint-disable-next-line no-console
       console.log("[scan] frame", {
         detected: detectedForOverlay,
+        visibleCandidate: detectedForOverlay,
+        captureCandidate:
+          !!detection &&
+          detection.readyForCapture !== false &&
+          detection.confidence >= MIN_DOCUMENT_CONFIDENCE &&
+          edgeTightness >= MIN_EDGE_TIGHTNESS_FOR_CAPTURE,
         readyForCapture,
         visibleOnly,
         reasonNotReady: reasonNotReady ?? null,
@@ -2680,6 +2691,31 @@ function ScanPage() {
           </div>
           <div>cameraReady: {String(cameraReady)}</div>
           <div>status: {status}</div>
+          {(() => {
+            const m = detectionMeta.current;
+            const visible = !!m;
+            const capture =
+              !!m &&
+              m.readyForCapture !== false &&
+              m.confidence >= MIN_DOCUMENT_CONFIDENCE &&
+              (m.debug.edgeTightness ?? 0) >= MIN_EDGE_TIGHTNESS_FOR_CAPTURE;
+            return (
+              <>
+                <div>
+                  visibleCandidate:{" "}
+                  <span className={visible ? "text-emerald-300" : "text-white/60"}>
+                    {visible ? "yes" : "no"}
+                  </span>
+                </div>
+                <div>
+                  captureCandidate:{" "}
+                  <span className={capture ? "text-emerald-300" : "text-amber-300"}>
+                    {capture ? "yes" : "no"}
+                  </span>
+                </div>
+              </>
+            );
+          })()}
           <div>
             detect: {detectCount.current} / stable: {stableCount.current}
           </div>
