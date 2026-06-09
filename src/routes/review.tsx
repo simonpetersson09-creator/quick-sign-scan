@@ -403,7 +403,7 @@ function ReviewPage() {
           <span className="text-sm text-foreground/80 leading-snug">{t("approveLabel")}</span>
         </label>
 
-        <PrimaryButton onClick={proceed} disabled={!approved || !pdfUrl}>
+        <PrimaryButton onClick={proceed} disabled={!approved || !ready || !pages.length}>
           <span className="inline-flex items-center justify-center gap-2">
             <Mail className="h-5 w-5" /> {t("continueToEmail")}
           </span>
