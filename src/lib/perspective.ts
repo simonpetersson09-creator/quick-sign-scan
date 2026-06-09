@@ -244,7 +244,9 @@ export function orientQuadForA4Portrait(
     { name: "rotate-180", quad: rot180 },
   ];
 
-  const maxSide = 720;
+  // Higher-resolution thumbnail (480 vs 240) for stronger upright detection —
+  // single-shot per scan, cost is negligible.
+  const maxSide = 1280;
   const scale = Math.min(1, maxSide / Math.max(srcW, srcH));
   const sampleW = Math.max(1, Math.round(srcW * scale));
   const sampleH = Math.max(1, Math.round(srcH * scale));
@@ -264,18 +266,17 @@ export function orientQuadForA4Portrait(
       Point,
     ];
     const geom = measureWarpQuadGeometry(candidate.quad);
-    // Thumb aspect matches the candidate quad — square-ish (e.g. 240×339 for
-    // portrait, 339×240 for landscape) so text projection isn't biased by
-    // forced stretching.
-    let thumbW = 240;
-    let thumbH = 240;
+    // Thumb aspect matches the candidate quad — bumped to ~480 short edge
+    // so ascender/descender asymmetry is visible to estimateTextSkew.
+    let thumbW = 480;
+    let thumbH = 480;
     if (geom.height >= geom.width) {
       thumbH = Math.round((geom.height / Math.max(1, geom.width)) * thumbW);
     } else {
       thumbW = Math.round((geom.width / Math.max(1, geom.height)) * thumbH);
     }
-    thumbW = Math.max(80, Math.min(360, thumbW));
-    thumbH = Math.max(80, Math.min(360, thumbH));
+    thumbW = Math.max(160, Math.min(720, thumbW));
+    thumbH = Math.max(160, Math.min(720, thumbH));
     const thumb = warpQuadToRect(sample, sampleW, sampleH, scaledQuad, thumbW, thumbH);
     const text = estimateTextSkew(thumb, 5, 1);
     const isPortrait = geom.height >= geom.width;
@@ -294,19 +295,32 @@ export function orientQuadForA4Portrait(
   const portraitOrFallback = portraitCandidates.length > 0 ? portraitCandidates : scored;
   const ranked = [...portraitOrFallback].sort((a, b) => b.score - a.score);
   const winner = ranked[0];
+  const keepCandidate = scored.find((c) => c.name === "keep")!;
 
   let selected = winner;
   let reason: A4PortraitQuadOrientationDiagnostics["reason"];
   if (portraitCandidates.length === 0) {
     reason = "fallback";
+  } else if (winner.hasText && winner.name !== "keep" && keepCandidate.isPortrait) {
+    // Strong keep-bias: only rotate away from "keep" when the winner clearly
+    // beats it. 180° flips are the most common false positive (text rows are
+    // near-symmetric horizontally), so require an even larger margin there.
+    const keepScore = Math.max(1e-6, keepCandidate.score);
+    const margin = winner.score / keepScore;
+    const required = winner.name === "rotate-180" ? 1.25 : 1.15;
+    if (margin >= required) {
+      reason = "text-score";
+    } else {
+      selected = keepCandidate;
+      reason = "keep-portrait";
+    }
   } else if (winner.hasText) {
     reason = winner.name === "keep" ? "keep-portrait" : "text-score";
   } else {
     // No text detected — keep the original ordering if it's portrait,
     // otherwise pick the first portrait candidate.
-    const keep = scored[0];
-    if (keep.isPortrait) {
-      selected = keep;
+    if (keepCandidate.isPortrait) {
+      selected = keepCandidate;
       reason = "keep-portrait";
     } else {
       reason = "landscape-quad";
