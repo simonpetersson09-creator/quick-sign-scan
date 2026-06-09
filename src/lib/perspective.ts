@@ -3794,7 +3794,7 @@ export function cropToWhiteEdges(
   const stripPx = options.stripPx ?? 6;
   const minMeanL = options.minMeanL ?? 200;
   const maxStdL = options.maxStdL ?? 28;
-  const maxFraction = options.maxFraction ?? 0.08;
+  const maxFraction = options.maxFraction ?? 0.03;
   const w = canvas.width;
   const h = canvas.height;
   if (w < stripPx * 4 || h < stripPx * 4) {
