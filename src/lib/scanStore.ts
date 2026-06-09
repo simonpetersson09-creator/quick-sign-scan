@@ -315,6 +315,20 @@ export const scanStore = {
     } catch {}
     return null;
   },
+  readPreviewHandoffAsync: async (): Promise<PreviewHandoff | null> => {
+    const sync = scanStore.readPreviewHandoff();
+    if (sync) return sync;
+    const parsed = parsePreviewHandoff(await readPreviewHandoffFromIndexedDb());
+    if (parsed) {
+      debugScanStore("read preview handoff from indexeddb", {
+        pages: parsed.pages.length,
+        activeIndex: parsed.activeIndex,
+      });
+      return parsed;
+    }
+    await deletePreviewHandoffFromIndexedDb();
+    return null;
+  },
   clearPreviewHandoff: () => {
     try {
       safeSessionStorage()?.removeItem(PREVIEW_HANDOFF_KEY);
