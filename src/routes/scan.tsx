@@ -1675,7 +1675,34 @@ function ScanPage() {
             )
           : null,
       });
-      let warped = warpQuadToRect(bestFrame ?? video, vw, vh, finalSrcQuad, outW, outH);
+      // Inner-crop: shrink the source quad toward its centroid before warping.
+      // Removes warp-edge fringes, paper shadow, fingertips at corners, and the
+      // thin "table" sliver where paper meets the surface. ~1.5% ≈ 4–5 mm on A4.
+      // Disable with ?innercrop=0 for debugging.
+      const innerCropEnabled = !(
+        new URLSearchParams(typeof window !== "undefined" ? window.location.search : "").get(
+          "innercrop",
+        ) === "0"
+      );
+      const INNER_CROP_FRACTION = 0.015;
+      let warpQuad = finalSrcQuad;
+      if (innerCropEnabled && INNER_CROP_FRACTION > 0) {
+        const cx =
+          (finalSrcQuad[0].x + finalSrcQuad[1].x + finalSrcQuad[2].x + finalSrcQuad[3].x) / 4;
+        const cy =
+          (finalSrcQuad[0].y + finalSrcQuad[1].y + finalSrcQuad[2].y + finalSrcQuad[3].y) / 4;
+        const t = INNER_CROP_FRACTION;
+        warpQuad = finalSrcQuad.map((p) => ({
+          x: p.x + (cx - p.x) * t,
+          y: p.y + (cy - p.y) * t,
+        })) as typeof finalSrcQuad;
+        logScanStage("warp-trace/5b-inner-crop", {
+          fraction: INNER_CROP_FRACTION,
+          beforePixels: formatQuad(finalSrcQuad),
+          afterPixels: formatQuad(warpQuad),
+        });
+      }
+      let warped = warpQuadToRect(bestFrame ?? video, vw, vh, warpQuad, outW, outH);
       logScanStage("warp-trace/6-after-warp", {
         canvasSize: { w: warped.width, h: warped.height },
         aspect: warped.width / warped.height,
