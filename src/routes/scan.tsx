@@ -1817,7 +1817,8 @@ function ScanPage() {
             stripPx: 6,
             minMeanL: 200,
             maxStdL: 28,
-            maxFraction: 0.08,
+            maxTopBottom: 0.08,
+            maxLeftRight: 0.02,
           });
           warped = cropped;
           logScanStage("white-edge-crop", {
