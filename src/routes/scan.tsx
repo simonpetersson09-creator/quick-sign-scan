@@ -190,7 +190,12 @@ function ScanPage() {
   //   - Early tier (EARLY_*): looser thresholds that engage during ramp-up
   //     so Hough/contour get a temporal anchor before first lock, gated on
   //     stableCount so a single noisy frame can't seed a wrong bias.
-  const ENABLE_PREFER_BIAS_GATE = true;
+  // Prefer-bias gate stängdes av: gaten kördes varje frame och beräknade
+  // confidence/edge-trösklar bara för att avgöra om bias mot förra quaden
+  // skulle användas. Live-loopen behöver vara så lätt som möjligt — bias
+  // mot förra smoothQuad är nu alltid på (lätt vinst på spårningsstabilitet)
+  // och de strikta kvalitetskontrollerna sker bara nära capture.
+  const ENABLE_PREFER_BIAS_GATE = false;
   const PREFER_BIAS_MIN_CONF = 0.55;
   const PREFER_BIAS_MIN_EDGE = 0.45;
   const PREFER_BIAS_EARLY_MIN_CONF = 0.25;
