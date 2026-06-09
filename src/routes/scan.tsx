@@ -17,6 +17,7 @@ import {
   maxCornerDelta,
   refineQuadCorners,
   computeHiResEdgeTightness,
+  orientQuadForA4Portrait,
   warpQuadToRect,
   autoOrientAndDeskewDocument,
   whitenBackground,
@@ -1512,15 +1513,15 @@ function ScanPage() {
     })) as [Point, Point, Point, Point];
     const geometry = measureQuadGeometry(srcQuad);
 
-    // För A4 ska output-ytan vara dokumentets verkliga proportion, inte
-    // kamerans/canvasens proportion. Själva innehållet mappas fortfarande från
-    // de fyra verkliga hörnen i srcQuad.
-    const aspect = geometry.height >= geometry.width ? Math.SQRT2 : 1 / Math.SQRT2;
+    // Warpa alltid direkt till stående A4. Tidigare valde vi landscape-output
+    // när den uppmätta quadens skärmbredd var större än höjden och roterade
+    // sedan efteråt; det var källan till 90°-felet. Samma hörn används nu
+    // direkt mot en stående A4-duk — ingen separat 90°-rotation behövs.
     // 200 DPI A4 (210 mm × 297 mm) ≈ 1654 × 2339 px. Document-scan quality:
     // tydlig text och signaturer, men ~40 % av pixlarna jämfört med 300 DPI →
     // dramatiskt mindre JPEG/PDF utan synlig läsbarhetsförsämring.
     const outW = 1654;
-    const outH = Math.round(outW * aspect);
+    const outH = Math.round(outW * Math.SQRT2);
 
 
     logScanStage("camera-frame", { width: vw, height: vh, readyState: video.readyState });
@@ -1626,12 +1627,19 @@ function ScanPage() {
         console.warn("[scan] threshold paper lock failed", e);
       }
 
-      // FINAL trace: this is the exact quad handed to warpQuadToRect.
-      const finalSrcQuad = refinedSrcQuad;
+      // FINAL trace: this is the exact quad handed to warpQuadToRect. If the
+      // detected paper is lying sideways in the camera frame, rotate the quad's
+      // corner order here (not the finished canvas) so the warp maps directly
+      // onto a standing A4 page.
+      let orientationDiag: unknown = null;
+      const finalSrcQuad = orientQuadForA4Portrait(refineSource, vw, vh, refinedSrcQuad, (d) => {
+        orientationDiag = d;
+      });
       logScanStage("warp-trace/5-final-input", {
         srcPixels: formatQuad(finalSrcQuad),
         frameSize: { vw, vh },
         outSize: { outW, outH },
+        portraitOrientation: orientationDiag,
         usingBurstFrame: Boolean(bestFrame),
         srcFromOverlayDeltaPx: overlayQuadNorm
           ? Math.max(
@@ -1649,15 +1657,17 @@ function ScanPage() {
       });
       logScanCanvas("after-perspective-transform", warped, debugEnabled);
 
-      // Rama in resultatet på en ren A4-yta och korrigera små vinklar.
-      // autoOrientAndDeskewDocument gör INGEN text-bleknings-cleanup
-      // (cleanPaperEdges/enhancePaper/removeShadows är borttagna).
+      // Efter warp ska bilden redan ligga på en stående A4-yta. 90°-
+      // auto-orientering är därför avstängd som standard; den kan slås på
+      // explicit med ?enableAutoOrient=1 för felsökning, men används inte i
+      // normalflödet.
       if (stageTimerRef.current) window.clearTimeout(stageTimerRef.current);
       setCaptureStage({ label: t("capStageEnhance"), progress: 0.5 });
       // Feature flags for stegvis felsökning av efter-warp-pipelinen.
       // Toggla via URL (?flag=1) eller localStorage ("docscan.<flag>"="1"):
       //   rawWarpOnly       → hoppa över ALLT efter warpQuadToRect
-      //   noAutoOrient      → hoppa över autoOrientAndDeskewDocument
+      //   enableAutoOrient  → slå på mild efter-deskew/A4-render för test
+      //   noAutoOrient      → tvinga av autoOrientAndDeskewDocument
       //   noWhiten          → hoppa över whitenBackground
       //   noInkBoost        → hoppa över boostInkContrast
       const readFlag = (name: string): boolean => {
@@ -1669,11 +1679,13 @@ function ScanPage() {
         return false;
       };
       const rawWarpOnly = readFlag("rawWarpOnly");
-      const disableAutoOrient = rawWarpOnly || readFlag("noAutoOrient");
+      const enableAutoOrient = readFlag("enableAutoOrient") && !readFlag("noAutoOrient");
+      const disableAutoOrient = rawWarpOnly || !enableAutoOrient;
       const disableWhiten = rawWarpOnly || readFlag("noWhiten");
       const disableInkBoost = rawWarpOnly || readFlag("noInkBoost");
       logScanStage("post-warp-flags", {
         rawWarpOnly,
+        enableAutoOrient,
         disableAutoOrient,
         disableWhiten,
         disableInkBoost,
@@ -1682,7 +1694,7 @@ function ScanPage() {
       if (disableAutoOrient) {
         logScanStage("warp-trace/7-auto-orient", {
           skipped: true,
-          reason: rawWarpOnly ? "raw-warp-only" : "feature-flag",
+          reason: rawWarpOnly ? "raw-warp-only" : "disabled-by-default",
           inputSize: { w: warped.width, h: warped.height },
           outputSize: { w: warped.width, h: warped.height },
         });

@@ -46,6 +46,20 @@ export interface QuadGeometryDiagnostics {
   aspect: number;
 }
 
+export interface A4PortraitQuadOrientationDiagnostics {
+  inputGeometry: QuadGeometryDiagnostics;
+  selected: "keep" | "rotate-ccw" | "rotate-cw";
+  reason: "landscape-quad" | "text-score" | "keep-portrait" | "fallback";
+  candidates: Array<{
+    name: "keep" | "rotate-ccw" | "rotate-cw";
+    quad: [Point, Point, Point, Point];
+    textScore: number;
+    uprightScore: number;
+    hasText: boolean;
+    score: number;
+  }>;
+}
+
 // Coefficients for a projective transform of the unit square -> arbitrary quad.
 // Quad corners in order: TL, TR, BR, BL (clockwise from top-left).
 //   x = (a*u + b*v + c) / (g*u + h*v + 1)
@@ -901,6 +915,75 @@ export function measureQuadGeometry(quad: [Point, Point, Point, Point]): QuadGeo
     height,
     aspect: height / Math.max(1, width),
   };
+}
+
+export function orientQuadForA4Portrait(
+  source: HTMLCanvasElement | HTMLVideoElement,
+  srcW: number,
+  srcH: number,
+  quad: [Point, Point, Point, Point],
+  onDiagnostics?: (diagnostics: A4PortraitQuadOrientationDiagnostics) => void,
+): [Point, Point, Point, Point] {
+  const ordered = orderQuad(quad);
+  const inputGeometry = measureQuadGeometry(ordered);
+  const isLandscapeQuad = inputGeometry.width > inputGeometry.height * 1.05;
+  const candidates = [
+    { name: "keep" as const, quad: ordered },
+    { name: "rotate-ccw" as const, quad: [ordered[1], ordered[2], ordered[3], ordered[0]] as [Point, Point, Point, Point] },
+    { name: "rotate-cw" as const, quad: [ordered[3], ordered[0], ordered[1], ordered[2]] as [Point, Point, Point, Point] },
+  ];
+
+  const maxSide = 720;
+  const scale = Math.min(1, maxSide / Math.max(srcW, srcH));
+  const sampleW = Math.max(1, Math.round(srcW * scale));
+  const sampleH = Math.max(1, Math.round(srcH * scale));
+  const sample = document.createElement("canvas");
+  sample.width = sampleW;
+  sample.height = sampleH;
+  const sampleCtx = sample.getContext("2d")!;
+  sampleCtx.fillStyle = "#ffffff";
+  sampleCtx.fillRect(0, 0, sampleW, sampleH);
+  sampleCtx.drawImage(source, 0, 0, sampleW, sampleH);
+
+  const scored = candidates.map((candidate) => {
+    const scaledQuad = candidate.quad.map((p) => ({ x: p.x * scale, y: p.y * scale })) as [
+      Point,
+      Point,
+      Point,
+      Point,
+    ];
+    const thumb = warpQuadToRect(sample, sampleW, sampleH, scaledQuad, 240, 339);
+    const text = estimateTextSkew(thumb, 5, 1);
+    return {
+      ...candidate,
+      textScore: text.score,
+      uprightScore: text.uprightScore,
+      hasText: text.hasText,
+      score: text.hasText ? text.score * text.uprightScore : 0,
+    };
+  });
+
+  const keep = scored[0];
+  const rotations = scored.slice(1).sort((a, b) => b.score - a.score);
+  const bestRotation = rotations[0];
+  let selected = keep;
+  let reason: A4PortraitQuadOrientationDiagnostics["reason"] = "keep-portrait";
+
+  if (isLandscapeQuad) {
+    selected = bestRotation.hasText ? bestRotation : rotations.find((c) => c.name === "rotate-cw") ?? bestRotation;
+    reason = bestRotation.hasText ? "landscape-quad" : "fallback";
+  } else if (bestRotation.hasText && bestRotation.score > Math.max(1e-6, keep.score) * 1.8) {
+    selected = bestRotation;
+    reason = "text-score";
+  }
+
+  onDiagnostics?.({
+    inputGeometry,
+    selected: selected.name,
+    reason,
+    candidates: scored,
+  });
+  return selected.quad;
 }
 
 function renderToA4Portrait(source: HTMLCanvasElement): HTMLCanvasElement {
