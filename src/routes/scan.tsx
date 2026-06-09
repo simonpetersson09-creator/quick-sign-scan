@@ -1692,12 +1692,17 @@ function ScanPage() {
       const enableAutoOrient = readFlag("enableAutoOrient") && !readFlag("noAutoOrient");
       const disableAutoOrient = rawWarpOnly || !enableAutoOrient;
       const disableWhiten = rawWarpOnly || readFlag("noWhiten");
-      const disableInkBoost = rawWarpOnly || readFlag("noInkBoost");
+      // Ink-boost är AV som standard — en unsharp mask ovanpå whitenBackground
+      // skapar grå halor runt text. Slå på explicit med ?enableInkBoost=1 om
+      // textsidor behöver extra knivskärpa.
+      const enableInkBoost = readFlag("enableInkBoost");
+      const disableInkBoost = rawWarpOnly || readFlag("noInkBoost") || !enableInkBoost;
       logScanStage("post-warp-flags", {
         rawWarpOnly,
         enableAutoOrient,
         disableAutoOrient,
         disableWhiten,
+        enableInkBoost,
         disableInkBoost,
       });
 
