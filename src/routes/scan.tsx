@@ -133,7 +133,7 @@ const LOCK_BREAK_DELTA = 0.2; // sustained delta this large breaks the lock and 
 // (in-camera) and the warped doc (post-capture). Tuned conservatively så
 // en suddig sida aldrig sparas, oavsett hur snabbt användaren rör mobilen.
 const SHARPNESS_LIVE_MIN = 35;
-const SHARPNESS_CAPTURE_MIN = 60;
+const SHARPNESS_CAPTURE_MIN = 110;
 const BLUR_HINT_FRAMES = 75; // ~2.5s of blur before suggesting "move back"
 // Lighting gate — mean luminance below this is "too dark to scan reliably".
 // Lowered from 55 to 38: detection itself is now tolerant of dim scenes
