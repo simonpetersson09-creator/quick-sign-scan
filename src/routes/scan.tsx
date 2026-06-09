@@ -1124,12 +1124,14 @@ function ScanPage() {
     const isSharp = sharpness >= SHARPNESS_LIVE_MIN;
     if (!isSharp) {
       blurFramesRef.current++;
-      stableCount.current = Math.min(stableCount.current, READY_FRAMES - 1);
+      // Soft regression: a single blurry frame shouldn't wipe ~0.3s of progress.
+      stableCount.current = Math.max(0, stableCount.current - 2);
     } else {
       blurFramesRef.current = 0;
     }
     if (!isBrightEnough) {
-      stableCount.current = Math.min(stableCount.current, READY_FRAMES - 1);
+      // Soft regression — exposure metering naturally causes 1-2 dim frames.
+      stableCount.current = Math.max(0, stableCount.current - 2);
     }
 
     // Engage lock once we've reached the READY threshold with good conditions.
