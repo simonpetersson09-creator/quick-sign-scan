@@ -308,6 +308,7 @@ function ScanPage() {
   const blurFramesRef = useRef(0);
   const captureRetryRef = useRef(0);
   const tooFarFramesRef = useRef(0);
+  const tooCloseRejectFramesRef = useRef(0);
   const lockedRef = useRef(false);
   const lockBreakFramesRef = useRef(0);
   const brightnessRef = useRef(255);
