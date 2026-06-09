@@ -185,11 +185,17 @@ function ScanPage() {
   // extra detect destabilised lock. Kept off; not used.
   const ENABLE_HI_RES_DETECT = false;
   // Feature flag: gate the prefer-bias toward the previously smoothed quad.
-  // Only bias the detector once we already have a confident, tight lock —
-  // before that, search freely so we don't get stuck on a noisy contour.
+  // Two-tier:
+  //   - Full tier (CONF/EDGE): post-lock confidence; safe at any stableCount.
+  //   - Early tier (EARLY_*): looser thresholds that engage during ramp-up
+  //     so Hough/contour get a temporal anchor before first lock, gated on
+  //     stableCount so a single noisy frame can't seed a wrong bias.
   const ENABLE_PREFER_BIAS_GATE = true;
   const PREFER_BIAS_MIN_CONF = 0.55;
   const PREFER_BIAS_MIN_EDGE = 0.45;
+  const PREFER_BIAS_EARLY_MIN_CONF = 0.25;
+  const PREFER_BIAS_EARLY_MIN_EDGE = 0.30;
+  const PREFER_BIAS_EARLY_MIN_STABLE = 3; // matches DETECT_FRAMES
   // Feature flag: live local corner refinement on the full-res video frame,
   // around the already-detected 280px quad. Never changes the quad shape,
   // only nudges each corner ±a few px toward the strongest local edge.
@@ -792,8 +798,16 @@ function ScanPage() {
     const prevConfidentEnough =
       !ENABLE_PREFER_BIAS_GATE ||
       (prevMeta !== null &&
-        prevMeta.confidence >= PREFER_BIAS_MIN_CONF &&
-        prevMeta.debug.edgeTightness >= PREFER_BIAS_MIN_EDGE);
+        (
+          (prevMeta.confidence >= PREFER_BIAS_MIN_CONF &&
+            prevMeta.debug.edgeTightness >= PREFER_BIAS_MIN_EDGE) ||
+          // Early tier: weaker quality OK if the quad has already survived
+          // a few consecutive frames — gives the detector a temporal anchor
+          // during ramp-up without trusting one-off noisy contours.
+          (stableCount.current >= PREFER_BIAS_EARLY_MIN_STABLE &&
+            prevMeta.confidence >= PREFER_BIAS_EARLY_MIN_CONF &&
+            prevMeta.debug.edgeTightness >= PREFER_BIAS_EARLY_MIN_EDGE)
+        ));
     const preferQuad =
       prevSmooth && prevConfidentEnough
         ? (prevSmooth.map((p) => ({ x: p.x * dw, y: p.y * dh })) as [Point, Point, Point, Point])
