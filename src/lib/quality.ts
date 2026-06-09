@@ -158,8 +158,10 @@ export async function analyzeDocumentQuality(
   if (t.maxBrightness !== null && brightness > t.maxBrightness) issues.push("bright");
   if (t.minContrast !== null && contrast < t.minContrast) issues.push("low_contrast");
   if (t.minSharpness !== null && sharpness < t.minSharpness) issues.push("blurry");
-  if (t.minBandInk !== null && inkBands.some((b) => b < t.minBandInk))
-    issues.push("incomplete");
+  if (t.minBandInk !== null) {
+    const minInk = t.minBandInk;
+    if (inkBands.some((b) => b < minInk)) issues.push("incomplete");
+  }
 
   const verdict: QualityVerdict = issues[0] ?? "ok";
 
