@@ -3274,9 +3274,10 @@ export function whitenBackground(canvas: HTMLCanvasElement): HTMLCanvasElement {
     }
   }
 
-  // Separable max-filter (radius ~8% of small image) — recovers paper
-  // brightness under text and through small smudges.
-  const R = Math.max(4, Math.round(Math.max(sw, sh) * 0.08));
+  // Separable max-filter (radius ~5% of small image) — recovers paper
+  // brightness under text and through small smudges. Tightened from 8%
+  // to reduce grey halos around large dark regions (text blocks, photos).
+  const R = Math.max(4, Math.round(Math.max(sw, sh) * 0.05));
   const bgX = new Float32Array(sw * sh);
   for (let y = 0; y < sh; y++) {
     const row = y * sw;
