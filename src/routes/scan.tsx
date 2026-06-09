@@ -1633,10 +1633,22 @@ function ScanPage() {
       const finalSrcQuad = orientQuadForA4Portrait(refineSource, vw, vh, refinedSrcQuad, (d) => {
         orientationDiag = d;
       });
+
+      // Bestäm output-storlek från den orienterade quadens egen geometri.
+      // Långsidan låses till 2339 px (200 DPI A4-långsida). Resultatet blir
+      // alltid stående eftersom orientQuadForA4Portrait garanterar att
+      // höjden ≥ bredden. Ingen forced A4-stretch, ingen extra rotation.
+      const finalGeom = measureQuadGeometry(finalSrcQuad);
+      const TARGET_LONG = 2339;
+      const aspect = finalGeom.width / Math.max(1, finalGeom.height); // ≤ 1 (portrait)
+      outH = TARGET_LONG;
+      outW = Math.max(200, Math.round(outH * aspect));
+
       logScanStage("warp-trace/5-final-input", {
         srcPixels: formatQuad(finalSrcQuad),
         frameSize: { vw, vh },
         outSize: { outW, outH },
+        quadGeom: { width: finalGeom.width, height: finalGeom.height, aspect },
         portraitOrientation: orientationDiag,
         usingBurstFrame: Boolean(bestFrame),
         srcFromOverlayDeltaPx: overlayQuadNorm
