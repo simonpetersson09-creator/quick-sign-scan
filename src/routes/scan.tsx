@@ -1741,7 +1741,10 @@ function ScanPage() {
         } catch (e) {
           console.warn("[scan] cropToWhiteEdges failed; continuing", e);
           logScanStage("white-edge-crop", { applied: false, reason: "exception" });
+        }
       }
+
+
 
       // Auto-straighten ±3°: finjustera små rotationer som blir kvar efter
       // perspektivwarp pga brusiga hörn. Projektionsvarians på en ~600 px
