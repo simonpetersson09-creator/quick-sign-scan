@@ -20,7 +20,6 @@ import {
   snapQuadToPaperEdges,
   orientQuadForA4Portrait,
   warpQuadToRect,
-  autoOrientAndDeskewDocument,
   whitenBackground,
   boostInkContrast,
   measureWarpQuadGeometry,
@@ -1682,19 +1681,17 @@ function ScanPage() {
       });
       logScanCanvas("after-perspective-transform", warped, debugEnabled);
 
-      // Efter warp ska bilden redan ligga på en stående A4-yta. 90°-
-      // auto-orientering är därför avstängd som standard; den kan slås på
-      // explicit med ?enableAutoOrient=1 för felsökning, men används inte i
-      // normalflödet.
+      // Efter warp ligger bilden redan på en stående yta i rätt aspect (väljs
+      // pre-warp av orientQuadForA4Portrait). Ingen post-warp 90°-orientering
+      // eller A4-stretch körs längre.
       if (stageTimerRef.current) window.clearTimeout(stageTimerRef.current);
       setCaptureStage({ label: t("capStageEnhance"), progress: 0.5 });
       // Feature flags for stegvis felsökning av efter-warp-pipelinen.
       // Toggla via URL (?flag=1) eller localStorage ("docscan.<flag>"="1"):
       //   rawWarpOnly       → hoppa över ALLT efter warpQuadToRect
-      //   enableAutoOrient  → slå på mild efter-deskew/A4-render för test
-      //   noAutoOrient      → tvinga av autoOrientAndDeskewDocument
       //   noWhiten          → hoppa över whitenBackground
-      //   noInkBoost        → hoppa över boostInkContrast
+      //   enableInkBoost    → slå PÅ unsharp mask (av som standard — kan ge grå halor)
+      //   noInkBoost        → tvinga av boostInkContrast
       const readFlag = (name: string): boolean => {
         try {
           const url = new URL(window.location.href);
@@ -1704,51 +1701,15 @@ function ScanPage() {
         return false;
       };
       const rawWarpOnly = readFlag("rawWarpOnly");
-      const enableAutoOrient = readFlag("enableAutoOrient") && !readFlag("noAutoOrient");
-      const disableAutoOrient = rawWarpOnly || !enableAutoOrient;
       const disableWhiten = rawWarpOnly || readFlag("noWhiten");
-      // Ink-boost är AV som standard — en unsharp mask ovanpå whitenBackground
-      // skapar grå halor runt text. Slå på explicit med ?enableInkBoost=1 om
-      // textsidor behöver extra knivskärpa.
       const enableInkBoost = readFlag("enableInkBoost");
       const disableInkBoost = rawWarpOnly || readFlag("noInkBoost") || !enableInkBoost;
       logScanStage("post-warp-flags", {
         rawWarpOnly,
-        enableAutoOrient,
-        disableAutoOrient,
         disableWhiten,
         enableInkBoost,
         disableInkBoost,
       });
-
-      if (disableAutoOrient) {
-        logScanStage("warp-trace/7-auto-orient", {
-          skipped: true,
-          reason: rawWarpOnly ? "raw-warp-only" : "disabled-by-default",
-          inputSize: { w: warped.width, h: warped.height },
-          outputSize: { w: warped.width, h: warped.height },
-        });
-      } else {
-        try {
-          const beforeW = warped.width;
-          const beforeH = warped.height;
-          let diag: unknown = null;
-          warped = autoOrientAndDeskewDocument(warped, (d) => {
-            diag = d;
-          });
-          logScanStage("warp-trace/7-auto-orient", {
-            skipped: false,
-            inputSize: { w: beforeW, h: beforeH },
-            outputSize: { w: warped.width, h: warped.height },
-            diagnostics: diag,
-          });
-          logScanCanvas("after-deskew", warped, debugEnabled);
-          logScanStage("deskew", { skipped: false });
-        } catch (e) {
-          console.warn("[scan] autoOrientAndDeskewDocument failed; using warped frame", e);
-          logScanStage("deskew", { skipped: true, reason: "exception" });
-        }
-      }
 
       // Mild flat-field whitening: shading correction + paper-level white
       // point (~250). Text strokes are mathematically protected via the
@@ -2549,7 +2510,17 @@ function formatQuad(quad: [Point, Point, Point, Point]) {
   }));
 }
 
+function isScanDebugEnabled(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    if (/[?&]debug=1\b/.test(window.location.search)) return true;
+    if (window.localStorage.getItem("docscan.debug") === "1") return true;
+  } catch {}
+  return false;
+}
+
 function logScanStage(stage: string, payload: unknown) {
+  if (!isScanDebugEnabled()) return;
   // eslint-disable-next-line no-console
   console.log(`[scan:${stage}]`, payload);
 }
