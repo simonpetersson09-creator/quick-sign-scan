@@ -924,13 +924,26 @@ export function orientQuadForA4Portrait(
   quad: [Point, Point, Point, Point],
   onDiagnostics?: (diagnostics: A4PortraitQuadOrientationDiagnostics) => void,
 ): [Point, Point, Point, Point] {
+  // Single orientation decision: enumerate ALL four cyclic corner orderings
+  // (0/90/180/270), score each by upright-text projection on a thumbnail
+  // warp, and pick the best candidate that ALSO produces a portrait output.
+  // Returning a portrait-oriented quad means the subsequent warp targets a
+  // portrait canvas with the quad's true aspect ratio — no extra rotation,
+  // no canvas-level rotate, no force-A4 stretching.
   const ordered = orderQuad(quad);
   const inputGeometry = measureQuadGeometry(ordered);
-  const isLandscapeQuad = inputGeometry.width > inputGeometry.height * 1.05;
-  const candidates = [
-    { name: "keep" as const, quad: ordered },
-    { name: "rotate-ccw" as const, quad: [ordered[1], ordered[2], ordered[3], ordered[0]] as [Point, Point, Point, Point] },
-    { name: "rotate-cw" as const, quad: [ordered[3], ordered[0], ordered[1], ordered[2]] as [Point, Point, Point, Point] },
+
+  // Cyclic permutations: shifting the TL index rotates the resulting warp
+  // by 0°, 90° CCW (TL→bottom-left of source), 180°, 270° CCW (== 90° CW).
+  const rot0  = ordered;
+  const rot90ccw = [ordered[1], ordered[2], ordered[3], ordered[0]] as [Point, Point, Point, Point];
+  const rot180   = [ordered[2], ordered[3], ordered[0], ordered[1]] as [Point, Point, Point, Point];
+  const rot90cw  = [ordered[3], ordered[0], ordered[1], ordered[2]] as [Point, Point, Point, Point];
+  const candidatesRaw: Array<{ name: "keep" | "rotate-ccw" | "rotate-cw" | "rotate-180"; quad: [Point, Point, Point, Point] }> = [
+    { name: "keep",       quad: rot0 },
+    { name: "rotate-ccw", quad: rot90ccw },
+    { name: "rotate-cw",  quad: rot90cw },
+    { name: "rotate-180", quad: rot180 },
   ];
 
   const maxSide = 720;
@@ -945,43 +958,70 @@ export function orientQuadForA4Portrait(
   sampleCtx.fillRect(0, 0, sampleW, sampleH);
   sampleCtx.drawImage(source, 0, 0, sampleW, sampleH);
 
-  const scored = candidates.map((candidate) => {
+  const scored = candidatesRaw.map((candidate) => {
     const scaledQuad = candidate.quad.map((p) => ({ x: p.x * scale, y: p.y * scale })) as [
       Point,
       Point,
       Point,
       Point,
     ];
-    const thumb = warpQuadToRect(sample, sampleW, sampleH, scaledQuad, 240, 339);
+    const geom = measureQuadGeometry(candidate.quad);
+    // Thumb aspect matches the candidate quad — square-ish (e.g. 240×339 for
+    // portrait, 339×240 for landscape) so text projection isn't biased by
+    // forced stretching.
+    let thumbW = 240;
+    let thumbH = 240;
+    if (geom.height >= geom.width) {
+      thumbH = Math.round((geom.height / Math.max(1, geom.width)) * thumbW);
+    } else {
+      thumbW = Math.round((geom.width / Math.max(1, geom.height)) * thumbH);
+    }
+    thumbW = Math.max(80, Math.min(360, thumbW));
+    thumbH = Math.max(80, Math.min(360, thumbH));
+    const thumb = warpQuadToRect(sample, sampleW, sampleH, scaledQuad, thumbW, thumbH);
     const text = estimateTextSkew(thumb, 5, 1);
+    const isPortrait = geom.height >= geom.width;
     return {
       ...candidate,
       textScore: text.score,
       uprightScore: text.uprightScore,
       hasText: text.hasText,
       score: text.hasText ? text.score * text.uprightScore : 0,
+      isPortrait,
     };
   });
 
-  const keep = scored[0];
-  const rotations = scored.slice(1).sort((a, b) => b.score - a.score);
-  const bestRotation = rotations[0];
-  let selected = keep;
-  let reason: A4PortraitQuadOrientationDiagnostics["reason"] = "keep-portrait";
+  // Hard rule: output MUST be portrait. Only consider portrait candidates.
+  const portraitCandidates = scored.filter((c) => c.isPortrait);
+  const portraitOrFallback = portraitCandidates.length > 0 ? portraitCandidates : scored;
+  const ranked = [...portraitOrFallback].sort((a, b) => b.score - a.score);
+  const winner = ranked[0];
 
-  if (isLandscapeQuad) {
-    selected = bestRotation.hasText ? bestRotation : rotations.find((c) => c.name === "rotate-cw") ?? bestRotation;
-    reason = bestRotation.hasText ? "landscape-quad" : "fallback";
-  } else if (bestRotation.hasText && bestRotation.score > Math.max(1e-6, keep.score) * 1.8) {
-    selected = bestRotation;
-    reason = "text-score";
+  let selected = winner;
+  let reason: A4PortraitQuadOrientationDiagnostics["reason"];
+  if (portraitCandidates.length === 0) {
+    reason = "fallback";
+  } else if (winner.hasText) {
+    reason = winner.name === "keep" ? "keep-portrait" : "text-score";
+  } else {
+    // No text detected — keep the original ordering if it's portrait,
+    // otherwise pick the first portrait candidate.
+    const keep = scored[0];
+    if (keep.isPortrait) {
+      selected = keep;
+      reason = "keep-portrait";
+    } else {
+      reason = "landscape-quad";
+    }
   }
 
+  // Strip the local isPortrait flag from the public diagnostics shape.
+  const publicCandidates = scored.map(({ isPortrait: _ip, ...rest }) => rest);
   onDiagnostics?.({
     inputGeometry,
-    selected: selected.name,
+    selected: selected.name as A4PortraitQuadOrientationDiagnostics["selected"],
     reason,
-    candidates: scored,
+    candidates: publicCandidates,
   });
   return selected.quad;
 }
