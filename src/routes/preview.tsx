@@ -145,7 +145,7 @@ function PreviewPage() {
       const list = scanStore.getPages();
       setPages((prev) => (list.length ? list : prev.length ? prev : list));
       if (!list.length) {
-        setActiveIndex((prev) => (pages.length ? prev : 0));
+        setActiveIndex((prev) => prev);
         return;
       }
       const idx = session.imageDataUrl
