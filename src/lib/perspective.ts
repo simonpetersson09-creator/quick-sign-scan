@@ -85,6 +85,15 @@ export function unitSquareToQuad(quad: [Point, Point, Point, Point]): UnitSquare
 
 // Warp a quadrilateral from a source canvas into a rectangular destination canvas.
 // `quad` corners are in source-canvas pixel coords (TL, TR, BR, BL).
+//
+// `supersample` controls anti-aliasing on downscale. With supersample=1 the
+// warp does one bilinear sample per output pixel — fast, but aliases thin
+// strokes and fine print whenever the source is downscaled (e.g. 4K source
+// → 1654 px output is a 2-3× downsample). With supersample=2 we take a 2×2
+// grid of bilinear samples per output pixel and average them — equivalent
+// to 4× supersampling, kills aliasing on 2-3× downscale, costs ~4× CPU.
+// Default is 2 for the production capture path; pass 1 for fast thumbnails
+// (orientation scoring) where AA is irrelevant.
 export function warpQuadToRect(
   source: HTMLCanvasElement | HTMLVideoElement,
   srcW: number,
@@ -92,6 +101,7 @@ export function warpQuadToRect(
   quad: [Point, Point, Point, Point],
   outW: number,
   outH: number,
+  supersample: 1 | 2 = 2,
 ): HTMLCanvasElement {
   // Render source into a canvas we can read.
   const srcCanvas = document.createElement("canvas");
@@ -113,47 +123,94 @@ export function warpQuadToRect(
 
   const t = unitSquareToQuad(quad);
 
+  // Sub-pixel sample offsets within a single output pixel, in [0, 1].
+  // supersample=1 → centre only. supersample=2 → 2×2 grid at quarter offsets.
+  const offsets: Array<[number, number]> =
+    supersample === 2
+      ? [
+          [0.25, 0.25],
+          [0.75, 0.25],
+          [0.25, 0.75],
+          [0.75, 0.75],
+        ]
+      : [[0.5, 0.5]];
+  const invSamples = 1 / offsets.length;
+  const srcWMinus1 = srcW - 1;
+  const srcHMinus1 = srcH - 1;
+  const srcStride = srcW * 4;
+
   for (let y = 0; y < outH; y++) {
-    const v = (y + 0.5) / outH;
     for (let x = 0; x < outW; x++) {
-      const u = (x + 0.5) / outW;
-      const denom = t.g * u + t.h * v + 1;
-      const sxF = (t.a * u + t.b * v + t.c) / denom;
-      const syF = (t.d * u + t.e * v + t.f) / denom;
+      let accR = 0,
+        accG = 0,
+        accB = 0,
+        validSamples = 0;
+
+      for (let s = 0; s < offsets.length; s++) {
+        const u = (x + offsets[s][0]) / outW;
+        const v = (y + offsets[s][1]) / outH;
+        const denom = t.g * u + t.h * v + 1;
+        const sxF = (t.a * u + t.b * v + t.c) / denom;
+        const syF = (t.d * u + t.e * v + t.f) / denom;
+
+        if (
+          !Number.isFinite(sxF) ||
+          !Number.isFinite(syF) ||
+          sxF < 0 ||
+          syF < 0 ||
+          sxF >= srcWMinus1 ||
+          syF >= srcHMinus1
+        ) {
+          // Out-of-bounds sample contributes white (matches old behaviour
+          // when the whole pixel was OOB — keeps borders clean).
+          accR += 255;
+          accG += 255;
+          accB += 255;
+          validSamples++;
+          continue;
+        }
+
+        const x0 = Math.floor(sxF);
+        const y0 = Math.floor(syF);
+        const dx = sxF - x0;
+        const dy = syF - y0;
+        const i00 = (y0 * srcW + x0) * 4;
+        const i10 = i00 + 4;
+        const i01 = i00 + srcStride;
+        const i11 = i01 + 4;
+        const w00 = (1 - dx) * (1 - dy);
+        const w10 = dx * (1 - dy);
+        const w01 = (1 - dx) * dy;
+        const w11 = dx * dy;
+        accR +=
+          srcData[i00] * w00 +
+          srcData[i10] * w10 +
+          srcData[i01] * w01 +
+          srcData[i11] * w11;
+        accG +=
+          srcData[i00 + 1] * w00 +
+          srcData[i10 + 1] * w10 +
+          srcData[i01 + 1] * w01 +
+          srcData[i11 + 1] * w11;
+        accB +=
+          srcData[i00 + 2] * w00 +
+          srcData[i10 + 2] * w10 +
+          srcData[i01 + 2] * w01 +
+          srcData[i11 + 2] * w11;
+        validSamples++;
+      }
 
       const oi = (y * outW + x) * 4;
-      if (!Number.isFinite(sxF) || !Number.isFinite(syF) || sxF < 0 || syF < 0 || sxF >= srcW - 1 || syF >= srcH - 1) {
+      if (validSamples === 0) {
         outData[oi] = 255;
         outData[oi + 1] = 255;
         outData[oi + 2] = 255;
         outData[oi + 3] = 255;
         continue;
       }
-      // Bilinear sample
-      const x0 = Math.floor(sxF);
-      const y0 = Math.floor(syF);
-      const dx = sxF - x0;
-      const dy = syF - y0;
-      const i00 = (y0 * srcW + x0) * 4;
-      const i10 = i00 + 4;
-      const i01 = i00 + srcW * 4;
-      const i11 = i01 + 4;
-      const w00 = (1 - dx) * (1 - dy);
-      const w10 = dx * (1 - dy);
-      const w01 = (1 - dx) * dy;
-      const w11 = dx * dy;
-      outData[oi] =
-        srcData[i00] * w00 + srcData[i10] * w10 + srcData[i01] * w01 + srcData[i11] * w11;
-      outData[oi + 1] =
-        srcData[i00 + 1] * w00 +
-        srcData[i10 + 1] * w10 +
-        srcData[i01 + 1] * w01 +
-        srcData[i11 + 1] * w11;
-      outData[oi + 2] =
-        srcData[i00 + 2] * w00 +
-        srcData[i10 + 2] * w10 +
-        srcData[i01 + 2] * w01 +
-        srcData[i11 + 2] * w11;
+      outData[oi] = accR * invSamples;
+      outData[oi + 1] = accG * invSamples;
+      outData[oi + 2] = accB * invSamples;
       outData[oi + 3] = 255;
     }
   }
