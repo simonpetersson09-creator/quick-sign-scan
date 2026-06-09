@@ -1400,7 +1400,9 @@ function ScanPage() {
     if (capturedRef.current) return;
     const meta = detectionMeta.current;
     if (!meta || meta.confidence < MIN_DOCUMENT_CONFIDENCE) {
-      stableCount.current = 0;
+      // Soft regression — confidence fluctuates frame-to-frame; full reset
+      // makes first lock feel arbitrary.
+      stableCount.current = Math.max(0, stableCount.current - 2);
       lockedRef.current = false;
       setStatus("uncertain");
       return;
@@ -1409,7 +1411,8 @@ function ScanPage() {
     // document edges. Stops auto-capture from firing when the frame is
     // still floating a few cm off the paper (e.g. on a uniform floor).
     if (meta.debug.edgeTightness < MIN_EDGE_TIGHTNESS_FOR_CAPTURE) {
-      stableCount.current = 0;
+      // Soft regression — hi-res tightness recompute may rescue next frame.
+      stableCount.current = Math.max(0, stableCount.current - 2);
       lockedRef.current = false;
       setStatus("align");
       return;
