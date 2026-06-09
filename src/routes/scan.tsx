@@ -1823,11 +1823,27 @@ function ScanPage() {
             maxTopBottom: 0.08,
             maxLeftRight: 0.02,
           });
-          warped = cropped;
+          // Skala tillbaka till exakt A4 så aspect inte driftar och preview
+          // inte får letterbox-band uppe/nere. cropToWhiteEdges trimmar bara
+          // ren vit marginal, så att skala upp några procent är visuellt
+          // försumbart och bevarar A4-formen som warpen siktade på.
+          const a4 = document.createElement("canvas");
+          a4.width = TARGET_SHORT;
+          a4.height = TARGET_LONG;
+          const a4ctx = a4.getContext("2d");
+          if (a4ctx) {
+            a4ctx.imageSmoothingEnabled = true;
+            a4ctx.imageSmoothingQuality = "high";
+            a4ctx.drawImage(cropped, 0, 0, a4.width, a4.height);
+            warped = a4;
+          } else {
+            warped = cropped;
+          }
           logScanStage("white-edge-crop", {
             applied: amount.top + amount.right + amount.bottom + amount.left > 0,
             cropped: amount,
             sizeAfter: { w: warped.width, h: warped.height },
+            rescaledToA4: Boolean(a4ctx),
           });
           logScanCanvas("after-white-edge-crop", warped, debugEnabled);
         } catch (e) {
