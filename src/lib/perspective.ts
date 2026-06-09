@@ -3617,3 +3617,93 @@ export function detectPaperByThreshold(
   })) as [Point, Point, Point, Point];
   return orderQuad(mapped);
 }
+
+// ============================================================================
+// Gray-world white balance
+// ============================================================================
+//
+// Removes a global colour cast (warm tungsten, cool fluorescent, yellowish
+// daylight through curtains) by forcing the average of the brightest ~20% of
+// pixels — which on a paper scan is overwhelmingly the page background — to
+// be neutral grey. Run BEFORE whitenBackground so the flat-field step sees a
+// neutral paper and doesn't bake the cast into the "white" target.
+//
+// Why "bright pixels only" and not classic full-frame gray-world: the page
+// usually fills the frame after warp, but text/ink would pull the average
+// off-neutral if we included every pixel. Sampling only the paper region
+// gives a clean estimate of the illuminant.
+export function grayWorldWhiteBalance(canvas: HTMLCanvasElement): HTMLCanvasElement {
+  const w = canvas.width;
+  const h = canvas.height;
+  if (w === 0 || h === 0) return canvas;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  const n = w * h;
+
+  // First pass: build a luminance histogram to find the brightness threshold
+  // that captures the top ~20% of pixels (= the paper background).
+  const hist = new Uint32Array(256);
+  for (let i = 0; i < n; i++) {
+    const o = i * 4;
+    const y = (0.299 * d[o] + 0.587 * d[o + 1] + 0.114 * d[o + 2]) | 0;
+    hist[y]++;
+  }
+  const targetCount = Math.max(1, Math.floor(n * 0.2));
+  let cum = 0;
+  let threshold = 0;
+  for (let v = 255; v >= 0; v--) {
+    cum += hist[v];
+    if (cum >= targetCount) {
+      threshold = v;
+      break;
+    }
+  }
+
+  // Second pass: average R/G/B over those bright pixels only.
+  let sumR = 0;
+  let sumG = 0;
+  let sumB = 0;
+  let cnt = 0;
+  for (let i = 0; i < n; i++) {
+    const o = i * 4;
+    const r = d[o];
+    const g = d[o + 1];
+    const b = d[o + 2];
+    const y = 0.299 * r + 0.587 * g + 0.114 * b;
+    if (y >= threshold) {
+      sumR += r;
+      sumG += g;
+      sumB += b;
+      cnt++;
+    }
+  }
+  if (cnt === 0) return canvas;
+  const meanR = sumR / cnt;
+  const meanG = sumG / cnt;
+  const meanB = sumB / cnt;
+  // Use the green-channel mean as the neutral target — green is the most
+  // perceptually-linear channel and least affected by chromatic aberration.
+  const target = meanG;
+  const gainR = target / Math.max(1, meanR);
+  const gainG = 1;
+  const gainB = target / Math.max(1, meanB);
+
+  // Clamp gains so a wildly mis-detected illuminant can't shift everything by
+  // more than ±25% (avoids over-correction on near-neutral scenes).
+  const clamp = (g: number) => Math.max(0.75, Math.min(1.25, g));
+  const gR = clamp(gainR);
+  const gB = clamp(gainB);
+  if (Math.abs(gR - 1) < 0.01 && Math.abs(gB - 1) < 0.01) return canvas;
+
+  for (let i = 0; i < n; i++) {
+    const o = i * 4;
+    const r = d[o] * gR;
+    const b = d[o + 2] * gB;
+    d[o] = r > 255 ? 255 : r;
+    d[o + 2] = b > 255 ? 255 : b;
+    // green unchanged (gainG === 1)
+  }
+  ctx.putImageData(img, 0, 0);
+  return canvas;
+}
