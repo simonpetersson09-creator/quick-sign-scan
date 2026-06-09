@@ -21,6 +21,7 @@ import {
   orientQuadForA4Portrait,
   warpQuadToRect,
   whitenBackground,
+  autoStraighten,
 
   grayWorldWhiteBalance,
   boostInkContrast,
@@ -1742,6 +1743,47 @@ function ScanPage() {
           logScanStage("white-edge-crop", { applied: false, reason: "exception" });
         }
       }
+
+
+
+      // Auto-straighten ±3°: finjustera små rotationer som blir kvar efter
+      // perspektivwarp pga brusiga hörn. Projektionsvarians på en ~600 px
+      // nedsamplad gråskaleversion. Roterar endast om |vinkel| ≥ 0,3° och
+      // confidence är hög nog — annars lämnas bilden orörd. Aldrig 90°/180°.
+      // Disable with ?straighten=0.
+      const straightenEnabled = !(
+        new URLSearchParams(typeof window !== "undefined" ? window.location.search : "").get(
+          "straighten",
+        ) === "0"
+      );
+      if (straightenEnabled) {
+        try {
+          const result = autoStraighten(warped, {
+            maxAngleDeg: 3,
+            stepDeg: 0.25,
+            minApplyDeg: 0.3,
+            targetWidth: 600,
+            minConfidence: 1.15,
+          });
+          if (result.applied) {
+            warped = result.canvas;
+            logScanCanvas("after-auto-straighten", warped, debugEnabled);
+          }
+          logScanStage("auto-straighten", {
+            applied: result.applied,
+            angleDeg: Number(result.angleDeg.toFixed(3)),
+            confidence: Number.isFinite(result.confidence)
+              ? Number(result.confidence.toFixed(3))
+              : "inf",
+            reason: result.reason,
+            sizeAfter: { w: warped.width, h: warped.height },
+          });
+        } catch (e) {
+          console.warn("[scan] autoStraighten failed; continuing", e);
+          logScanStage("auto-straighten", { applied: false, reason: "exception" });
+        }
+      }
+
 
       // Efter warp ligger bilden redan på en stående yta i rätt aspect (väljs
       // pre-warp av orientQuadForA4Portrait). Ingen post-warp 90°-orientering
