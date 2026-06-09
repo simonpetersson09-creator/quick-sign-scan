@@ -889,6 +889,15 @@ export function autoOrientAndDeskewDocument(
 
 export function measureQuadGeometry(quad: [Point, Point, Point, Point]): QuadGeometryDiagnostics {
   const ordered = orderQuad(quad);
+  return measureWarpQuadGeometry(ordered);
+}
+
+// Measures the quad exactly in the corner order it will be handed to
+// warpQuadToRect. This is critical for orientation: cyclically rotating the
+// corners changes whether the warp output is portrait or landscape, but
+// orderQuad() would undo that rotation and hide the real output geometry.
+export function measureWarpQuadGeometry(quad: [Point, Point, Point, Point]): QuadGeometryDiagnostics {
+  const ordered = quad;
   const topAngle = segmentAngle(ordered[0], ordered[1]);
   const bottomAngle = segmentAngle(ordered[3], ordered[2]);
   const leftRaw = segmentAngle(ordered[0], ordered[3]);
@@ -965,7 +974,7 @@ export function orientQuadForA4Portrait(
       Point,
       Point,
     ];
-    const geom = measureQuadGeometry(candidate.quad);
+    const geom = measureWarpQuadGeometry(candidate.quad);
     // Thumb aspect matches the candidate quad — square-ish (e.g. 240×339 for
     // portrait, 339×240 for landscape) so text projection isn't biased by
     // forced stretching.
