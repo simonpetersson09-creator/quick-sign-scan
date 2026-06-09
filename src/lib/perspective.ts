@@ -3773,3 +3773,117 @@ export function unsharpMaskText(
   ctx.putImageData(img, 0, 0);
   return canvas;
 }
+
+// Crop the warped rectangle inward until all four edges are predominantly
+// "paper white". Defends against detector mistakes where the source quad
+// included a sliver of background (e.g. wooden table next to the paper).
+//
+// Algorithm: for each side, sample a thin strip (default 6 px) along the
+// edge. If the strip's mean luminance is below `minMeanL` OR its luminance
+// stddev is above `maxStdL` (texture/shadow), peel it off. Repeat per side
+// up to `maxFraction` of that dimension. Pure 2D crop — no re-warp needed.
+export function cropToWhiteEdges(
+  canvas: HTMLCanvasElement,
+  options: {
+    stripPx?: number;
+    minMeanL?: number;
+    maxStdL?: number;
+    maxFraction?: number;
+  } = {},
+): { canvas: HTMLCanvasElement; cropped: { top: number; right: number; bottom: number; left: number } } {
+  const stripPx = options.stripPx ?? 6;
+  const minMeanL = options.minMeanL ?? 200;
+  const maxStdL = options.maxStdL ?? 28;
+  const maxFraction = options.maxFraction ?? 0.08;
+  const w = canvas.width;
+  const h = canvas.height;
+  if (w < stripPx * 4 || h < stripPx * 4) {
+    return { canvas, cropped: { top: 0, right: 0, bottom: 0, left: 0 } };
+  }
+  const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  const lumAt = (x: number, y: number): number => {
+    const o = (y * w + x) * 4;
+    return (0.299 * d[o] + 0.587 * d[o + 1] + 0.114 * d[o + 2]) | 0;
+  };
+  const sideStats = (
+    side: "top" | "bottom" | "left" | "right",
+    offset: number,
+  ): { mean: number; std: number } => {
+    let sum = 0;
+    let sumSq = 0;
+    let n = 0;
+    if (side === "top" || side === "bottom") {
+      const y0 = side === "top" ? offset : h - 1 - offset - stripPx;
+      const y1 = y0 + stripPx;
+      for (let y = y0; y < y1; y++) {
+        for (let x = 0; x < w; x++) {
+          const v = lumAt(x, y);
+          sum += v;
+          sumSq += v * v;
+          n++;
+        }
+      }
+    } else {
+      const x0 = side === "left" ? offset : w - 1 - offset - stripPx;
+      const x1 = x0 + stripPx;
+      for (let y = 0; y < h; y++) {
+        for (let x = x0; x < x1; x++) {
+          const v = lumAt(x, y);
+          sum += v;
+          sumSq += v * v;
+          n++;
+        }
+      }
+    }
+    const mean = sum / n;
+    const variance = sumSq / n - mean * mean;
+    return { mean, std: Math.sqrt(Math.max(0, variance)) };
+  };
+
+  const maxTop = Math.floor(h * maxFraction);
+  const maxBottom = Math.floor(h * maxFraction);
+  const maxLeft = Math.floor(w * maxFraction);
+  const maxRight = Math.floor(w * maxFraction);
+  let top = 0;
+  let bottom = 0;
+  let left = 0;
+  let right = 0;
+  const isPaperWhite = (s: { mean: number; std: number }) =>
+    s.mean >= minMeanL && s.std <= maxStdL;
+  // Peel one side at a time in the order that has the worst stats first.
+  for (let iter = 0; iter < 64; iter++) {
+    const sides = [
+      { name: "top" as const, offset: top, max: maxTop },
+      { name: "bottom" as const, offset: bottom, max: maxBottom },
+      { name: "left" as const, offset: left, max: maxLeft },
+      { name: "right" as const, offset: right, max: maxRight },
+    ];
+    let worst: { name: "top" | "bottom" | "left" | "right"; score: number } | null = null;
+    for (const s of sides) {
+      if (s.offset >= s.max) continue;
+      const stat = sideStats(s.name, s.offset);
+      if (isPaperWhite(stat)) continue;
+      // Higher score = worse (darker or noisier).
+      const score = (minMeanL - stat.mean) + (stat.std - maxStdL) * 2;
+      if (!worst || score > worst.score) worst = { name: s.name, score };
+    }
+    if (!worst) break;
+    if (worst.name === "top") top += stripPx;
+    else if (worst.name === "bottom") bottom += stripPx;
+    else if (worst.name === "left") left += stripPx;
+    else right += stripPx;
+  }
+  if (top === 0 && bottom === 0 && left === 0 && right === 0) {
+    return { canvas, cropped: { top: 0, right: 0, bottom: 0, left: 0 } };
+  }
+  const nw = w - left - right;
+  const nh = h - top - bottom;
+  const out = document.createElement("canvas");
+  out.width = nw;
+  out.height = nh;
+  const octx = out.getContext("2d")!;
+  octx.drawImage(canvas, left, top, nw, nh, 0, 0, nw, nh);
+  return { canvas: out, cropped: { top, right, bottom, left } };
+}
