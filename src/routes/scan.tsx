@@ -2685,6 +2685,31 @@ function ScanPage() {
           </div>
           <div>cameraReady: {String(cameraReady)}</div>
           <div>status: {status}</div>
+          {(() => {
+            const m = detectionMeta.current;
+            const visible = !!m;
+            const capture =
+              !!m &&
+              m.readyForCapture !== false &&
+              m.confidence >= MIN_DOCUMENT_CONFIDENCE &&
+              (m.debug.edgeTightness ?? 0) >= MIN_EDGE_TIGHTNESS_FOR_CAPTURE;
+            return (
+              <>
+                <div>
+                  visibleCandidate:{" "}
+                  <span className={visible ? "text-emerald-300" : "text-white/60"}>
+                    {visible ? "yes" : "no"}
+                  </span>
+                </div>
+                <div>
+                  captureCandidate:{" "}
+                  <span className={capture ? "text-emerald-300" : "text-amber-300"}>
+                    {capture ? "yes" : "no"}
+                  </span>
+                </div>
+              </>
+            );
+          })()}
           <div>
             detect: {detectCount.current} / stable: {stableCount.current}
           </div>
