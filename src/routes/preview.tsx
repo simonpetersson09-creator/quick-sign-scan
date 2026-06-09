@@ -322,12 +322,12 @@ function PreviewPage() {
           )}
           <div
             className="relative rounded-2xl overflow-hidden border border-border bg-muted/30 p-3"
-            style={{ width: "min(78vw, 340px)" }}
+            style={{ width: "min(78vw, 340px)", aspectRatio: "1 / 1.4142" }}
           >
             <img
               src={displayUrl ?? originalImage}
               alt={t("scannedAlt")}
-              className="block w-full h-auto bg-white"
+              className="w-full h-full object-contain bg-white"
             />
             {filtering && (
               <div className="absolute inset-3 flex items-center justify-center bg-white/60 backdrop-blur-sm rounded-xl">
