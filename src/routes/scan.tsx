@@ -1277,7 +1277,13 @@ function ScanPage() {
       let ambiguous = false;
       if (ENABLE_CANDIDATE_MEMORY) {
         const hist = candidateHistoryRef.current;
-        if (hist.length >= 6) {
+        // Lowered min window 6 → 3 so we can rule a candidate stable (or
+        // genuinely ambiguous) earlier in ramp-up. Secondary-cluster floor
+        // drops 3 → 2 to remain meaningful at the smaller window, but the
+        // 0.55 ratio gate still requires the runner-up to have real support
+        // relative to the winner — a single stray frame from a laptop/book
+        // edge will not flip the gate.
+        if (hist.length >= 3) {
           const clusters: { rep: CandidateEntry; count: number }[] = [];
           for (const e of hist) {
             let placed = false;
@@ -1297,7 +1303,7 @@ function ScanPage() {
           clusters.sort((a, b) => b.count - a.count);
           if (
             clusters.length >= 2 &&
-            clusters[1].count >= Math.max(3, Math.ceil(clusters[0].count * CANDIDATE_AMBIGUITY_RATIO))
+            clusters[1].count >= Math.max(2, Math.ceil(clusters[0].count * CANDIDATE_AMBIGUITY_RATIO))
           ) {
             ambiguous = true;
           }
@@ -1317,11 +1323,14 @@ function ScanPage() {
         stableCount.current = Math.min(stableCount.current, STABLE_FRAMES - 1);
         if (captureGateRef.current) captureGateRef.current.reason = "motion";
       } else if (ambiguous) {
-        // Competing candidates — wait for one to win.
+        // Competing candidates — wait for one to win. With the shorter (3-frame)
+        // memory window we lean a bit harder on the ambiguity window itself:
+        // decrement stableCount by 1 instead of 2 so a true competing
+        // rectangle (laptop, book, keyboard) needs more consecutive clean
+        // frames before capture is allowed, even though a single noisy
+        // frame won't wipe ramp-up.
         setStatus("ready");
-        // Soft regression: ambiguity often resolves within 1-2 frames; don't
-        // wipe ramp-up progress entirely.
-        stableCount.current = Math.max(0, stableCount.current - 2);
+        stableCount.current = Math.max(0, stableCount.current - 1);
         if (captureGateRef.current) captureGateRef.current.reason = "ambiguous";
       } else {
         setStatus("capturing");
