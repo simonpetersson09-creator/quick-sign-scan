@@ -216,10 +216,31 @@ function PreviewPage() {
     };
   }, [originalImage, activeIndex, filterMode, pages]);
 
-  // Invalidate cache when the underlying pages change (delete, reorder).
+  // Invalidate caches when the underlying pages change (delete, reorder).
   useEffect(() => {
     filterCache.current.clear();
+    setQualityByIndex({});
+    setDismissedQuality({});
   }, [pages]);
+
+  // Run a soft quality check on the warped/enhanced original image of the
+  // active page. Non-blocking: results render as a banner; user can ignore.
+  useEffect(() => {
+    if (!originalImage) return;
+    if (qualityByIndex[activeIndex]) return;
+    let cancelled = false;
+    void analyzeDocumentQuality(originalImage)
+      .then((report) => {
+        if (cancelled) return;
+        setQualityByIndex((prev) => ({ ...prev, [activeIndex]: report }));
+      })
+      .catch(() => {
+        // Silent — quality check is advisory only.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [originalImage, activeIndex, qualityByIndex]);
 
   function logPreviewImageLoad(source: string | null | undefined) {
     console.info("[preview] image element load", {
