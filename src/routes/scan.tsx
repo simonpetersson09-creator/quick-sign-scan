@@ -2186,11 +2186,41 @@ function ScanPage() {
     triggerCaptureHaptic();
     const vw = video.videoWidth;
     const vh = video.videoHeight;
-    const canvas = document.createElement("canvas");
+    let canvas = document.createElement("canvas");
     canvas.width = vw;
     canvas.height = vh;
     canvas.getContext("2d")!.drawImage(video, 0, 0, vw, vh);
-    const dataUrl = canvasToSafeImageDataUrl(canvas, 0.82);
+
+    // Even with no detection we still owe the user the document-enhancement
+    // pipeline. Skipping it would mean the manual escape hatch produces a
+    // raw camera screenshot — significantly worse than a normal scan in
+    // every dimension (illumination, sharpness, white balance, file size).
+    // We deliberately skip the perspective warp (no quad to warp to) but
+    // keep the same colour / illumination / sharpening chain that capture()
+    // applies after warpQuadToRect. Errors are non-fatal — the raw frame
+    // is the always-safe fallback.
+    try {
+      canvas = grayWorldWhiteBalance(canvas);
+    } catch (e) {
+      console.warn("[scan] manual fallback: grayWorldWhiteBalance failed", e);
+    }
+    try {
+      canvas = whitenBackground(canvas);
+    } catch (e) {
+      console.warn("[scan] manual fallback: whitenBackground failed", e);
+    }
+    try {
+      canvas = unsharpMaskText(canvas, { amount: 0.4, threshold: 4 });
+    } catch (e) {
+      console.warn("[scan] manual fallback: unsharpMaskText failed", e);
+    }
+    try {
+      canvas = boostInkContrast(canvas);
+    } catch (e) {
+      console.warn("[scan] manual fallback: boostInkContrast failed", e);
+    }
+
+    const dataUrl = canvasToSafeImageDataUrl(canvas, 0.92);
     if (!dataUrl) {
       capturedRef.current = false;
       setStatus("searching");
