@@ -340,10 +340,6 @@ export function enhancePaper(canvas: HTMLCanvasElement): HTMLCanvasElement {
   const img = ctx.getImageData(0, 0, w, h);
   const d = img.data;
   const n = w * h;
-  const originalLum = new Uint8ClampedArray(n);
-  for (let i = 0, j = 0; i < d.length; i += 4, j++) {
-    originalLum[j] = (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) | 0;
-  }
 
   // 1) Luminance plane
   const lum = new Float32Array(n);
