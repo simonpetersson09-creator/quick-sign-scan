@@ -1626,7 +1626,22 @@ function ScanPage() {
         console.warn("[scan] threshold paper lock failed", e);
       }
 
-      let warped = warpQuadToRect(bestFrame ?? video, vw, vh, refinedSrcQuad, outW, outH);
+      // FINAL trace: this is the exact quad handed to warpQuadToRect.
+      const finalSrcQuad = refinedSrcQuad;
+      logScanStage("warp-trace/5-final-input", {
+        srcPixels: formatQuad(finalSrcQuad),
+        frameSize: { vw, vh },
+        outSize: { outW, outH },
+        usingBurstFrame: Boolean(bestFrame),
+        srcFromOverlayDeltaPx: overlayQuadNorm
+          ? Math.max(
+              ...orderQuad(overlayQuadNorm).map((p, i) =>
+                Math.hypot(p.x * vw - finalSrcQuad[i].x, p.y * vh - finalSrcQuad[i].y),
+              ),
+            )
+          : null,
+      });
+      let warped = warpQuadToRect(bestFrame ?? video, vw, vh, finalSrcQuad, outW, outH);
       logScanCanvas("after-perspective-transform", warped, debugEnabled);
 
       // Rama in resultatet på en ren A4-yta och korrigera små vinklar.
