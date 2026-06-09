@@ -126,6 +126,9 @@ const sv: Dict = {
   verdict_low_contrast: "För lite kontrast",
   verdict_blurry: "Bilden är suddig",
   verdict_incomplete: "Dokumentet verkar inte komplett",
+  qualityWarnTitle: "Bildkvaliteten kan vara låg",
+  qualityRescan: "Skanna om",
+  qualityUseAnyway: "Använd ändå",
 
   // place
   placeTitle: "Placera signatur",
