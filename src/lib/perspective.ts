@@ -3274,10 +3274,12 @@ export function whitenBackground(canvas: HTMLCanvasElement): HTMLCanvasElement {
     }
   }
 
-  // Separable max-filter (radius ~5% of small image) — recovers paper
-  // brightness under text and through small smudges. Tightened from 8%
-  // to reduce grey halos around large dark regions (text blocks, photos).
-  const R = Math.max(4, Math.round(Math.max(sw, sh) * 0.05));
+  // Separable max-filter (radius ~8% of small image) — recovers paper
+  // brightness under text and through small smudges. 5% var för litet för
+  // täta textblock (svenska A4-brev): fönstret nådde aldrig vit marginal
+  // och lämnade grå moln formade som styckena. 8% reach ≈ 128 px på en
+  // 1654 px bred A4 → täcker ett helt stycke + lite till.
+  const R = Math.max(4, Math.round(Math.max(sw, sh) * 0.08));
   const bgX = new Float32Array(sw * sh);
   for (let y = 0; y < sh; y++) {
     const row = y * sw;
