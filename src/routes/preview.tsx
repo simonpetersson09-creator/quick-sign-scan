@@ -87,6 +87,7 @@ function PreviewPage() {
     () => scanStore.get().debugStages,
   );
   const [debugZoom, setDebugZoom] = useState<ScanDebugStage | null>(null);
+  const handoffClearPendingRef = useRef(false);
 
   useEffect(() => {
     const fallbackPages = handedOffPages.length ? handedOffPages : recoveredPages;
@@ -103,13 +104,13 @@ function PreviewPage() {
         pages: fallbackPages,
         imageDataUrl: fallbackPages[safeActive],
       });
-      scanStore.clearPreviewHandoff();
+      handoffClearPendingRef.current = true;
       window.history.replaceState(
         { ...window.history.state, scanPages: undefined, scanActiveIndex: undefined },
         "",
       );
     } else if (scanStore.getPages().length) {
-      scanStore.clearPreviewHandoff();
+      handoffClearPendingRef.current = true;
     }
     const first = list[0];
     console.info("[preview] mounted with pages count", {
@@ -129,7 +130,7 @@ function PreviewPage() {
       scanStore.set({ pages: handoff.pages, imageDataUrl: handoff.pages[safeActive] });
       setPages(handoff.pages);
       setActiveIndex(safeActive);
-      scanStore.clearPreviewHandoff();
+      handoffClearPendingRef.current = true;
     });
     return () => {
       cancelled = true;
@@ -216,6 +217,17 @@ function PreviewPage() {
   useEffect(() => {
     filterCache.current.clear();
   }, [pages]);
+
+  function clearPreviewHandoffAfterImageLoad(source: string | null | undefined) {
+    console.info("[preview] image element load", {
+      hasSource: Boolean(source),
+      pendingHandoffClear: handoffClearPendingRef.current,
+      pages: pages.length,
+    });
+    if (!source || !handoffClearPendingRef.current) return;
+    scanStore.clearPreviewHandoff();
+    handoffClearPendingRef.current = false;
+  }
 
   function commitPages(next: string[], nextActive: number) {
     const safeActive = Math.max(0, Math.min(next.length - 1, nextActive));
@@ -347,6 +359,13 @@ function PreviewPage() {
               <img
                 src={displayUrl ?? originalImage}
                 alt={t("scannedAlt")}
+                onLoad={() => clearPreviewHandoffAfterImageLoad(displayUrl ?? originalImage)}
+                onError={() => {
+                  console.info("[preview] image element failed to load", {
+                    hasSource: Boolean(displayUrl ?? originalImage),
+                    pages: pages.length,
+                  });
+                }}
                 className="absolute inset-0 w-full h-full object-contain"
               />
             </div>
