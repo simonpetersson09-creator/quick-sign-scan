@@ -904,20 +904,26 @@ export function measureQuadGeometry(quad: [Point, Point, Point, Point]): QuadGeo
 }
 
 function renderToA4Portrait(source: HTMLCanvasElement): HTMLCanvasElement {
-  // 300 DPI A4 portrait (210 × 297 mm). Matches the capture resolution so
-  // the final page stays sharp end-to-end with no extra downscale.
-  const outW = 2480;
-  const outH = Math.round(outW * Math.SQRT2);
+  // 300 DPI A4 (210 × 297 mm) = 2480 × 3508 px. Matchar capture-upplösningen
+  // så slutsidan är skarp end-to-end utan extra downscale.
+  //
+  // VIKTIGT: Output-orienteringen MÅSTE följa källans orientering. Om vi
+  // alltid tvingar portrait klipps landscape-dokument bort vid sidorna och
+  // ser ut att ha "vridits 90°". Källan här är resultatet av warpQuadToRect,
+  // som redan har korrekt A4-aspekt baserat på den detekterade quaden.
+  const A4_LONG = 3508;
+  const A4_SHORT = 2480;
+  const sourceIsLandscape = source.width > source.height;
+  const outW = sourceIsLandscape ? A4_LONG : A4_SHORT;
+  const outH = sourceIsLandscape ? A4_SHORT : A4_LONG;
   const out = document.createElement("canvas");
   out.width = outW;
   out.height = outH;
   const ctx = out.getContext("2d")!;
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, outW, outH);
-  // The input is already a perspective-warped A4 page. If a fine deskew
-  // rotation expanded the canvas, contain-scaling creates visible white
-  // bands (as in the preview screenshot). Cover-scaling keeps the page full
-  // frame and only crops the synthetic rotation padding / tiny edge slivers.
+  // Cover-skalning för att eliminera vita band från fine-deskew-padding.
+  // Nu när output-aspekten matchar source-aspekten klipps ingenting bort.
   const scale = Math.max(outW / source.width, outH / source.height);
   const drawW = source.width * scale;
   const drawH = source.height * scale;
