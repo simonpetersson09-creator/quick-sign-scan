@@ -224,20 +224,24 @@ function PreviewPage() {
   // Invalidate caches when the underlying pages change (delete, reorder).
   useEffect(() => {
     filterCache.current.clear();
-    setQualityByIndex({});
+    setQualityByKey({});
     setDismissedQuality({});
   }, [pages]);
 
-  // Run a soft quality check on the warped/enhanced original image of the
-  // active page. Non-blocking: results render as a banner; user can ignore.
+  // Run a soft quality check on the currently displayed image (per filter
+  // mode). Non-blocking — results render as a banner; user can ignore.
+  const qualityKey = `${activeIndex}|${filterMode}`;
+  const analysisSource = filterMode === "color" ? originalImage : displayUrl;
   useEffect(() => {
-    if (!originalImage) return;
-    if (qualityByIndex[activeIndex]) return;
+    if (!analysisSource) return;
+    if (qualityByKey[qualityKey]) return;
+    if (filtering) return;
     let cancelled = false;
-    void analyzeDocumentQuality(originalImage)
+    const mode: QualityMode = filterMode;
+    void analyzeDocumentQuality(analysisSource, mode)
       .then((report) => {
         if (cancelled) return;
-        setQualityByIndex((prev) => ({ ...prev, [activeIndex]: report }));
+        setQualityByKey((prev) => ({ ...prev, [qualityKey]: report }));
       })
       .catch(() => {
         // Silent — quality check is advisory only.
@@ -245,7 +249,7 @@ function PreviewPage() {
     return () => {
       cancelled = true;
     };
-  }, [originalImage, activeIndex, qualityByIndex]);
+  }, [analysisSource, qualityKey, qualityByKey, filterMode, filtering]);
 
   function logPreviewImageLoad(source: string | null | undefined) {
     console.info("[preview] image element load", {
