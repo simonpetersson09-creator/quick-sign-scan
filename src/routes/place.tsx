@@ -202,7 +202,7 @@ function PlacePage() {
     <AppShell title={t("placeTitle")} back="/preview">
       <p className="text-sm text-muted-foreground mt-1 mb-3">{t("placeHint")}</p>
       <div className="flex-1 flex flex-col items-center justify-center gap-3 min-h-0">
-        <div className="relative flex items-center justify-center" style={{ width: "min(92vw, 440px)" }}>
+        <div className="relative flex items-center justify-center min-h-0 flex-1" style={{ width: "min(92vw, 440px)" }}>
           {pages.length > 1 && (
             <button
               type="button"
