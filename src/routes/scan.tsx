@@ -1466,13 +1466,20 @@ function ScanPage() {
     }
 
     // Sortera alltid hörnen i exakt ordning TL, TR, BR, BL innan warp.
-    // Multi-frame voting: median of the last N smoothed quads (per corner).
-    // En enstaka skakig frame kan inte längre dra warp-hörnen av pappret.
+    //
+    // Sanningskälla för warp = overlayQuadNorm (smoothQuad.current), dvs
+    // exakt den ram användaren ser i preview. Multi-frame median voting kan
+    // ge en quad som avviker från overlayen och har därför stängts av som
+    // default — slå på med ?voting=1 för experimentation.
+    const urlParams = new URLSearchParams(
+      typeof window !== "undefined" ? window.location.search : "",
+    );
+    const votingEnabled = urlParams.get("voting") === "1";
     const votes = recentSmoothQuadsRef.current;
     const overlayQuadNorm = smoothQuad.current; // exactly what overlay drew
     let votedQuad: [Point, Point, Point, Point] = normQuad;
     let votingApplied = false;
-    if (votes.length >= 3) {
+    if (votingEnabled && votes.length >= 3) {
       const orderedVotes = votes.map((v) => orderQuad(v));
       const median = (arr: number[]) => {
         const s = [...arr].sort((a, b) => a - b);
@@ -1485,15 +1492,20 @@ function ScanPage() {
       })) as [Point, Point, Point, Point];
       votingApplied = true;
     }
-    const orderedNormQuad = orderQuad(votedQuad);
+    // WYSIWYG: använd overlay quad som källa när den finns. Annars fall back
+    // till voted/detected quad.
+    const sourceQuadNorm: [Point, Point, Point, Point] = overlayQuadNorm ?? votedQuad;
+    const orderedNormQuad = orderQuad(sourceQuadNorm);
 
     logScanStage("warp-trace/1-detected-norm", {
       raw: formatQuad(normQuad),
       overlayLast: overlayQuadNorm ? formatQuad(overlayQuadNorm) : null,
       voteWindow: votes.length,
+      votingEnabled,
       votingApplied,
       votedQuadNorm: formatQuad(votedQuad),
-      overlayVsVotedMaxDelta: overlayQuadNorm
+      sourceUsed: overlayQuadNorm ? "overlay" : votingApplied ? "voted" : "raw",
+      overlayVsSourceMaxDelta: overlayQuadNorm
         ? Math.max(
             ...orderQuad(overlayQuadNorm).map((p, i) =>
               Math.hypot(p.x - orderedNormQuad[i].x, p.y - orderedNormQuad[i].y),
@@ -1501,6 +1513,7 @@ function ScanPage() {
           )
         : null,
     });
+
 
     // Text-safe mode: do not grow or shrink the detected crop. Growing shows
     // desk/background; shrinking risks cutting off real text near the edges.
@@ -1574,62 +1587,74 @@ function ScanPage() {
       }
       logScanStage("burst-capture", { bestSharpness: bestScore });
 
-      // Subpixel corner refinement on the full-res frame just before warp.
-      // Keep this conservative: it can only nudge individual corners ±5px.
+      // Subpixel corner refinement — kan nudga hörn upp till ±5 px och
+      // därmed avvika från overlay-ramen. AV som default (?refineCorners=1
+      // för experimentation).
+      const refineCornersEnabled = urlParams.get("refineCorners") === "1";
       const refineSource = bestFrame ?? video;
       let refinedSrcQuad = srcQuad;
-      try {
-        refinedSrcQuad = refineQuadCorners(refineSource, vw, vh, srcQuad);
-        logScanStage("subpixel-refine", {
-          before: formatQuad(srcQuad),
-          after: formatQuad(refinedSrcQuad),
-        });
-      } catch (e) {
-        console.warn("[scan] subpixel refine failed, using raw quad", e);
+      if (refineCornersEnabled) {
+        try {
+          refinedSrcQuad = refineQuadCorners(refineSource, vw, vh, srcQuad);
+          logScanStage("subpixel-refine", {
+            applied: true,
+            before: formatQuad(srcQuad),
+            after: formatQuad(refinedSrcQuad),
+          });
+        } catch (e) {
+          console.warn("[scan] subpixel refine failed, using raw quad", e);
+          logScanStage("subpixel-refine", { applied: false, reason: "exception" });
+        }
+      } else {
+        logScanStage("subpixel-refine", { applied: false, reason: "disabled-by-default" });
       }
 
-      // Threshold-based paper lock — Otsu + largest bright connected
-      // component + min-area oriented bounding box. Used to snap the crop
-      // tight to the actual paper edges so the wood/desk background doesn't
-      // appear around the warped page. Only adopted when its centroid is
-      // near the detected quad (sanity check) and its area is within a
-      // plausible range relative to the detected quad.
-      try {
-        const thrQuad = detectPaperByThreshold(refineSource, vw, vh);
-        if (thrQuad) {
-          const cx = (refinedSrcQuad[0].x + refinedSrcQuad[1].x + refinedSrcQuad[2].x + refinedSrcQuad[3].x) / 4;
-          const cy = (refinedSrcQuad[0].y + refinedSrcQuad[1].y + refinedSrcQuad[2].y + refinedSrcQuad[3].y) / 4;
-          const tx = (thrQuad[0].x + thrQuad[1].x + thrQuad[2].x + thrQuad[3].x) / 4;
-          const ty = (thrQuad[0].y + thrQuad[1].y + thrQuad[2].y + thrQuad[3].y) / 4;
-          const centroidDist = Math.hypot(cx - tx, cy - ty) / Math.hypot(vw, vh);
-          // quad areas (shoelace)
-          const quadArea = (q: typeof refinedSrcQuad) => {
-            let s = 0;
-            for (let i = 0; i < 4; i++) {
-              const a = q[i];
-              const b = q[(i + 1) % 4];
-              s += a.x * b.y - b.x * a.y;
-            }
-            return Math.abs(s) / 2;
-          };
-          const aDet = quadArea(refinedSrcQuad);
-          const aThr = quadArea(thrQuad);
-          const areaRatio = aDet > 0 ? aThr / aDet : 0;
-          const accept = centroidDist < 0.18 && areaRatio > 0.55 && areaRatio < 1.6;
-          logScanStage("threshold-paper-lock", {
-            applied: accept,
-            centroidDist,
-            areaRatio,
-            before: formatQuad(refinedSrcQuad),
-            candidate: formatQuad(thrQuad),
-          });
-          if (accept) refinedSrcQuad = thrQuad;
-        } else {
-          logScanStage("threshold-paper-lock", { applied: false, reason: "no-candidate" });
+      // Threshold-paper-lock — kan ERSÄTTA hela quaden med en Otsu-baserad
+      // kandidat upp till 60 % större. Var huvudorsaken till att bakgrund
+      // syntes längs en sida trots korrekt overlay-ram. AV som default
+      // (?paperLock=1 för experimentation).
+      const paperLockEnabled = urlParams.get("paperLock") === "1";
+      if (paperLockEnabled) {
+        try {
+          const thrQuad = detectPaperByThreshold(refineSource, vw, vh);
+          if (thrQuad) {
+            const cx = (refinedSrcQuad[0].x + refinedSrcQuad[1].x + refinedSrcQuad[2].x + refinedSrcQuad[3].x) / 4;
+            const cy = (refinedSrcQuad[0].y + refinedSrcQuad[1].y + refinedSrcQuad[2].y + refinedSrcQuad[3].y) / 4;
+            const tx = (thrQuad[0].x + thrQuad[1].x + thrQuad[2].x + thrQuad[3].x) / 4;
+            const ty = (thrQuad[0].y + thrQuad[1].y + thrQuad[2].y + thrQuad[3].y) / 4;
+            const centroidDist = Math.hypot(cx - tx, cy - ty) / Math.hypot(vw, vh);
+            const quadArea = (q: typeof refinedSrcQuad) => {
+              let s = 0;
+              for (let i = 0; i < 4; i++) {
+                const a = q[i];
+                const b = q[(i + 1) % 4];
+                s += a.x * b.y - b.x * a.y;
+              }
+              return Math.abs(s) / 2;
+            };
+            const aDet = quadArea(refinedSrcQuad);
+            const aThr = quadArea(thrQuad);
+            const areaRatio = aDet > 0 ? aThr / aDet : 0;
+            const accept = centroidDist < 0.18 && areaRatio > 0.55 && areaRatio < 1.6;
+            logScanStage("threshold-paper-lock", {
+              applied: accept,
+              centroidDist,
+              areaRatio,
+              before: formatQuad(refinedSrcQuad),
+              candidate: formatQuad(thrQuad),
+            });
+            if (accept) refinedSrcQuad = thrQuad;
+          } else {
+            logScanStage("threshold-paper-lock", { applied: false, reason: "no-candidate" });
+          }
+        } catch (e) {
+          console.warn("[scan] threshold paper lock failed", e);
+          logScanStage("threshold-paper-lock", { applied: false, reason: "exception" });
         }
-      } catch (e) {
-        console.warn("[scan] threshold paper lock failed", e);
+      } else {
+        logScanStage("threshold-paper-lock", { applied: false, reason: "disabled-by-default" });
       }
+
 
       // snapQuadToPaperEdges disabled per user request
       // try {
@@ -1706,7 +1731,36 @@ function ScanPage() {
           afterPixels: formatQuad(warpQuad),
         });
       }
+
+      // ── Quad equality check ────────────────────────────────────────────
+      // preview / capture / warp i samma pixelrymd. Om overlay-ramen låg
+      // korrekt runt A4 ska previewVsWarpMaxDeltaPx vara ungefär lika med
+      // det inner-crop som INNER_CROP_FRACTION ger (~ kortsida * 0.01).
+      // Allt utöver det betyder att en quad-modifierare har flyttat hörnen.
+      {
+        const previewPx = overlayQuadNorm
+          ? (orderQuad(overlayQuadNorm).map((p) => ({ x: p.x * vw, y: p.y * vh })) as typeof finalSrcQuad)
+          : null;
+        const capturePx = orderQuad(srcQuad);
+        const warpPx = orderQuad(warpQuad);
+        const maxDelta = (
+          a: typeof finalSrcQuad | null,
+          b: typeof finalSrcQuad,
+        ): number | null =>
+          a ? Math.max(...a.map((p, i) => Math.hypot(p.x - b[i].x, p.y - b[i].y))) : null;
+        logScanStage("quad-equality-check", {
+          previewQuadPx: previewPx ? formatQuad(previewPx) : null,
+          captureQuadPx: formatQuad(capturePx),
+          finalWarpQuadPx: formatQuad(warpPx),
+          previewVsCaptureMaxDeltaPx: maxDelta(previewPx, capturePx),
+          previewVsWarpMaxDeltaPx: maxDelta(previewPx, warpPx),
+          captureVsWarpMaxDeltaPx: maxDelta(capturePx, warpPx),
+          innerCropFraction: innerCropEnabled ? INNER_CROP_FRACTION : 0,
+        });
+      }
+
       let warped = warpQuadToRect(bestFrame ?? video, vw, vh, warpQuad, outW, outH);
+
       logScanStage("warp-trace/6-after-warp", {
         canvasSize: { w: warped.width, h: warped.height },
         aspect: warped.width / warped.height,
