@@ -2034,6 +2034,7 @@ function ScanPage() {
           debug: meta.debug,
         },
       });
+      flushStageDumpToStore();
       finishPageCapture(dataUrl, scanStore.getPages().length || session.pages.length);
     } catch (e) {
       console.error("[scan] capture warp failed, falling back to raw frame", e);
