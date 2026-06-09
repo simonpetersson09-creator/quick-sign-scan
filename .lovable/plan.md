@@ -1,57 +1,80 @@
-## Mål
-Skanningar i klass med Microsoft Lens / Adobe Scan:
-- Pappret blir **helt rakt** (perspektiv-korrigerat)
-- Bakgrunden (bord, trä, skugga) **helt borta**
-- **All text bevaras** – även smått i sidfot/sidhuvud
-- Pappret blir **rent vitt** utan att radera text
+# Åtgärdsplan: orientering, ren warp och vitgörning
 
-## Problemanalys (varför det blivit fel hittills)
-Vi har pendlat mellan två fel:
-1. **För aggressiv rensning** (`cleanPaperEdges`, `enhancePaper`, `removeShadows`, hård deskew) → text försvinner.
-2. **Ingen rensning alls** → bakgrund/träkanter syns runt pappret.
+Detekteringen lämnas orörd. Vi fokuserar på de tre felen som syns efter att hörnen är hittade.
 
-Roten är att **kantdetekteringen är osäker**. När hörnen sitter någon mm utanför pappret räcker det inte med marginal-trick – då måste vi antingen visa bakgrund eller skala bort text. Lens löser detta genom:
-- En **mycket bättre hörndetektering** (multi-skala + verifiering)
-- En **separat "vitgörning"** som bara påverkar bakgrunden, inte text
-- **Ingen** efter-deskew som skalar om bilden
+---
 
-## Förslag – 4 steg
+## Steg 1 — En enda orienteringsbeslut, före warp
 
-### 1. Robust hörndetektering (största vinsten)
-Ersätt nuvarande quad-detection med en flerstegspipeline i `src/lib/perspective.ts`:
-- Nedskalning till ~1024 px för snabb analys
-- **Adaptiv tröskling** (Sauvola/Otsu) istället för enbart Canny – fungerar på vita papper mot ljusa bord
-- Hitta största 4-hörniga konturen med rätt aspect ratio (~√2 för A4)
-- **Hörnförfining ("corner refinement")**: för varje hittat hörn, sök inom ±20 px efter den faktiska kantövergången → hörn hamnar exakt på papperskanten
-- Fallback till nuvarande detector om inget hittas
+Idag bestäms orientering på flera ställen (warp, auto-orient, force-portrait). De konkurrerar och resultatet blir liggande även när pappret är stående.
 
-Resultat: hörnen sitter pixel-exakt på pappret → ingen marginal behövs → ingen träkant, ingen bortskuren text.
+Ny modell — **ett** beslut, sedan inga fler rotationer:
 
-### 2. Ta bort EDGE_MARGIN-hacket
-Med exakta hörn kan `EDGE_MARGIN` sättas till `0`. Vi varken växer (bakgrund) eller krymper (text bort).
+1. När quad finns: gör en liten thumbnail-warp (~200 px bred) med quadens egen aspect ratio.
+2. Mät text-orientering via horisontell/vertikal projektion (rader = upprätt text).
+3. Välj 0/90/180/270 **en gång** och rotera hörnens ordning (TL/TR/BR/BL) innan riktig warp.
+4. Riktig `warpQuadToRect` körs med korrekt hörnordning + quadens egen aspect ratio → output blir alltid stående A4, utan extra omsampling.
+5. **Ta bort** `autoOrientAndDeskewDocument`-anropet helt.
+6. **Ta bort** hårdkodade `outW=1654/outH=2339` — använd quadens aspect ratio.
 
-### 3. "Smart whitening" istället för shadow removal
-Ny funktion `whitenBackground` i `src/lib/perspective.ts` som:
-- Beräknar lokal bakgrundsnivå (stor box-blur, ~5% av bildbredd)
-- Dividerar bilden med bakgrunden (klassisk "flat-field correction" – samma teknik Lens/CamScanner använder)
-- Gör pappret jämnvitt **utan** att röra mörka pixlar (text förblir svart och skarp)
-- Mild kontrastkurva (gamma ~0.95), ingen tröskling
+Loggning: `quadIn`, `chosenRotation`, `quadAfterRotate`, `outW/outH`.
 
-Detta ersätter de gamla `enhancePaper`/`removeShadows` som åt upp text.
+**Checkpoint:** stående papper → stående output. Liggande papper → stående output (roterat). Ingen dubbelrotation, ingen suddighet.
 
-### 4. Behåll hög JPEG-kvalitet, ingen efter-deskew
-- `JPEG_QUALITY = 0.95` (redan satt)
-- **Ingen** `autoOrientAndDeskewDocument` efter warp – perspektivkorrigeringen räcker, extra rotation = omsampling = suddig text
-- `renderToA4Portrait` använder `Math.max` (redan satt) så ingen vit kant
+---
 
-## Filer som ändras
-- `src/lib/perspective.ts` – ny hörndetektering + `whitenBackground`
-- `src/routes/scan.tsx` – `EDGE_MARGIN = 0`, anropa `whitenBackground` efter warp
-- `src/routes/preview.tsx` – sätt "Smart vit" som standardfilter
+## Steg 2 — Ren warp utan bakgrund eller vita kanter
 
-## Vad detta INTE gör
-- Inget OCR (kan läggas till senare)
-- Ingen ML-modell – allt körs i Canvas/JS, samma stack som idag
-- Ingen extern dependency
+- `EDGE_MARGIN = 0` i `src/routes/scan.tsx`.
+- Ta bort all "fill background"-logik i warpen — output-canvas = exakt warpens storlek.
+- Ingen padding, ingen vit ram, ingen sampling utanför quad.
 
-Vill du att jag kör hela paketet, eller börjar med steg 1 (kantdetekteringen) först och utvärderar?
+**Checkpoint:** vitt papper → resultatet visar bara papper, ingen träkant, ingen vit kant.
+
+---
+
+## Steg 3 — Textsäker vitgörning (löser grå fläckar + veck)
+
+Ny `whitenBackground` i `src/lib/perspective.ts`. Ersätter `enhancePaper`, `removeShadows`, `cleanPaperEdges`, ev. "ink-boost".
+
+Algoritm (flat-field correction, samma teknik som Lens/CamScanner):
+1. Stor box-blur (~5% av bildbredd) → uppskattar lokal bakgrundsnivå (ljus + skuggor + veck).
+2. Dividera bilden med bakgrunden → pappret blir jämnvitt.
+3. **Skydda mörka pixlar**: pixlar under tröskel rörs inte → text förblir svart och skarp.
+4. Mild gammakurva (~0.95). **Ingen** binarisering. **Ingen** unsharp mask.
+
+Tillagd som standardfilter i `src/routes/preview.tsx` ("Smart vit").
+
+**Checkpoint:**
+- Veck och skuggor borta.
+- Inga grå fläckar.
+- Diff mot original: ingen text försvunnen, även smått i sidfot.
+
+---
+
+## Felsökningsflaggor (under arbetet)
+
+`?step=1` stoppar efter orientering, `?step=2` efter ren warp, `?step=3` full pipeline. Då kan vi isolera vilket steg som bryts om något ser fel ut.
+
+---
+
+## Filer som påverkas
+
+- `src/lib/perspective.ts` — ny orienteringslogik, ny `whitenBackground`, tar bort gamla filter och `autoOrientAndDeskewDocument`-anropet.
+- `src/routes/scan.tsx` — `EDGE_MARGIN=0`, tar bort hårdkodade A4-dimensioner, lägger till `?step=` flagga, anropar `whitenBackground` efter warp.
+- `src/routes/preview.tsx` — "Smart vit" som standardfilter.
+
+---
+
+## Vad vi INTE gör
+
+- Rör inte detekteringen.
+- Ingen ML, ingen extern dependency, ingen OCR.
+- Ingen efter-deskew (extra rotation = suddig text).
+- Inte flera filter samtidigt — ett i taget, med checkpoint emellan.
+
+---
+
+## Ordning
+
+Ett steg i taget med verifiering emellan. Säg till om jag ska köra Steg 1 först, eller hela paketet på en gång.
