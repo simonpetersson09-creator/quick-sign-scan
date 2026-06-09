@@ -1713,6 +1713,36 @@ function ScanPage() {
       });
       logScanCanvas("after-perspective-transform", warped, debugEnabled);
 
+      // Whiteness-validate the warped edges: if a side contains non-paper
+      // pixels (wood, shadow, fingertip), peel it off in 6 px strips until
+      // all four borders read as "paper white". Bounded to 8 % per side.
+      // Disable with ?whitecrop=0.
+      const whiteCropEnabled = !(
+        new URLSearchParams(typeof window !== "undefined" ? window.location.search : "").get(
+          "whitecrop",
+        ) === "0"
+      );
+      if (whiteCropEnabled) {
+        try {
+          const { canvas: cropped, cropped: amount } = cropToWhiteEdges(warped, {
+            stripPx: 6,
+            minMeanL: 200,
+            maxStdL: 28,
+            maxFraction: 0.08,
+          });
+          warped = cropped;
+          logScanStage("white-edge-crop", {
+            applied: amount.top + amount.right + amount.bottom + amount.left > 0,
+            cropped: amount,
+            sizeAfter: { w: warped.width, h: warped.height },
+          });
+          logScanCanvas("after-white-edge-crop", warped, debugEnabled);
+        } catch (e) {
+          console.warn("[scan] cropToWhiteEdges failed; continuing", e);
+          logScanStage("white-edge-crop", { applied: false, reason: "exception" });
+        }
+      }
+
       // Efter warp ligger bilden redan på en stående yta i rätt aspect (väljs
       // pre-warp av orientQuadForA4Portrait). Ingen post-warp 90°-orientering
       // eller A4-stretch körs längre.
