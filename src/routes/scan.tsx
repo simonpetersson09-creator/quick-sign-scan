@@ -1849,7 +1849,7 @@ function ScanPage() {
       // Toggla via URL (?flag=1) eller localStorage ("docscan.<flag>"="1"):
       //   rawWarpOnly       → hoppa över ALLT efter warpQuadToRect
       //   noWhiten          → hoppa över whitenBackground
-      //   enableInkBoost    → slå PÅ unsharp mask (av som standard — kan ge grå halor)
+      //   enableInkBoost    → (default PÅ) lokal unsharp mask på bläckpixlar (L≤150)
       //   noInkBoost        → tvinga av boostInkContrast
       const readFlag = (name: string): boolean => {
         try {
@@ -1861,8 +1861,8 @@ function ScanPage() {
       };
       const rawWarpOnly = readFlag("rawWarpOnly");
       const disableWhiten = rawWarpOnly || readFlag("noWhiten");
-      const enableInkBoost = readFlag("enableInkBoost");
-      const disableInkBoost = rawWarpOnly || readFlag("noInkBoost") || !enableInkBoost;
+      const enableInkBoost = !readFlag("noInkBoost"); // default PÅ
+      const disableInkBoost = rawWarpOnly || !enableInkBoost;
       logScanStage("post-warp-flags", {
         rawWarpOnly,
         disableWhiten,
