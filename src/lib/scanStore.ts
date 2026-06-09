@@ -2,10 +2,10 @@
 //
 // Privacy requirement: documents, images, PDFs, signatures and related
 // metadata normally lives only in memory and is wiped on reload / tab close.
-// The one exception is a short-lived same-tab handoff used only while moving
-// from /scan to /preview; preview consumes and removes it immediately. This
-// prevents mobile browsers or stale route chunks from dropping the captured
-// image during navigation.
+// The one exception is a short-lived same-tab active-document handoff used
+// while moving through scan/preview. It is cleared only by explicit document
+// cleanup, not by camera cleanup or a preview image load, so route/HMR reloads
+// cannot drop the captured page mid-flow.
 
 type Listener = () => void;
 
@@ -79,7 +79,7 @@ type PreviewHandoff = {
 
 const PREVIEW_HANDOFF_KEY = "docscan.preview-handoff.v1";
 const PREVIEW_HANDOFF_WINDOW_NAME_PREFIX = `${PREVIEW_HANDOFF_KEY}:`;
-const PREVIEW_HANDOFF_MAX_AGE_MS = 2 * 60 * 1000;
+const PREVIEW_HANDOFF_MAX_AGE_MS = 30 * 60 * 1000;
 const PREVIEW_HANDOFF_DB = "docscan-preview-handoff";
 const PREVIEW_HANDOFF_STORE = "handoff";
 
@@ -291,6 +291,13 @@ export const scanStore = {
   },
   set: (patch: Partial<ScanSession>) => {
     bag.state = { ...bag.state, ...patch };
+    const pages = sessionPages(bag.state);
+    if (pages.length && ("pages" in patch || "imageDataUrl" in patch)) {
+      const activeIndex = bag.state.imageDataUrl
+        ? Math.max(0, pages.indexOf(bag.state.imageDataUrl))
+        : pages.length - 1;
+      savePreviewHandoffSync(pages, activeIndex >= 0 ? activeIndex : pages.length - 1, "set");
+    }
     notify();
   },
   savePreviewHandoff: (pages: string[], activeIndex: number) => {
