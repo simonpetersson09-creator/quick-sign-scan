@@ -21,6 +21,7 @@ import {
   orientQuadForA4Portrait,
   warpQuadToRect,
   whitenBackground,
+  autoStraighten,
 
   grayWorldWhiteBalance,
   boostInkContrast,
