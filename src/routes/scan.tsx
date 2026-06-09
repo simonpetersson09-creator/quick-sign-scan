@@ -1513,15 +1513,13 @@ function ScanPage() {
     })) as [Point, Point, Point, Point];
     const geometry = measureQuadGeometry(srcQuad);
 
-    // Warpa alltid direkt till stående A4. Tidigare valde vi landscape-output
-    // när den uppmätta quadens skärmbredd var större än höjden och roterade
-    // sedan efteråt; det var källan till 90°-felet. Samma hörn används nu
-    // direkt mot en stående A4-duk — ingen separat 90°-rotation behövs.
-    // 200 DPI A4 (210 mm × 297 mm) ≈ 1654 × 2339 px. Document-scan quality:
-    // tydlig text och signaturer, men ~40 % av pixlarna jämfört med 300 DPI →
-    // dramatiskt mindre JPEG/PDF utan synlig läsbarhetsförsämring.
-    const outW = 1654;
-    const outH = Math.round(outW * Math.SQRT2);
+    // Output-storlek bestäms av den slutgiltigt valda quadens egen geometri
+    // (efter orientQuadForA4Portrait) längre ner, inte här. Långsidan skalas
+    // till ~2339 px (200 DPI A4-långsida) så filstorleken förblir rimlig
+    // utan att förlora text. Värden initieras provisoriskt och skrivs över
+    // efter att vi har valt orientering.
+    let outW = 1654;
+    let outH = 2339;
 
 
     logScanStage("camera-frame", { width: vw, height: vh, readyState: video.readyState });
