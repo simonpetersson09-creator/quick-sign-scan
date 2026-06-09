@@ -220,8 +220,9 @@ function PlacePage() {
           onPointerMove={onMove}
           onPointerUp={onUp}
           onPointerCancel={onUp}
-          className="relative rounded-2xl overflow-hidden border border-border bg-muted/30 touch-none select-none"
-          style={{ width: "min(82vw, 360px)", aspectRatio: "1 / 1.414" }}
+          className="relative rounded-2xl overflow-hidden border border-border bg-muted/30 touch-none select-none max-h-full"
+          style={{ width: "min(82vw, 360px)", aspectRatio: "1 / 1.414", maxHeight: "100%" }}
+        
         >
           <div
             className="absolute inset-0 p-3"
