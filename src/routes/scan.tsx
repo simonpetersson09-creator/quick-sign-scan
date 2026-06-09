@@ -1283,7 +1283,9 @@ function ScanPage() {
       } else if (ambiguous) {
         // Competing candidates — wait for one to win.
         setStatus("ready");
-        stableCount.current = Math.min(stableCount.current, STABLE_FRAMES - 1);
+        // Soft regression: ambiguity often resolves within 1-2 frames; don't
+        // wipe ramp-up progress entirely.
+        stableCount.current = Math.max(0, stableCount.current - 2);
         if (captureGateRef.current) captureGateRef.current.reason = "ambiguous";
       } else {
         setStatus("capturing");
