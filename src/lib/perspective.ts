@@ -807,7 +807,7 @@ export function detectDocumentQuad(
   // dominant in the edge image — the case where contour-based extraction
   // tends to lock onto a sub-rectangle inside the page.
   if (ENABLE_HOUGH_LINE_DETECTION) {
-    const houghQuads = houghLineQuadCandidates(connectedEdges, width, height);
+    const houghQuads = houghLineQuadCandidates(connectedEdges, gradMag, width, height);
     for (const q of houghQuads) {
       candidateCount++;
       const detection = evaluateEdgeQuad({
@@ -909,13 +909,15 @@ export function detectDocumentQuad(
     // text-heavy pages (lumStd high inside) and letting smaller white
     // sub-quads win, which clipped text. Hough candidates also added
     // frame-to-frame flicker; both downweighted/disabled below.
+    // Sprint 2 — Hough-kandidater är nu gradient-styrkda så vi vågar lita på
+    // deras egen confidence mer. Vikt 0.09 → 0.14 på det priset av centerScore.
     const outerConfidence =
       0.38 * areaScore +
       0.18 * a4Score +
       0.12 * det.debug.edgeScore +
       0.06 * bgContrastScore +
-      0.09 * centerScore +
-      0.09 * det.confidence +
+      0.04 * centerScore +
+      0.14 * det.confidence +
       0.08 * tempScore;
     void paperInteriorScore;
     if (outerConfidence > bestScore) {
@@ -2152,6 +2154,7 @@ function houghTransform(
 
 function houghLineQuadCandidates(
   edges: Uint8Array,
+  gradMag: Float32Array,
   width: number,
   height: number,
 ): [Point, Point, Point, Point][] {
@@ -2184,27 +2187,104 @@ function houghLineQuadCandidates(
     }
   }
 
-  // Rank per side: vote-weight + outwardness (lines closer to image border
-  // win — that's where the A4 outer edge lives, not text inside the page).
-  function rankHoriz(arr: HoughLine[], wantTop: boolean) {
-    arr.sort((a, b) => score(b) - score(a));
-    function score(ln: HoughLine) {
+  // Sprint 2 — sample the gradient magnitude along each candidate line inside
+  // the image, returning (meanGradient, supportFraction, lengthInside). A real
+  // A4 edge has both high mean gradient (sharp paper/desk transition) and high
+  // support fraction (most of the line lies on actual edges). Text inside the
+  // page produces high vote counts but low mean gradient over the line span.
+  function lineQuality(ln: HoughLine): { meanGrad: number; support: number; lengthInside: number } {
+    const c = Math.cos(ln.theta), s = Math.sin(ln.theta);
+    // Find intersection of line with image bbox to get the in-image segment.
+    const pts: Point[] = [];
+    if (Math.abs(s) > 1e-6) {
+      const y0 = ln.rho / s; if (y0 >= 0 && y0 <= height - 1) pts.push({ x: 0, y: y0 });
+      const y1 = (ln.rho - (width - 1) * c) / s; if (y1 >= 0 && y1 <= height - 1) pts.push({ x: width - 1, y: y1 });
+    }
+    if (Math.abs(c) > 1e-6) {
+      const x0 = ln.rho / c; if (x0 >= 0 && x0 <= width - 1) pts.push({ x: x0, y: 0 });
+      const x1 = (ln.rho - (height - 1) * s) / c; if (x1 >= 0 && x1 <= width - 1) pts.push({ x: x1, y: height - 1 });
+    }
+    if (pts.length < 2) return { meanGrad: 0, support: 0, lengthInside: 0 };
+    const a = pts[0], b = pts[pts.length - 1];
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    const steps = Math.max(8, Math.ceil(len));
+    let sum = 0, hit = 0;
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const x = Math.round(a.x + (b.x - a.x) * t);
+      const y = Math.round(a.y + (b.y - a.y) * t);
+      if (x < 0 || y < 0 || x >= width || y >= height) continue;
+      const g = gradMag[y * width + x];
+      sum += g;
+      if (g > 25) hit++;
+    }
+    return { meanGrad: sum / Math.max(1, steps + 1), support: hit / Math.max(1, steps + 1), lengthInside: len };
+  }
+
+  // Cluster lines that are nearly identical (similar theta + rho) and keep
+  // only the strongest representative per cluster. Prevents top-K being
+  // saturated by 3 copies of the same edge.
+  function clusterDedupe(arr: HoughLine[], scored: Map<HoughLine, number>): HoughLine[] {
+    const sorted = arr.slice().sort((a, b) => (scored.get(b) ?? 0) - (scored.get(a) ?? 0));
+    const kept: HoughLine[] = [];
+    const thetaTol = (4 * Math.PI) / 180;
+    const rhoTol = Math.max(8, Math.min(width, height) * 0.04);
+    for (const ln of sorted) {
+      let dup = false;
+      for (const k of kept) {
+        if (Math.abs(ln.theta - k.theta) < thetaTol && Math.abs(ln.rho - k.rho) < rhoTol) {
+          dup = true; break;
+        }
+      }
+      if (!dup) kept.push(ln);
+      if (kept.length >= HOUGH_TOP_LINES_PER_SIDE) break;
+    }
+    return kept;
+  }
+
+  // Rank per side: combine vote-weight, gradient mean, support fraction, and
+  // outwardness (lines closer to image border win — that's where A4 lives,
+  // not text inside the page). Then dedupe near-duplicates.
+  const qualCache = new Map<HoughLine, { meanGrad: number; support: number; lengthInside: number }>();
+  function qual(ln: HoughLine) {
+    let q = qualCache.get(ln);
+    if (!q) { q = lineQuality(ln); qualCache.set(ln, q); }
+    return q;
+  }
+  function rankHoriz(arr: HoughLine[], wantTop: boolean): HoughLine[] {
+    const scored = new Map<HoughLine, number>();
+    for (const ln of arr) {
       const sin = Math.sin(ln.theta);
       const y = (ln.rho - cx * Math.cos(ln.theta)) / sin;
       const outward = wantTop ? (cy - y) / cy : (y - cy) / cy;
-      return ln.votes * 0.55 + Math.max(0, outward) * Math.min(width, height) * 0.45;
+      const q = qual(ln);
+      const lengthScore = q.lengthInside / Math.max(1, width);
+      // Equal weight to votes, gradient strength, line length, and outwardness.
+      const score =
+        ln.votes * 0.30 +
+        q.meanGrad * lengthScore * 0.35 * Math.min(width, height) * 0.01 +
+        q.support * Math.min(width, height) * 0.20 +
+        Math.max(0, outward) * Math.min(width, height) * 0.15;
+      scored.set(ln, score);
     }
-    return arr.slice(0, HOUGH_TOP_LINES_PER_SIDE);
+    return clusterDedupe(arr, scored);
   }
-  function rankVert(arr: HoughLine[], wantLeft: boolean) {
-    arr.sort((a, b) => score(b) - score(a));
-    function score(ln: HoughLine) {
+  function rankVert(arr: HoughLine[], wantLeft: boolean): HoughLine[] {
+    const scored = new Map<HoughLine, number>();
+    for (const ln of arr) {
       const cos = Math.cos(ln.theta);
       const x = (ln.rho - cy * Math.sin(ln.theta)) / cos;
       const outward = wantLeft ? (cx - x) / cx : (x - cx) / cx;
-      return ln.votes * 0.55 + Math.max(0, outward) * Math.min(width, height) * 0.45;
+      const q = qual(ln);
+      const lengthScore = q.lengthInside / Math.max(1, height);
+      const score =
+        ln.votes * 0.30 +
+        q.meanGrad * lengthScore * 0.35 * Math.min(width, height) * 0.01 +
+        q.support * Math.min(width, height) * 0.20 +
+        Math.max(0, outward) * Math.min(width, height) * 0.15;
+      scored.set(ln, score);
     }
-    return arr.slice(0, HOUGH_TOP_LINES_PER_SIDE);
+    return clusterDedupe(arr, scored);
   }
   const topL = rankHoriz(top, true);
   const botL = rankHoriz(bot, false);
