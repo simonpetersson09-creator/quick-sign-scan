@@ -202,7 +202,7 @@ function PlacePage() {
     <AppShell title={t("placeTitle")} back="/preview">
       <p className="text-sm text-muted-foreground mt-1 mb-3">{t("placeHint")}</p>
       <div className="flex-1 flex flex-col items-center justify-center gap-3 min-h-0">
-        <div className="relative flex items-center justify-center" style={{ width: "min(92vw, 440px)" }}>
+        <div className="relative flex items-center justify-center min-h-0 flex-1" style={{ width: "min(92vw, 440px)" }}>
           {pages.length > 1 && (
             <button
               type="button"
@@ -221,7 +221,7 @@ function PlacePage() {
           onPointerUp={onUp}
           onPointerCancel={onUp}
           className="relative rounded-2xl overflow-hidden border border-border bg-muted/30 touch-none select-none"
-          style={{ width: "min(82vw, 360px)", aspectRatio: "1 / 1.414" }}
+          style={{ height: "100%", width: "auto", aspectRatio: "1 / 1.414", maxWidth: "min(82vw, 360px)" }}
         >
           <div
             className="absolute inset-0 p-3"
