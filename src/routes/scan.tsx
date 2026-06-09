@@ -25,6 +25,7 @@ import {
   grayWorldWhiteBalance,
   boostInkContrast,
   unsharpMaskText,
+  cropToWhiteEdges,
   measureWarpQuadGeometry,
 } from "@/lib/perspective";
 import { useT } from "@/lib/i18n";
