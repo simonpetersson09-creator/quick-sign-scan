@@ -48,10 +48,10 @@ export interface QuadGeometryDiagnostics {
 
 export interface A4PortraitQuadOrientationDiagnostics {
   inputGeometry: QuadGeometryDiagnostics;
-  selected: "keep" | "rotate-ccw" | "rotate-cw";
+  selected: "keep" | "rotate-ccw" | "rotate-cw" | "rotate-180";
   reason: "landscape-quad" | "text-score" | "keep-portrait" | "fallback";
   candidates: Array<{
-    name: "keep" | "rotate-ccw" | "rotate-cw";
+    name: "keep" | "rotate-ccw" | "rotate-cw" | "rotate-180";
     quad: [Point, Point, Point, Point];
     textScore: number;
     uprightScore: number;
