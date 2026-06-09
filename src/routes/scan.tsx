@@ -1642,6 +1642,11 @@ function ScanPage() {
           : null,
       });
       let warped = warpQuadToRect(bestFrame ?? video, vw, vh, finalSrcQuad, outW, outH);
+      logScanStage("warp-trace/6-after-warp", {
+        canvasSize: { w: warped.width, h: warped.height },
+        aspect: warped.width / warped.height,
+        orientation: warped.width >= warped.height ? "landscape" : "portrait",
+      });
       logScanCanvas("after-perspective-transform", warped, debugEnabled);
 
       // Rama in resultatet på en ren A4-yta och korrigera små vinklar.
@@ -1649,13 +1654,44 @@ function ScanPage() {
       // (cleanPaperEdges/enhancePaper/removeShadows är borttagna).
       if (stageTimerRef.current) window.clearTimeout(stageTimerRef.current);
       setCaptureStage({ label: t("capStageEnhance"), progress: 0.5 });
+      // Feature flag: temporarily disable auto-rotation/deskew so we can
+      // verify whether the rotation issue lives before warp, inside warp, or
+      // inside autoOrientAndDeskewDocument. Toggle via either:
+      //   - URL: ?noAutoOrient=1
+      //   - localStorage: docscan.disableAutoOrient = "1"
+      let disableAutoOrient = false;
       try {
-        warped = autoOrientAndDeskewDocument(warped);
-        logScanCanvas("after-deskew", warped, debugEnabled);
-        logScanStage("deskew", { skipped: false });
-      } catch (e) {
-        console.warn("[scan] autoOrientAndDeskewDocument failed; using warped frame", e);
-        logScanStage("deskew", { skipped: true, reason: "exception" });
+        const url = new URL(window.location.href);
+        if (url.searchParams.get("noAutoOrient") === "1") disableAutoOrient = true;
+        if (window.localStorage.getItem("docscan.disableAutoOrient") === "1") disableAutoOrient = true;
+      } catch {}
+      if (disableAutoOrient) {
+        logScanStage("warp-trace/7-auto-orient", {
+          skipped: true,
+          reason: "feature-flag",
+          inputSize: { w: warped.width, h: warped.height },
+          outputSize: { w: warped.width, h: warped.height },
+        });
+      } else {
+        try {
+          const beforeW = warped.width;
+          const beforeH = warped.height;
+          let diag: unknown = null;
+          warped = autoOrientAndDeskewDocument(warped, (d) => {
+            diag = d;
+          });
+          logScanStage("warp-trace/7-auto-orient", {
+            skipped: false,
+            inputSize: { w: beforeW, h: beforeH },
+            outputSize: { w: warped.width, h: warped.height },
+            diagnostics: diag,
+          });
+          logScanCanvas("after-deskew", warped, debugEnabled);
+          logScanStage("deskew", { skipped: false });
+        } catch (e) {
+          console.warn("[scan] autoOrientAndDeskewDocument failed; using warped frame", e);
+          logScanStage("deskew", { skipped: true, reason: "exception" });
+        }
       }
 
       // Mild flat-field whitening: shading correction + paper-level white
