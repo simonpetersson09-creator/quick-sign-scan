@@ -346,6 +346,7 @@ export const scanStore = {
       safeSessionStorage()?.removeItem(PREVIEW_HANDOFF_KEY);
       if (window.name.startsWith(PREVIEW_HANDOFF_WINDOW_NAME_PREFIX)) window.name = "";
     } catch {}
+    deletePreviewHandoffFromIndexedDb().catch(() => {});
     wipe(reason);
     notify();
   },
