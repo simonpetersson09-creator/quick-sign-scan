@@ -87,7 +87,7 @@ function PreviewPage() {
     () => scanStore.get().debugStages,
   );
   const [debugZoom, setDebugZoom] = useState<ScanDebugStage | null>(null);
-  const handoffClearPendingRef = useRef(false);
+  const handoffRecoveredRef = useRef(false);
 
   useEffect(() => {
     const fallbackPages = handedOffPages.length ? handedOffPages : recoveredPages;
@@ -104,13 +104,13 @@ function PreviewPage() {
         pages: fallbackPages,
         imageDataUrl: fallbackPages[safeActive],
       });
-      handoffClearPendingRef.current = true;
+      handoffRecoveredRef.current = true;
       window.history.replaceState(
         { ...window.history.state, scanPages: undefined, scanActiveIndex: undefined },
         "",
       );
     } else if (scanStore.getPages().length) {
-      handoffClearPendingRef.current = true;
+      handoffRecoveredRef.current = true;
     }
     const first = list[0];
     console.info("[preview] mounted with pages count", {
@@ -130,7 +130,7 @@ function PreviewPage() {
       scanStore.set({ pages: handoff.pages, imageDataUrl: handoff.pages[safeActive] });
       setPages(handoff.pages);
       setActiveIndex(safeActive);
-      handoffClearPendingRef.current = true;
+      handoffRecoveredRef.current = true;
     });
     return () => {
       cancelled = true;
@@ -218,15 +218,12 @@ function PreviewPage() {
     filterCache.current.clear();
   }, [pages]);
 
-  function clearPreviewHandoffAfterImageLoad(source: string | null | undefined) {
+  function logPreviewImageLoad(source: string | null | undefined) {
     console.info("[preview] image element load", {
       hasSource: Boolean(source),
-      pendingHandoffClear: handoffClearPendingRef.current,
+      recoveredFromHandoff: handoffRecoveredRef.current,
       pages: pages.length,
     });
-    if (!source || !handoffClearPendingRef.current) return;
-    scanStore.clearPreviewHandoff();
-    handoffClearPendingRef.current = false;
   }
 
   function commitPages(next: string[], nextActive: number) {
@@ -359,7 +356,7 @@ function PreviewPage() {
               <img
                 src={displayUrl ?? originalImage}
                 alt={t("scannedAlt")}
-                onLoad={() => clearPreviewHandoffAfterImageLoad(displayUrl ?? originalImage)}
+                onLoad={() => logPreviewImageLoad(displayUrl ?? originalImage)}
                 onError={() => {
                   console.info("[preview] image element failed to load", {
                     hasSource: Boolean(displayUrl ?? originalImage),
