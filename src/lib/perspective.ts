@@ -334,7 +334,7 @@ export function orientQuadForA4Portrait(
     }
     thumbW = Math.max(160, Math.min(720, thumbW));
     thumbH = Math.max(160, Math.min(720, thumbH));
-    const thumb = warpQuadToRect(sample, sampleW, sampleH, scaledQuad, thumbW, thumbH);
+    const thumb = warpQuadToRect(sample, sampleW, sampleH, scaledQuad, thumbW, thumbH, 1);
     const text = estimateTextSkew(thumb, 5, 1);
     const isPortrait = geom.height >= geom.width;
     return {
