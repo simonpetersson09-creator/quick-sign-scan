@@ -214,7 +214,7 @@ function ScanPage() {
   // Set to false to instantly revert to the previous 280px behaviour if
   // we see regressions (false locks, slower frames, etc.).
   const ENABLE_DETECT_HIRES = true;
-  const DETECT_WIDTH = ENABLE_DETECT_HIRES ? 360 : 280;
+  const DETECT_WIDTH = ENABLE_DETECT_HIRES ? 416 : 280;
   // Feature flag: candidate-memory across recent frames. Cluster the last N
   // detections by corner similarity (+ areaRatio / a4Ratio) so an ambiguous
   // scene (multiple competing quads frame-to-frame) delays auto-capture
