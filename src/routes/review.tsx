@@ -22,7 +22,36 @@ import {
 export const Route = createFileRoute("/review")({
   head: () => ({ meta: [{ title: "Granska PDF" }] }),
   component: ReviewPage,
+  errorComponent: ReviewErrorComponent,
 });
+
+function ReviewErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+  console.error("[review] route error", error);
+  return (
+    <div className="min-h-dvh flex items-center justify-center bg-background px-6">
+      <div className="max-w-sm text-center">
+        <h1 className="text-lg font-semibold text-foreground">Något gick fel på granska-sidan</h1>
+        <p className="mt-2 text-xs text-muted-foreground break-words whitespace-pre-wrap">
+          {error?.message || String(error)}
+        </p>
+        <div className="mt-5 flex flex-wrap justify-center gap-2">
+          <button
+            onClick={() => reset()}
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+          >
+            Försök igen
+          </button>
+          <a
+            href="/place"
+            className="rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground"
+          >
+            Tillbaka till placera
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 4;

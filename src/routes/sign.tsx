@@ -86,9 +86,22 @@ function SignPage() {
   }
 
   function done() {
-    const dataUrl = trimCanvas(canvasRef.current!);
-    scanStore.set({ signatureDataUrl: dataUrl });
-    navigate({ to: "/review" });
+    try {
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        console.error("[sign] done: canvas ref missing");
+        return;
+      }
+      const dataUrl = trimCanvas(canvas);
+      if (!dataUrl || !dataUrl.startsWith("data:image/")) {
+        console.error("[sign] done: trimCanvas returned invalid dataUrl", { dataUrl });
+        return;
+      }
+      scanStore.set({ signatureDataUrl: dataUrl });
+      navigate({ to: "/review" });
+    } catch (err) {
+      console.error("[sign] done failed", err);
+    }
   }
 
   return (
