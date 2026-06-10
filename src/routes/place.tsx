@@ -37,6 +37,7 @@ function PlacePage() {
         pages: list,
         imageDataUrl: list[safe],
         signaturePosition: { x: 0.5, y: 0.86 },
+        signaturePageIndex: safe,
       });
     }
 
@@ -79,7 +80,7 @@ function PlacePage() {
     setZoom(1);
     setPan({ x: 0, y: 0 });
     setSigPos({ x: 0.5, y: 0.86 });
-    scanStore.set({ imageDataUrl: pages[next], signaturePosition: { x: 0.5, y: 0.86 } });
+    scanStore.set({ imageDataUrl: pages[next], signaturePosition: { x: 0.5, y: 0.86 }, signaturePageIndex: next });
   }
 
   // Pointer state — distinguish tap (place signature) from drag (pan when zoomed).
