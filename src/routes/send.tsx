@@ -141,28 +141,60 @@ function SendPage() {
 
 
   useEffect(() => {
-    const s = scanStore.get();
-    if (!s.imageDataUrl) {
-      navigate({ to: "/" });
-      return;
-    }
-    // Rebuild the PDF every time the page mounts. We deliberately do NOT
-    // persist the rendered PDF — only the source image + signature live
-    // in sessionStorage to stay under the iOS quota.
-    const allPages = s.pages.length > 0 ? s.pages : [s.imageDataUrl];
-    const sig =
-      s.signatureDataUrl && s.signaturePosition
-        ? {
-            dataUrl: s.signatureDataUrl,
-            x: s.signaturePosition.x,
-            y: s.signaturePosition.y,
-          }
-        : null;
-    (async () => {
-      const url = await buildPdf(allPages, sig);
+    let cancelled = false;
+
+    async function buildFromSession() {
+      const s = scanStore.get();
+      let pages = s.pages.length > 0 ? s.pages : s.imageDataUrl ? [s.imageDataUrl] : [];
+
+      // Try sync handoff recovery before giving up — same pattern as /place and /review.
+      if (pages.length === 0) {
+        const sync = scanStore.readPreviewHandoff();
+        if (sync?.pages.length) {
+          pages = sync.pages;
+          scanStore.set({ pages, imageDataUrl: pages[Math.min(sync.activeIndex, pages.length - 1)] });
+        }
+      }
+
+      // Async handoff recovery (IndexedDB) as last resort before failing.
+      if (pages.length === 0) {
+        const handoff = await scanStore.readPreviewHandoffAsync();
+        if (cancelled) return;
+        if (handoff?.pages.length) {
+          pages = handoff.pages;
+          scanStore.set({ pages, imageDataUrl: pages[Math.min(handoff.activeIndex, pages.length - 1)] });
+        }
+      }
+
+      if (cancelled) return;
+
+      if (pages.length === 0) {
+        // Don't hard-bounce to "/" — surface a recoverable error instead.
+        setRecovering(false);
+        setRecoveryFailed(true);
+        return;
+      }
+
+      const sCurrent = scanStore.get();
+      const sig =
+        sCurrent.signatureDataUrl && sCurrent.signaturePosition
+          ? {
+              dataUrl: sCurrent.signatureDataUrl,
+              x: sCurrent.signaturePosition.x,
+              y: sCurrent.signaturePosition.y,
+            }
+          : null;
+      const url = await buildPdf(pages, sig);
+      if (cancelled) return;
       setPdfUrl(url);
-    })();
-  }, [navigate]);
+      setRecovering(false);
+    }
+
+    void buildFromSession();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function downloadPdf(): { blob: Blob; filename: string } | null {
     if (!pdfUrl) return null;
