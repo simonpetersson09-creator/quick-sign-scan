@@ -429,9 +429,8 @@ function ReviewPage() {
         </div>
 
 
-        {/* Page nav + zoom controls */}
-        <div className="flex items-center gap-2">
-          {pages.length > 1 && (
+        {pages.length > 1 && (
+          <div className="flex items-center gap-2">
             <div className="inline-flex items-center gap-1 rounded-full border border-border bg-card p-1 shadow-[var(--shadow-soft)]">
               <ZoomButton
                 onClick={() => setPageIdx((i) => Math.max(0, i - 1))}
@@ -451,9 +450,8 @@ function ReviewPage() {
                 <ChevronRight className="h-4 w-4" />
               </ZoomButton>
             </div>
-          )}
-          <div className="inline-flex items-center gap-1 rounded-full border border-border bg-card p-1 shadow-[var(--shadow-soft)]" />
-        </div>
+          </div>
+        )}
         {signed && (
           <p className="text-[11px] text-center text-muted-foreground">
             {t("dragSignatureHint")}
