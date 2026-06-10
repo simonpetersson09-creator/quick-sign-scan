@@ -197,9 +197,9 @@ const sv: Dict = {
   err_network_error: "Nätverksfel – kontrollera anslutningen och försök igen.",
   err_unauthorized: "E-posttjänsten är inte korrekt konfigurerad. Kontakta administratör.",
   err_unknown: 'Kunde inte skicka mailet. Försök igen, eller tryck "Ladda ned PDF" och skicka manuellt.',
-  defaultSubjectFallback: "Skannat dokument",
-  defaultSubjectInitial: "Dokument",
-  defaultMessageInitial: "Hej,\n\nBifogar dokumentet.\n\nVänliga hälsningar",
+  defaultSubjectFallback: "Sign & Go – Skannat dokument",
+  defaultSubjectInitial: "Sign & Go – Skannat dokument",
+  defaultMessageInitial: "Hej,\n\nBifogat finner du det skannade dokumentet.\n\nMed vänliga hälsningar",
   largePdfWarning: "Varning: PDF:en är {mb} MB. Stora bilagor kan blockeras av mottagarens server – om utskicket misslyckas, använd \"Ladda ned PDF\" och skicka manuellt.",
 
   // settings
