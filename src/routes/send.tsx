@@ -148,11 +148,17 @@ function SendPage() {
       let pages = s.pages.length > 0 ? s.pages : s.imageDataUrl ? [s.imageDataUrl] : [];
 
       // Try sync handoff recovery before giving up — same pattern as /place and /review.
+      // The handoff also carries the signature; restore it if the store lost it.
       if (pages.length === 0) {
         const sync = scanStore.readPreviewHandoff();
         if (sync?.pages.length) {
           pages = sync.pages;
-          scanStore.set({ pages, imageDataUrl: pages[Math.min(sync.activeIndex, pages.length - 1)] });
+          scanStore.set({
+            pages,
+            imageDataUrl: pages[Math.min(sync.activeIndex, pages.length - 1)],
+            signatureDataUrl: s.signatureDataUrl ?? sync.signatureDataUrl,
+            signaturePosition: s.signaturePosition ?? sync.signaturePosition,
+          });
         }
       }
 
@@ -162,7 +168,12 @@ function SendPage() {
         if (cancelled) return;
         if (handoff?.pages.length) {
           pages = handoff.pages;
-          scanStore.set({ pages, imageDataUrl: pages[Math.min(handoff.activeIndex, pages.length - 1)] });
+          scanStore.set({
+            pages,
+            imageDataUrl: pages[Math.min(handoff.activeIndex, pages.length - 1)],
+            signatureDataUrl: s.signatureDataUrl ?? handoff.signatureDataUrl,
+            signaturePosition: s.signaturePosition ?? handoff.signaturePosition,
+          });
         }
       }
 
