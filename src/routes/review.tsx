@@ -66,6 +66,9 @@ function ReviewPage() {
   const [pageIdx, setPageIdx] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  // Natural aspect ratio (w/h) of the current page — drives the exact
+  // contain-box size so the signature overlay maps 1:1 onto the image.
+  const [imgRatio, setImgRatio] = useState(0.707);
   const [approved, setApproved] = useState(false);
   const [sigPos, setSigPos] = useState<{ x: number; y: number } | null>(null);
   const [sigDataUrl, setSigDataUrl] = useState<string | null>(null);
@@ -343,6 +346,7 @@ function ReviewPage() {
 
   return (
     <AppShell title={t("reviewTitle")} back={signed ? "/sign" : "/place"}>
+      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
       {/* Status row */}
       <div className="mt-1 mb-3 flex flex-wrap items-center justify-center gap-2">
         <StatusChip tone="success" label={t("documentReady")} />
@@ -358,8 +362,8 @@ function ReviewPage() {
       </div>
 
       {/* Page preview — image-based so iOS Safari shows full page at fit-to-page. */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-3 min-h-0">
-        <div className="relative flex items-center justify-center min-h-0 flex-1" style={{ width: "min(92vw, 440px)" }}>
+      <div className="flex flex-col items-center justify-center gap-3">
+        <div className="relative flex items-center justify-center shrink-0" style={{ width: "min(92vw, 440px)", height: "var(--doc-box-h)" }}>
         <div
           ref={containerRef}
           onPointerDown={onPointerDown}
@@ -370,8 +374,10 @@ function ReviewPage() {
           style={{ height: "100%", maxWidth: "min(82vw, 360px)" }}
         >
           <div
-            className="relative h-full"
+            className="relative"
             style={{
+              width: `min(calc(min(82vw, 360px) - 1.5rem), calc((var(--doc-box-h) - 1.5rem) * ${imgRatio}))`,
+              height: `min(calc(var(--doc-box-h) - 1.5rem), calc((min(82vw, 360px) - 1.5rem) / ${imgRatio}))`,
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
               transformOrigin: "center center",
               transition: pointers.current.size === 0 ? "transform 120ms ease" : "none",
@@ -382,7 +388,13 @@ function ReviewPage() {
                 ref={imgRef}
                 src={currentImg}
                 alt={t("scannedAlt")}
-                className="block h-full w-auto object-contain pointer-events-none"
+                onLoad={(e) => {
+                  const el = e.currentTarget;
+                  if (el.naturalWidth && el.naturalHeight) {
+                    setImgRatio(el.naturalWidth / el.naturalHeight);
+                  }
+                }}
+                className="absolute inset-0 h-full w-full object-contain pointer-events-none"
                 draggable={false}
               />
             )}
@@ -530,6 +542,7 @@ function ReviewPage() {
         >
           <ArrowLeft className="h-3.5 w-3.5" /> {t("backToSign")}
         </button>
+      </div>
       </div>
     </AppShell>
   );

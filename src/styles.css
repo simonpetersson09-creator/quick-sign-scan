@@ -39,6 +39,12 @@
 :root {
   --radius: 1rem;
 
+  /* Shared document viewport box for /place and /review so the scanned page
+     renders at exactly the same size on both screens. */
+  --doc-box-h: min(calc(min(82vw, 360px) * 1.45), calc(100dvh - 19rem));
+
+
+
   /* Warm, premium, calm palette */
   --background: oklch(0.74 0.008 50);
   --foreground: oklch(0.22 0.015 250);
