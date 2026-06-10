@@ -461,9 +461,9 @@ const en: Dict = {
   err_network_error: "Network error – check your connection and try again.",
   err_unauthorized: "The email service is not configured correctly. Contact the administrator.",
   err_unknown: 'Could not send the email. Try again, or tap "Download PDF" and send it manually.',
-  defaultSubjectFallback: "Scanned document",
-  defaultSubjectInitial: "Document",
-  defaultMessageInitial: "Hello,\n\nPlease find the document attached.\n\nKind regards",
+  defaultSubjectFallback: "Sign & Go – Scanned document",
+  defaultSubjectInitial: "Sign & Go – Scanned document",
+  defaultMessageInitial: "Hello,\n\nPlease find attached the scanned document.\n\nKind regards",
   largePdfWarning: "Warning: the PDF is {mb} MB. Large attachments may be blocked by the recipient's server – if sending fails, use \"Download PDF\" and send manually.",
 
   // settings
