@@ -2802,7 +2802,7 @@ function ScanPage() {
             }}
           >
             <span
-              className="absolute left-1/2 -translate-x-1/2 -bottom-8 whitespace-nowrap rounded-full bg-black/45 px-3 py-1 text-[12px] font-medium text-white/90 backdrop-blur-sm"
+              className="absolute left-1/2 -translate-x-1/2 -top-8 whitespace-nowrap rounded-full bg-black/45 px-3 py-1 text-[12px] font-medium text-white/90 backdrop-blur-sm"
             >
               {guideHint}
             </span>
