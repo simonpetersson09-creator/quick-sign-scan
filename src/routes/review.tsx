@@ -13,10 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Mail,
-  Maximize2,
-  Minus,
   PenLine,
-  Plus,
 } from "lucide-react";
 
 export const Route = createFileRoute("/review")({
@@ -55,7 +52,6 @@ function ReviewErrorComponent({ error, reset }: { error: Error; reset: () => voi
 
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 4;
-const ZOOM_STEP = 0.5;
 
 function ReviewPage() {
   const navigate = useNavigate();
@@ -318,36 +314,11 @@ function ReviewPage() {
   }
 
   function onPointerUp(e: React.PointerEvent<HTMLDivElement>) {
-    // Detect tap (single pointer, minimal movement) → toggle fit ↔ 2x zoom.
-    const start = singleStart.current;
-    const wasSingle = pointers.current.size === 1 && !gestureStart.current && start;
     pointers.current.delete(e.pointerId);
     if (pointers.current.size < 2) gestureStart.current = null;
     if (pointers.current.size === 0) singleStart.current = null;
-    if (wasSingle) {
-      const dx = e.clientX - start!.x;
-      const dy = e.clientY - start!.y;
-      if (Math.hypot(dx, dy) < 6) {
-        if (zoom > 1) {
-          setZoom(1);
-          setPan({ x: 0, y: 0 });
-        } else {
-          setZoom(2);
-          setPan({ x: 0, y: 0 });
-        }
-      }
-    }
   }
 
-  function changeZoom(next: number) {
-    const z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, +next.toFixed(2)));
-    setZoom(z);
-    setPan((p) => clampPan(p.x, p.y, z));
-  }
-  function resetView() {
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
-  }
 
   function proceed() {
     if (!approved || !ready || !pages.length) return;
@@ -379,21 +350,21 @@ function ReviewPage() {
 
       {/* Page preview — image-based so iOS Safari shows full page at fit-to-page. */}
       <div className="flex flex-col items-center justify-center gap-3">
-        <div className="relative flex items-center justify-center shrink-0" style={{ width: "min(78vw, 360px)", height: "calc(var(--doc-box-h) * 0.82)" }}>
+        <div className="relative flex items-center justify-center shrink-0" style={{ width: "min(94vw, 460px)", height: "var(--doc-box-h)" }}>
         <div
           ref={containerRef}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
-          className="relative overflow-hidden touch-none select-none p-3 flex items-center justify-center cursor-pointer"
-          style={{ height: "100%", maxWidth: "min(70vw, 300px)" }}
+          className="relative overflow-hidden touch-none select-none p-3 flex items-center justify-center"
+          style={{ height: "100%", maxWidth: "min(88vw, 400px)" }}
         >
           <div
             className="relative"
             style={{
-              width: `min(calc(min(70vw, 300px) - 1.5rem), calc((var(--doc-box-h) * 0.82 - 1.5rem) * ${imgRatio}))`,
-              height: `min(calc(var(--doc-box-h) * 0.82 - 1.5rem), calc((min(70vw, 300px) - 1.5rem) / ${imgRatio}))`,
+              width: `min(calc(min(88vw, 400px) - 1.5rem), calc((var(--doc-box-h) - 1.5rem) * ${imgRatio}))`,
+              height: `min(calc(var(--doc-box-h) - 1.5rem), calc((min(88vw, 400px) - 1.5rem) / ${imgRatio}))`,
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
               transformOrigin: "center center",
               transition: pointers.current.size === 0 ? "transform 120ms ease" : "none",
@@ -445,9 +416,8 @@ function ReviewPage() {
         </div>
 
 
-        {/* Page nav + zoom controls */}
-        <div className="flex items-center gap-2">
-          {pages.length > 1 && (
+        {pages.length > 1 && (
+          <div className="flex items-center gap-2">
             <div className="inline-flex items-center gap-1 rounded-full border border-border bg-card p-1 shadow-[var(--shadow-soft)]">
               <ZoomButton
                 onClick={() => setPageIdx((i) => Math.max(0, i - 1))}
@@ -467,34 +437,8 @@ function ReviewPage() {
                 <ChevronRight className="h-4 w-4" />
               </ZoomButton>
             </div>
-          )}
-          <div className="inline-flex items-center gap-1 rounded-full border border-border bg-card p-1 shadow-[var(--shadow-soft)]">
-            <ZoomButton
-              onClick={() => changeZoom(zoom - ZOOM_STEP)}
-              disabled={zoom <= MIN_ZOOM}
-              aria-label={t("zoomOut")}
-            >
-              <Minus className="h-4 w-4" />
-            </ZoomButton>
-            <span className="px-3 text-xs font-medium tabular-nums w-12 text-center">
-              {Math.round(zoom * 100)}%
-            </span>
-            <ZoomButton
-              onClick={() => changeZoom(zoom + ZOOM_STEP)}
-              disabled={zoom >= MAX_ZOOM}
-              aria-label={t("zoomIn")}
-            >
-              <Plus className="h-4 w-4" />
-            </ZoomButton>
-            <ZoomButton
-              onClick={resetView}
-              disabled={zoom === 1 && pan.x === 0 && pan.y === 0}
-              aria-label="Återställ"
-            >
-              <Maximize2 className="h-4 w-4" />
-            </ZoomButton>
           </div>
-        </div>
+        )}
         {signed && (
           <p className="text-[11px] text-center text-muted-foreground">
             {t("dragSignatureHint")}
