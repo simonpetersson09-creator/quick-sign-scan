@@ -228,13 +228,13 @@ function PlacePage() {
           onPointerUp={onUp}
           onPointerCancel={onUp}
           className="relative overflow-hidden touch-none select-none p-3 flex items-center justify-center"
-          style={{ height: "100%", maxWidth: "min(82vw, 360px)" }}
+          style={{ height: "100%", maxWidth: "min(70vw, 300px)" }}
         >
           <div
             className="relative"
             style={{
-              width: `min(calc(min(82vw, 360px) - 1.5rem), calc((var(--doc-box-h) - 1.5rem) * ${imgRatio}))`,
-              height: `min(calc(var(--doc-box-h) - 1.5rem), calc((min(82vw, 360px) - 1.5rem) / ${imgRatio}))`,
+              width: `min(calc(min(70vw, 300px) - 1.5rem), calc((var(--doc-box-h) - 1.5rem) * ${imgRatio}))`,
+              height: `min(calc(var(--doc-box-h) - 1.5rem), calc((min(70vw, 300px) - 1.5rem) / ${imgRatio}))`,
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
               transformOrigin: "center center",
               transition: pointer.current.id === null ? "transform 120ms ease" : "none",
