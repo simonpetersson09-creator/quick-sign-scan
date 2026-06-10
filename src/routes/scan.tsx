@@ -24,8 +24,6 @@ import {
   autoStraighten,
 
   grayWorldWhiteBalance,
-  boostInkContrast,
-  unsharpMaskText,
   sharpenInk,
   cropToWhiteEdges,
   measureWarpQuadGeometry,
