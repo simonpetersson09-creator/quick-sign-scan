@@ -1473,7 +1473,7 @@ function ScanPage() {
         brightness: +meanLum.toFixed(1),
         visibleStable: stableCount.current,
         captureStable: captureStableCount.current,
-        stableTarget: STABLE_FRAMES,
+        stableTarget,
         locked: lockedRef.current,
         blockedBy: captureGateRef.current?.reason ?? null,
       });
