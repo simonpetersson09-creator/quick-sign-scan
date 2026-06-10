@@ -77,20 +77,21 @@ function ReviewPage() {
   useEffect(() => {
     let cancelled = false;
 
-    function adopt(allPages: string[], activeUrl: string | null, sig: { dataUrl: string | null; pos: { x: number; y: number } | null }) {
+    function adopt(allPages: string[], activeUrl: string | null, sig: { dataUrl: string | null; pos: { x: number; y: number } | null; pageIndex: number | null }) {
       setPages(allPages);
-      // Signature is always rendered on the LAST page (matches PDF output in
-      // src/lib/pdf.ts). If a signature exists, jump to the last page so the
-      // user actually sees it — otherwise defaulting to `activeUrl` (often
-      // page 1) hides the signature behind isLastPage=false.
+      // Signature renders on the page the user picked in /place. If we
+      // don't have that index (legacy session), fall back to last page
+      // to match the previous behavior.
       const lookup = activeUrl ? allPages.indexOf(activeUrl) : -1;
       const fallbackIdx = lookup >= 0 ? lookup : allPages.length - 1;
-      const idx = sig.dataUrl ? allPages.length - 1 : fallbackIdx;
+      const sigPageIdx =
+        sig.pageIndex != null && sig.pageIndex >= 0 && sig.pageIndex < allPages.length
+          ? sig.pageIndex
+          : allPages.length - 1;
+      const idx = sig.dataUrl ? sigPageIdx : fallbackIdx;
       setPageIdx(idx);
       setSigDataUrl(sig.dataUrl);
-      // If a signature exists but position was never set (e.g. user came
-      // straight to /sign without passing /place), fall back to a sensible
-      // default instead of silently hiding the signature.
+      setSigPageIndex(sig.dataUrl ? sigPageIdx : null);
       let pos = sig.pos;
       if (sig.dataUrl && !pos) {
         pos = { x: 0.5, y: 0.86 };
