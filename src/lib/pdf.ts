@@ -24,7 +24,7 @@ function approxBytes(dataUrl: string): number {
 //   - Vit bakgrund ritas EJ längre eftersom hela sidan ändå täcks av bilden.
 export async function buildPdf(
   images: string | string[],
-  signature?: { dataUrl: string; x: number; y: number } | null,
+  signature?: { dataUrl: string; x: number; y: number; pageIndex?: number | null } | null,
 ): Promise<string> {
   const pages = Array.isArray(images) ? images.filter(Boolean) : [images];
   if (pages.length === 0) {
@@ -38,6 +38,11 @@ export async function buildPdf(
   });
   const pageW = 210;
   const pageH = 297;
+
+  const sigPageIndex =
+    signature && signature.pageIndex != null && signature.pageIndex >= 0 && signature.pageIndex < pages.length
+      ? signature.pageIndex
+      : pages.length - 1;
 
   let totalInputBytes = 0;
   pages.forEach((imageDataUrl, idx) => {
@@ -60,24 +65,23 @@ export async function buildPdf(
     // JPEG embeds bytes verbatim (FAST = no extra zlib pass).
     const compression = imgFormat === "JPEG" ? "FAST" : "MEDIUM";
     pdf.addImage(imageDataUrl, imgFormat, 0, 0, pageW, pageH, undefined, compression);
-  });
 
-  if (signature && signature.dataUrl) {
-    // Signature is placed on the last page.
-    const sigW = 60; // mm
-    const sigH = 25;
-    const cx = signature.x * pageW;
-    const cy = signature.y * pageH;
-    const sigFormat = detectImageFormat(signature.dataUrl);
-    pdf.addImage(
-      signature.dataUrl,
-      sigFormat,
-      Math.max(0, cx - sigW / 2),
-      Math.max(0, cy - sigH / 2),
-      sigW,
-      sigH,
-    );
-  }
+    if (signature && signature.dataUrl && idx === sigPageIndex) {
+      const sigW = 60; // mm
+      const sigH = 25;
+      const cx = signature.x * pageW;
+      const cy = signature.y * pageH;
+      const sigFormat = detectImageFormat(signature.dataUrl);
+      pdf.addImage(
+        signature.dataUrl,
+        sigFormat,
+        Math.max(0, cx - sigW / 2),
+        Math.max(0, cy - sigH / 2),
+        sigW,
+        sigH,
+      );
+    }
+  });
 
   const out = pdf.output("datauristring");
   const outBytes = approxBytes(out);
