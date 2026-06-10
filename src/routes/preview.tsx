@@ -379,7 +379,7 @@ function PreviewPage() {
           )}
           <div
             className="relative rounded-2xl overflow-hidden border border-border bg-muted/30 p-3 flex items-center justify-center"
-            style={{ height: "100%", maxWidth: "min(82vw, 360px)" }}
+            style={{ height: "100%", maxWidth: "min(92vw, 480px)" }}
           >
             <img
               src={displayUrl ?? originalImage}
