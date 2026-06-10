@@ -1412,7 +1412,7 @@ function ScanPage() {
       if (performance.now() < armedAtRef.current) {
         // Re-aim cooldown after a saved page — show "ready" but don't snap yet.
         setStatus("ready");
-        captureStableCount.current = Math.min(captureStableCount.current, STABLE_FRAMES - 1);
+        captureStableCount.current = Math.min(captureStableCount.current, stableTarget - 1);
         if (captureGateRef.current) captureGateRef.current.reason = "cooldown";
       } else if (isShaky) {
         // Phone is moving — keep "ready" but don't auto-capture this frame.
