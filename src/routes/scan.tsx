@@ -2300,9 +2300,9 @@ function ScanPage() {
           });
         } else {
           try {
-            warped = sharpenInk(warped, { amount: 0.45, threshold: 4, inkGate: 150 });
+            warped = sharpenInk(warped, { amount: 0.55, threshold: 4, inkGate: 150 });
             logScanCanvas("after-sharpen-ink", warped, debugEnabled);
-            logScanStage("sharpen-ink", { applied: true, amount: 0.45, inkGate: 150 });
+            logScanStage("sharpen-ink", { applied: true, amount: 0.55, inkGate: 150 });
           } catch (e) {
             console.warn("[scan] sharpenInk failed; keeping previous frame", e);
             logScanStage("sharpen-ink", { applied: false, reason: "exception" });
@@ -2444,7 +2444,7 @@ function ScanPage() {
       console.warn("[scan] manual fallback: whitenBackground failed", e);
     }
     try {
-      canvas = sharpenInk(canvas, { amount: 0.45, threshold: 4, inkGate: 150 });
+      canvas = sharpenInk(canvas, { amount: 0.55, threshold: 4, inkGate: 150 });
     } catch (e) {
       console.warn("[scan] manual fallback: sharpenInk failed", e);
     }
