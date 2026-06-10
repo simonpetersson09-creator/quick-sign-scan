@@ -370,50 +370,48 @@ function ReviewPage() {
           style={{ height: "100%", width: "100%", maxWidth: "min(82vw, 360px)" }}
         >
           <div
-            className="absolute inset-0 p-3"
+            className="relative max-h-full max-w-full"
             style={{
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
               transformOrigin: "center center",
               transition: pointers.current.size === 0 ? "transform 120ms ease" : "none",
             }}
           >
-            <div className="relative w-full h-full">
-              {currentImg && (
+            {currentImg && (
+              <img
+                ref={imgRef}
+                src={currentImg}
+                alt={t("scannedAlt")}
+                className="block max-h-full max-w-full w-auto h-auto object-contain pointer-events-none"
+                draggable={false}
+              />
+            )}
+            {isSigPage && sigDataUrl && sigPos && (
+              <div
+                onPointerDown={onSigDown}
+                onPointerMove={onSigMove}
+                onPointerUp={onSigUp}
+                onPointerCancel={onSigUp}
+                role="button"
+                aria-label="Flytta signatur"
+                className={`absolute touch-none select-none transition ${
+                  isDraggingSig ? "cursor-grabbing" : "cursor-grab"
+                }`}
+                style={{
+                  left: `${sigPos.x * 100}%`,
+                  top: `${sigPos.y * 100}%`,
+                  width: "28%",
+                  transform: "translate(-50%, -50%)",
+                }}
+              >
                 <img
-                  ref={imgRef}
-                  src={currentImg}
-                  alt={t("scannedAlt")}
-                  className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+                  src={sigDataUrl}
+                  alt=""
+                  className="block w-full h-auto pointer-events-none"
                   draggable={false}
                 />
-              )}
-              {isSigPage && sigDataUrl && sigPos && (
-                <div
-                  onPointerDown={onSigDown}
-                  onPointerMove={onSigMove}
-                  onPointerUp={onSigUp}
-                  onPointerCancel={onSigUp}
-                  role="button"
-                  aria-label="Flytta signatur"
-                  className={`absolute touch-none select-none transition ${
-                    isDraggingSig ? "cursor-grabbing" : "cursor-grab"
-                  }`}
-                  style={{
-                    left: `${sigPos.x * 100}%`,
-                    top: `${sigPos.y * 100}%`,
-                    width: "28%",
-                    transform: "translate(-50%, -50%)",
-                  }}
-                >
-                  <img
-                    src={sigDataUrl}
-                    alt=""
-                    className="block w-full h-auto pointer-events-none"
-                    draggable={false}
-                  />
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
         </div>

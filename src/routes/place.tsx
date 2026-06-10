@@ -225,74 +225,72 @@ function PlacePage() {
           style={{ height: "100%", width: "100%", maxWidth: "min(82vw, 360px)" }}
         >
           <div
-            className="absolute inset-0 p-3"
+            className="relative max-h-full max-w-full"
             style={{
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
               transformOrigin: "center center",
               transition: pointer.current.id === null ? "transform 120ms ease" : "none",
             }}
           >
-            <div className="relative w-full h-full">
-              <img
-                src={image}
-                alt={t("scannedAlt")}
-                className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-                draggable={false}
-              />
+            <img
+              src={image}
+              alt={t("scannedAlt")}
+              className="block max-h-full max-w-full w-auto h-auto object-contain pointer-events-none"
+              draggable={false}
+            />
+            <div
+              className="absolute -translate-x-1/2 -translate-y-1/2"
+              style={{ left: `${sigPos.x * 100}%`, top: `${sigPos.y * 100}%` }}
+            >
+            <div
+              onPointerDown={onSigDown}
+              onPointerMove={onSigMove}
+              onPointerUp={onSigUp}
+              onPointerCancel={onSigUp}
+              role="button"
+              aria-label={t("signatureLabel")}
+              className={`relative flex items-center touch-none select-none transition ${
+                isDraggingSig ? "cursor-grabbing" : "cursor-grab"
+              }`}
+              style={{
+                width: `${110 / zoom}px`,
+                padding: `${5 / zoom}px ${3 / zoom}px`,
+              }}
+            >
+              <div className="flex-1 bg-primary/80 rounded-full pointer-events-none self-center" style={{ height: `${Math.max(0.5, 0.6 / zoom)}px` }} />
               <div
-                className="absolute -translate-x-1/2 -translate-y-1/2"
-                style={{ left: `${sigPos.x * 100}%`, top: `${sigPos.y * 100}%` }}
+                className="absolute left-1/2 -translate-x-1/2 flex items-center pointer-events-none"
+                style={{ gap: `${1.5 / zoom}px`, bottom: `calc(50% + ${1.5 / zoom}px)` }}
               >
-              <div
-                onPointerDown={onSigDown}
-                onPointerMove={onSigMove}
-                onPointerUp={onSigUp}
-                onPointerCancel={onSigUp}
-                role="button"
-                aria-label={t("signatureLabel")}
-                className={`relative flex items-center touch-none select-none transition ${
-                  isDraggingSig ? "cursor-grabbing" : "cursor-grab"
-                }`}
-                style={{
-                  width: `${110 / zoom}px`,
-                  padding: `${5 / zoom}px ${3 / zoom}px`,
-                }}
-              >
-                <div className="flex-1 bg-primary/80 rounded-full pointer-events-none self-center" style={{ height: `${Math.max(0.5, 0.6 / zoom)}px` }} />
-                <div
-                  className="absolute left-1/2 -translate-x-1/2 flex items-center pointer-events-none"
-                  style={{ gap: `${1.5 / zoom}px`, bottom: `calc(50% + ${1.5 / zoom}px)` }}
+                <span
+                  className="font-semibold tracking-[0.08em] uppercase text-primary/70 whitespace-nowrap"
+                  style={{ fontSize: `${7 / zoom}px` }}
                 >
-                  <span
-                    className="font-semibold tracking-[0.08em] uppercase text-primary/70 whitespace-nowrap"
-                    style={{ fontSize: `${7 / zoom}px` }}
-                  >
-                    {t("signatureLabel")}
-                  </span>
-                  <PenLine
-                    className="text-primary shrink-0"
-                    style={{ width: `${7 / zoom}px`, height: `${7 / zoom}px` }}
-                  />
-                </div>
-
-                <div
-                  className="absolute -translate-y-1/2 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[var(--shadow-soft)]"
-                  style={{
-                    top: "50%",
-                    right: `${-8 / zoom}px`,
-                    width: `${14 / zoom}px`,
-                    height: `${14 / zoom}px`,
-                  }}
-                >
-                  <Move style={{ width: `${8 / zoom}px`, height: `${8 / zoom}px` }} />
-                </div>
+                  {t("signatureLabel")}
+                </span>
+                <PenLine
+                  className="text-primary shrink-0"
+                  style={{ width: `${7 / zoom}px`, height: `${7 / zoom}px` }}
+                />
               </div>
 
+              <div
+                className="absolute -translate-y-1/2 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[var(--shadow-soft)]"
+                style={{
+                  top: "50%",
+                  right: `${-8 / zoom}px`,
+                  width: `${14 / zoom}px`,
+                  height: `${14 / zoom}px`,
+                }}
+              >
+                <Move style={{ width: `${8 / zoom}px`, height: `${8 / zoom}px` }} />
+              </div>
+            </div>
+
 
 
             </div>
 
-            </div>
           </div>
         </div>
           {pages.length > 1 && (
