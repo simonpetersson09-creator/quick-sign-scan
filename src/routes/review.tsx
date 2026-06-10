@@ -367,7 +367,7 @@ function ReviewPage() {
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
           className="relative overflow-hidden touch-none select-none p-3 flex items-center justify-center"
-          style={{ height: "100%", width: "100%", maxWidth: "min(82vw, 360px)" }}
+          style={{ height: "100%", maxWidth: "min(82vw, 360px)" }}
         >
           <div
             className="relative max-h-full max-w-full"
