@@ -379,21 +379,21 @@ function ReviewPage() {
 
       {/* Page preview — image-based so iOS Safari shows full page at fit-to-page. */}
       <div className="flex flex-col items-center justify-center gap-3">
-        <div className="relative flex items-center justify-center shrink-0" style={{ width: "min(92vw, 440px)", height: "var(--doc-box-h)" }}>
+        <div className="relative flex items-center justify-center shrink-0" style={{ width: "min(78vw, 360px)", height: "calc(var(--doc-box-h) * 0.82)" }}>
         <div
           ref={containerRef}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
-          className="relative overflow-hidden touch-none select-none p-3 flex items-center justify-center"
-          style={{ height: "100%", maxWidth: "min(82vw, 360px)" }}
+          className="relative overflow-hidden touch-none select-none p-3 flex items-center justify-center cursor-pointer"
+          style={{ height: "100%", maxWidth: "min(70vw, 300px)" }}
         >
           <div
             className="relative"
             style={{
-              width: `min(calc(min(82vw, 360px) - 1.5rem), calc((var(--doc-box-h) - 1.5rem) * ${imgRatio}))`,
-              height: `min(calc(var(--doc-box-h) - 1.5rem), calc((min(82vw, 360px) - 1.5rem) / ${imgRatio}))`,
+              width: `min(calc(min(70vw, 300px) - 1.5rem), calc((var(--doc-box-h) * 0.82 - 1.5rem) * ${imgRatio}))`,
+              height: `min(calc(var(--doc-box-h) * 0.82 - 1.5rem), calc((min(70vw, 300px) - 1.5rem) / ${imgRatio}))`,
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
               transformOrigin: "center center",
               transition: pointers.current.size === 0 ? "transform 120ms ease" : "none",
