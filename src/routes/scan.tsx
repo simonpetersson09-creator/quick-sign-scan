@@ -518,6 +518,7 @@ function ScanPage() {
       brightnessRef.current = 255;
       lowLightFramesRef.current = 0;
       stableCount.current = 0;
+      captureStableCount.current = 0;
       detectCount.current = 0;
       missCount.current = 0;
       smoothQuad.current = null;
