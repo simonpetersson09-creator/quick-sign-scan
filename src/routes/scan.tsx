@@ -323,6 +323,11 @@ function ScanPage() {
   const detectCount = useRef(0);
   const missCount = useRef(0);
   const capturedRef = useRef(false);
+  // Cooldown timestamp (performance.now ms). While now() < cooldown, capture
+  // stability cannot accumulate and auto-capture cannot fire. Set after a
+  // motion-discard so the next stable hold actually re-verifies stillness
+  // instead of re-triggering capture in the same frame.
+  const captureCooldownUntilRef = useRef(0);
   const sharpnessRef = useRef(0);
   const blurFramesRef = useRef(0);
   const captureRetryRef = useRef(0);
@@ -1247,7 +1252,13 @@ function ScanPage() {
     // är capture-grade: readyForCapture, skarp och tillräckligt ljus.
     // Nollas direkt om readyForCapture flippar bort.
     const captureCandidate = readyForCapture && isSharp && isBrightEnough;
-    if (!readyForCapture) {
+    const inCaptureCooldown = now < captureCooldownUntilRef.current;
+    if (inCaptureCooldown) {
+      // Post-discard cooldown: progress must visibly drop and the user must
+      // produce a fresh stable hold before we can fire again.
+      captureStableCount.current = 0;
+      lockedRef.current = false;
+    } else if (!readyForCapture) {
       captureStableCount.current = 0;
     } else if (captureCandidate && delta < STABLE_DELTA) {
       captureStableCount.current++;
@@ -1888,7 +1899,18 @@ function ScanPage() {
             captureStableCount.current = 0;
             stableCount.current = Math.max(0, stableCount.current - 4);
             lockedRef.current = false;
-            setStatus("hold");
+            // Force the progress bar back down immediately so the UI doesn't
+            // sit at 100 % while we wait for the next processFrame tick.
+            setProgress(0);
+            // 450 ms cooldown: capture-stability cannot accumulate and
+            // auto-capture cannot fire during this window. Prevents the
+            // exact-same frame from re-triggering capture and gives the
+            // user a moment to actually steady the phone.
+            captureCooldownUntilRef.current = performance.now() + 450;
+            // Use "align" rather than "hold": "hold" reads as "we're about
+            // to capture", but we just rejected a capture. processFrame will
+            // recompute the correct status on the next tick anyway.
+            setStatus("align");
             return;
           }
 
