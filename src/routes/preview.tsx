@@ -11,7 +11,7 @@ import {
   type QualityMode,
   type QualityReport,
 } from "@/lib/quality";
-import { AlertTriangle } from "lucide-react";
+
 import {
   ArrowRight,
   Plus,
