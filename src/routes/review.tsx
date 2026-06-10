@@ -69,6 +69,7 @@ function ReviewPage() {
   const [approved, setApproved] = useState(false);
   const [sigPos, setSigPos] = useState<{ x: number; y: number } | null>(null);
   const [sigDataUrl, setSigDataUrl] = useState<string | null>(null);
+  const [sigPageIndex, setSigPageIndex] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
 
@@ -117,7 +118,7 @@ function ReviewPage() {
     }
 
     const s = scanStore.get();
-    const sig = { dataUrl: s.signatureDataUrl ?? null, pos: s.signaturePosition ?? null };
+    const sig = { dataUrl: s.signatureDataUrl ?? null, pos: s.signaturePosition ?? null, pageIndex: s.signaturePageIndex ?? null };
     const img = s.imageDataUrl;
     const allPages = s.pages.length > 0 ? s.pages : img ? [img] : [];
     if (allPages.length > 0) {
@@ -134,6 +135,7 @@ function ReviewPage() {
       const recoveredSig = {
         dataUrl: sig.dataUrl ?? h.signatureDataUrl,
         pos: sig.pos ?? h.signaturePosition,
+        pageIndex: sig.pageIndex,
       };
       scanStore.set({
         pages: h.pages,
