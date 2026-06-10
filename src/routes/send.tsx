@@ -193,6 +193,7 @@ function SendPage() {
               dataUrl: sCurrent.signatureDataUrl,
               x: sCurrent.signaturePosition.x,
               y: sCurrent.signaturePosition.y,
+              pageIndex: sCurrent.signaturePageIndex,
             }
           : null;
       const url = await buildPdf(pages, sig);
