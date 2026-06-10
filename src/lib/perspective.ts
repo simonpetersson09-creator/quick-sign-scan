@@ -4031,7 +4031,7 @@ export function sharpenInk(
   canvas: HTMLCanvasElement,
   options: { amount?: number; threshold?: number; inkGate?: number } = {},
 ): HTMLCanvasElement {
-  const amount = options.amount ?? 0.45;
+  const amount = options.amount ?? 0.55;
   const threshold = options.threshold ?? 4;
   const INK_GATE = options.inkGate ?? 150;
   const w = canvas.width;
