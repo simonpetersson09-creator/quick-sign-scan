@@ -106,6 +106,8 @@ function SendPage() {
   const [softPromptRemaining, setSoftPromptRemaining] = useState<number | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
+  const [recovering, setRecovering] = useState(true);
+  const [recoveryFailed, setRecoveryFailed] = useState(false);
 
   const pdfMeta = useMemo(() => {
     if (!pdfUrl) return null;
@@ -139,28 +141,60 @@ function SendPage() {
 
 
   useEffect(() => {
-    const s = scanStore.get();
-    if (!s.imageDataUrl) {
-      navigate({ to: "/" });
-      return;
-    }
-    // Rebuild the PDF every time the page mounts. We deliberately do NOT
-    // persist the rendered PDF — only the source image + signature live
-    // in sessionStorage to stay under the iOS quota.
-    const allPages = s.pages.length > 0 ? s.pages : [s.imageDataUrl];
-    const sig =
-      s.signatureDataUrl && s.signaturePosition
-        ? {
-            dataUrl: s.signatureDataUrl,
-            x: s.signaturePosition.x,
-            y: s.signaturePosition.y,
-          }
-        : null;
-    (async () => {
-      const url = await buildPdf(allPages, sig);
+    let cancelled = false;
+
+    async function buildFromSession() {
+      const s = scanStore.get();
+      let pages = s.pages.length > 0 ? s.pages : s.imageDataUrl ? [s.imageDataUrl] : [];
+
+      // Try sync handoff recovery before giving up — same pattern as /place and /review.
+      if (pages.length === 0) {
+        const sync = scanStore.readPreviewHandoff();
+        if (sync?.pages.length) {
+          pages = sync.pages;
+          scanStore.set({ pages, imageDataUrl: pages[Math.min(sync.activeIndex, pages.length - 1)] });
+        }
+      }
+
+      // Async handoff recovery (IndexedDB) as last resort before failing.
+      if (pages.length === 0) {
+        const handoff = await scanStore.readPreviewHandoffAsync();
+        if (cancelled) return;
+        if (handoff?.pages.length) {
+          pages = handoff.pages;
+          scanStore.set({ pages, imageDataUrl: pages[Math.min(handoff.activeIndex, pages.length - 1)] });
+        }
+      }
+
+      if (cancelled) return;
+
+      if (pages.length === 0) {
+        // Don't hard-bounce to "/" — surface a recoverable error instead.
+        setRecovering(false);
+        setRecoveryFailed(true);
+        return;
+      }
+
+      const sCurrent = scanStore.get();
+      const sig =
+        sCurrent.signatureDataUrl && sCurrent.signaturePosition
+          ? {
+              dataUrl: sCurrent.signatureDataUrl,
+              x: sCurrent.signaturePosition.x,
+              y: sCurrent.signaturePosition.y,
+            }
+          : null;
+      const url = await buildPdf(pages, sig);
+      if (cancelled) return;
       setPdfUrl(url);
-    })();
-  }, [navigate]);
+      setRecovering(false);
+    }
+
+    void buildFromSession();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function downloadPdf(): { blob: Blob; filename: string } | null {
     if (!pdfUrl) return null;
@@ -270,6 +304,22 @@ function SendPage() {
     } finally {
       setSending(false);
     }
+  }
+
+  if (recoveryFailed) {
+    return (
+      <AppShell title={t("sendTitle")} back="/review" className="h-dvh overflow-hidden">
+        <div className="flex-1 flex flex-col items-center justify-center text-center px-6 gap-4">
+          <h2 className="text-lg font-semibold">Inget dokument hittades</h2>
+          <p className="text-sm text-muted-foreground">
+            Skanningen kunde inte återställas. Gå tillbaka och skanna dokumentet på nytt.
+          </p>
+          <PrimaryButton onClick={() => navigate({ to: "/scan" })} className="mt-2">
+            Tillbaka till skanning
+          </PrimaryButton>
+        </div>
+      </AppShell>
+    );
   }
 
   if (done) {

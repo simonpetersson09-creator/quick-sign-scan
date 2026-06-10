@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
@@ -41,11 +42,6 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
 
-  // Stale chunk after a redeploy: the lazy-loaded route bundle hash has
-  // changed and the old hashed file no longer exists. The browser then
-  // throws "Importing a module script failed" / "Failed to fetch dynamically
-  // imported module". The only safe recovery is a hard reload so the new
-  // index.html with current chunk hashes is loaded.
   const msg = (error?.message || "").toLowerCase();
   const isChunkError =
     msg.includes("importing a module script failed") ||
@@ -54,20 +50,43 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
     msg.includes("loading chunk") ||
     msg.includes("loading css chunk");
 
-  // Don't auto-reload if an in-memory scan session is in progress — a hard
-  // reload wipes scanStore (privacy-by-design: nothing is persisted) and the
-  // user loses the pages they just captured. In that case we instead let the
-  // user retry the failed route load via the "Try again" button, which calls
-  // router.invalidate() and re-imports the chunk without nuking app state.
-  const hasInflightSession = typeof window !== "undefined" && scanStore.getPages().length > 0;
+  const hasInflightSession =
+    typeof window !== "undefined" && scanStore.getPages().length > 0;
 
-  if (typeof window !== "undefined" && isChunkError && !hasInflightSession) {
-    // Avoid an infinite reload loop — only auto-reload once per session.
-    const KEY = "__lov_chunk_reloaded";
-    if (!sessionStorage.getItem(KEY)) {
-      sessionStorage.setItem(KEY, "1");
-      window.location.reload();
+  // Soft retry for chunk errors: invalidate + reset without a full reload,
+  // so transient route-bundle loads don't flash this error page or wipe
+  // the in-memory scan session.
+  const triedSoftRetryRef = useRef(false);
+  useEffect(() => {
+    if (isChunkError && !triedSoftRetryRef.current) {
+      triedSoftRetryRef.current = true;
+      router.invalidate();
+      reset();
     }
+  }, [isChunkError, router, reset]);
+
+  // Debounce visible render — many transient errors resolve within ~200ms
+  // (route chunk re-fetch, brief render throw). Don't flash the error UI
+  // during that window.
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setVisible(true), 250);
+    return () => clearTimeout(t);
+  }, []);
+
+  // Hard reload is only acceptable when nothing is in flight AND the soft
+  // retry has already been attempted. Even then, do it at most once.
+  if (typeof window !== "undefined" && isChunkError && !hasInflightSession) {
+    const KEY = "__lov_chunk_reloaded";
+    if (triedSoftRetryRef.current && !sessionStorage.getItem(KEY)) {
+      sessionStorage.setItem(KEY, "1");
+      // Defer slightly so React can flush; avoids reload-loops during render.
+      setTimeout(() => window.location.reload(), 50);
+    }
+  }
+
+  if (!visible) {
+    return <div className="min-h-screen bg-background" aria-hidden="true" />;
   }
 
   return (
@@ -85,16 +104,6 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
-              if (isChunkError && typeof window !== "undefined") {
-                const hasInflightSession = scanStore.getPages().length > 0;
-                if (!hasInflightSession) {
-                  window.location.reload();
-                  return;
-                }
-                router.invalidate();
-                reset();
-                return;
-              }
               router.invalidate();
               reset();
             }}
@@ -102,12 +111,12 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
           >
             Try again
           </button>
-          <a
-            href="/"
+          <Link
+            to="/"
             className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
           >
             Go home
-          </a>
+          </Link>
         </div>
       </div>
     </div>

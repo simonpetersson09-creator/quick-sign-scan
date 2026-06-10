@@ -97,7 +97,15 @@ function SignPage() {
         console.error("[sign] done: trimCanvas returned invalid dataUrl", { dataUrl });
         return;
       }
-      scanStore.set({ signatureDataUrl: dataUrl });
+      // Ensure a signature position exists — otherwise /review will hide
+      // the signature silently. Default to a sensible spot near the bottom
+      // of the current/last page if /place hasn't set one yet.
+      const existing = scanStore.get().signaturePosition;
+      const patch: { signatureDataUrl: string; signaturePosition?: { x: number; y: number } } = {
+        signatureDataUrl: dataUrl,
+      };
+      if (!existing) patch.signaturePosition = { x: 0.5, y: 0.86 };
+      scanStore.set(patch);
       navigate({ to: "/review" });
     } catch (err) {
       console.error("[sign] done failed", err);

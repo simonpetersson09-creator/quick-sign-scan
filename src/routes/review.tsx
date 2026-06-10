@@ -79,10 +79,19 @@ function ReviewPage() {
 
     function adopt(allPages: string[], activeUrl: string | null, sig: { dataUrl: string | null; pos: { x: number; y: number } | null }) {
       setPages(allPages);
-      const idx = activeUrl ? Math.max(0, allPages.indexOf(activeUrl)) : allPages.length - 1;
-      setPageIdx(idx >= 0 ? idx : allPages.length - 1);
+      const lookup = activeUrl ? allPages.indexOf(activeUrl) : -1;
+      const idx = lookup >= 0 ? lookup : allPages.length - 1;
+      setPageIdx(idx);
       setSigDataUrl(sig.dataUrl);
-      setSigPos(sig.pos);
+      // If a signature exists but position was never set (e.g. user came
+      // straight to /sign without passing /place), fall back to a sensible
+      // default instead of silently hiding the signature.
+      let pos = sig.pos;
+      if (sig.dataUrl && !pos) {
+        pos = { x: 0.5, y: 0.86 };
+        scanStore.set({ signaturePosition: pos });
+      }
+      setSigPos(pos);
       setReady(true);
 
       try {
