@@ -345,7 +345,12 @@ function PreviewPage() {
               {t("previewEmptyBody")}
             </p>
           </div>
-          <PrimaryButton onClick={() => navigate({ to: "/scan", replace: true })}>
+          <PrimaryButton
+            onClick={() => {
+              requestMotionPermissionFromGesture();
+              navigate({ to: "/scan", replace: true });
+            }}
+          >
             {t("scanDocument")}
           </PrimaryButton>
         </div>
