@@ -286,7 +286,43 @@ export const scanStore = {
   getPages: () => sessionPages(bag.state),
   addPage: (dataUrl: string, patch: Partial<ScanSession> = {}) => {
     if (!dataUrl) return bag.state;
-    const nextPages = [...sessionPages(bag.state), dataUrl];
+    let existing = sessionPages(bag.state);
+    if (!existing.length) {
+      // Defensive: if in-memory state was lost between captures (HMR reload,
+      // memory pressure, transient route error wiping the module), recover
+      // prior pages from the persisted handoff BEFORE appending. Without
+      // this, the second capture would start from [] and silently drop
+      // every earlier page in the scan session.
+      const storage = safeSessionStorage();
+      let raw: string | null = null;
+      try {
+        raw = storage?.getItem(PREVIEW_HANDOFF_KEY) ?? null;
+      } catch {}
+      if (!raw) {
+        try {
+          if (
+            typeof window !== "undefined" &&
+            window.name.startsWith(PREVIEW_HANDOFF_WINDOW_NAME_PREFIX)
+          ) {
+            raw = window.name.slice(PREVIEW_HANDOFF_WINDOW_NAME_PREFIX.length);
+          }
+        } catch {}
+      }
+      const recovered = parsePreviewHandoff(raw);
+      if (recovered?.pages.length) {
+        existing = recovered.pages;
+        bag.state = {
+          ...bag.state,
+          pages: existing,
+          signatureDataUrl: bag.state.signatureDataUrl ?? recovered.signatureDataUrl,
+          signaturePosition: bag.state.signaturePosition ?? recovered.signaturePosition,
+        };
+        debugScanStore("addPage recovered pages from handoff before append", {
+          recovered: existing.length,
+        });
+      }
+    }
+    const nextPages = [...existing, dataUrl];
     debugScanStore("addPage", {
       pagesBefore: nextPages.length - 1,
       pagesAfter: nextPages.length,
@@ -306,6 +342,7 @@ export const scanStore = {
     notify();
     return bag.state;
   },
+
   set: (patch: Partial<ScanSession>) => {
     bag.state = { ...bag.state, ...patch };
     const pages = sessionPages(bag.state);
