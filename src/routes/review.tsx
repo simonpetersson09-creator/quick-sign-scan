@@ -79,8 +79,13 @@ function ReviewPage() {
 
     function adopt(allPages: string[], activeUrl: string | null, sig: { dataUrl: string | null; pos: { x: number; y: number } | null }) {
       setPages(allPages);
+      // Signature is always rendered on the LAST page (matches PDF output in
+      // src/lib/pdf.ts). If a signature exists, jump to the last page so the
+      // user actually sees it — otherwise defaulting to `activeUrl` (often
+      // page 1) hides the signature behind isLastPage=false.
       const lookup = activeUrl ? allPages.indexOf(activeUrl) : -1;
-      const idx = lookup >= 0 ? lookup : allPages.length - 1;
+      const fallbackIdx = lookup >= 0 ? lookup : allPages.length - 1;
+      const idx = sig.dataUrl ? allPages.length - 1 : fallbackIdx;
       setPageIdx(idx);
       setSigDataUrl(sig.dataUrl);
       // If a signature exists but position was never set (e.g. user came
@@ -93,6 +98,7 @@ function ReviewPage() {
       }
       setSigPos(pos);
       setReady(true);
+
 
       try {
         let bytes = 0;
