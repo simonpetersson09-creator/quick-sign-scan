@@ -33,6 +33,10 @@ import { useT } from "@/lib/i18n";
 import { Camera, CameraOff, X, RefreshCw, ArrowLeft, ArrowRight, Zap, ZapOff, Settings, Loader2 } from "lucide-react";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { isNative, openNativeSettings } from "@/lib/native-init";
+import {
+  getMotionPermissionState,
+  requestMotionPermissionFromGesture,
+} from "@/lib/motion-permission";
 
 function triggerCaptureHaptic() {
   Haptics.impact({ style: ImpactStyle.Medium }).catch(() => {
