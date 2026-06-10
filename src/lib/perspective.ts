@@ -3525,7 +3525,7 @@ export function whitenBackground(canvas: HTMLCanvasElement): HTMLCanvasElement {
       // without affecting text/stamps.
       if (wt >= 1) {
         const avg = (or + og + ob) / 3;
-        const lifted = avg + (255 - avg) * 0.42;
+        const lifted = avg + (255 - avg) * 0.25;
         or = lifted;
         og = lifted;
         ob = lifted;
