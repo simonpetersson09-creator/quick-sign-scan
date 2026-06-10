@@ -33,6 +33,10 @@ import { useT } from "@/lib/i18n";
 import { Camera, CameraOff, X, RefreshCw, ArrowLeft, ArrowRight, Zap, ZapOff, Settings, Loader2 } from "lucide-react";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { isNative, openNativeSettings } from "@/lib/native-init";
+import {
+  getMotionPermissionState,
+  requestMotionPermissionFromGesture,
+} from "@/lib/motion-permission";
 
 function triggerCaptureHaptic() {
   Haptics.impact({ style: ImpactStyle.Medium }).catch(() => {
@@ -763,10 +767,14 @@ function ScanPage() {
     cancelledRef.current = false;
     startCamera();
 
-    // Listen to device motion as a stillness signal. iOS 13+ requires an
-    // explicit permission request (gated behind a user gesture) — we ask
-    // once on mount and silently fall back if denied; the scanner still
-    // works without gyro data, just without this extra gate.
+    // Listen to device motion as a stillness signal. iOS 13+ requires
+    // DeviceMotionEvent.requestPermission() to be invoked synchronously
+    // inside a user gesture. The "Skanna dokument" entry buttons call
+    // requestMotionPermissionFromGesture() on click; here we only attach
+    // the listener if permission is (or will be) granted. If permission
+    // is denied, missing, or unsupported, motionAvailableRef stays false
+    // and detect() falls back to stricter visual stability gates — we
+    // never block scanning over a missing motion sensor.
     const onMotion = (e: DeviceMotionEvent) => {
       const a = e.acceleration ?? e.accelerationIncludingGravity;
       if (!a) return;
@@ -776,21 +784,45 @@ function ScanPage() {
       // sustained calm wins quickly.
       motionMagRef.current = motionMagRef.current * 0.7 + mag * 0.3;
     };
-    type IOSMotionEvent = typeof DeviceMotionEvent & {
-      requestPermission?: () => Promise<"granted" | "denied">;
-    };
-    const dme = (typeof DeviceMotionEvent !== "undefined"
-      ? (DeviceMotionEvent as IOSMotionEvent)
-      : null);
-    if (dme?.requestPermission) {
-      dme.requestPermission()
-        .then((res) => {
-          if (res === "granted") window.addEventListener("devicemotion", onMotion);
-        })
-        .catch(() => {});
-    } else if (typeof window !== "undefined" && "DeviceMotionEvent" in window) {
+    let motionAttached = false;
+    const attachMotion = () => {
+      if (motionAttached) return;
+      motionAttached = true;
       window.addEventListener("devicemotion", onMotion);
+    };
+    const state = getMotionPermissionState();
+    if (state === "granted") {
+      attachMotion();
+    } else if (state === "pending") {
+      // A click handler already kicked off the iOS prompt — poll briefly
+      // and attach once the user accepts. No-op if they deny.
+      const start = performance.now();
+      const poll = window.setInterval(() => {
+        const s = getMotionPermissionState();
+        if (s === "granted") {
+          window.clearInterval(poll);
+          attachMotion();
+        } else if (s !== "pending" || performance.now() - start > 8000) {
+          window.clearInterval(poll);
+        }
+      }, 250);
+    } else if (state === "unknown") {
+      // Last-ditch best-effort: try requesting now. On iOS without a
+      // gesture this resolves to "denied" silently — the fallback path
+      // in detect() handles that case gracefully.
+      requestMotionPermissionFromGesture();
+      const start = performance.now();
+      const poll = window.setInterval(() => {
+        const s = getMotionPermissionState();
+        if (s === "granted") {
+          window.clearInterval(poll);
+          attachMotion();
+        } else if (s !== "pending" || performance.now() - start > 4000) {
+          window.clearInterval(poll);
+        }
+      }, 250);
     }
+    // state === "denied" or "unsupported": skip — fallback gates handle it.
 
     return () => {
       cancelledRef.current = true;
@@ -1229,8 +1261,17 @@ function ScanPage() {
       lockedRef.current = true;
     }
 
+    // When the motion sensor is unavailable (denied permission, desktop,
+    // unsupported browser) we don't have a stillness signal — compensate
+    // by requiring more consecutive stable visual frames before auto-
+    // capture. Same threshold used everywhere captureStableCount is
+    // compared to STABLE_FRAMES below.
+    const stableTarget = motionAvailableRef.current
+      ? STABLE_FRAMES
+      : STABLE_FRAMES + 8; // ~+0.27s extra hold without gyro confirmation
+
     // Progress 0..1 — fills up as capture-stability builds, hits 1.0 right before capture.
-    const pct = Math.max(0, Math.min(1, captureStableCount.current / STABLE_FRAMES));
+    const pct = Math.max(0, Math.min(1, captureStableCount.current / stableTarget));
     setProgress(pct);
 
 
@@ -1277,14 +1318,14 @@ function ScanPage() {
     else if (captureStableCount.current < HOLD_FRAMES) captureBlockedBy = "stability:framing";
     else if (!isSharp) captureBlockedBy = "sharpness";
     else if (captureStableCount.current < READY_FRAMES) captureBlockedBy = "stability:ready";
-    else if (captureStableCount.current < STABLE_FRAMES) captureBlockedBy = "stability:stable";
+    else if (captureStableCount.current < stableTarget) captureBlockedBy = "stability:stable";
     else if (cooldownMs > 0) captureBlockedBy = "cooldown";
     else if (isShakyNow) captureBlockedBy = "motion";
     // "ambiguous" is filled in below once it's computed.
     captureGateRef.current = {
       reason: captureBlockedBy,
       stable: captureStableCount.current,
-      stableTarget: STABLE_FRAMES,
+      stableTarget,
       sharpness: sharpnessRef.current,
       sharpnessMin: SHARPNESS_LIVE_MIN,
       brightness: brightnessRef.current,
@@ -1320,7 +1361,7 @@ function ScanPage() {
       else if (tilted) setStatus("tilt");
       else if (looseEdges) setStatus("align");
       else setStatus("hold");
-    } else if (captureStableCount.current < STABLE_FRAMES) {
+    } else if (captureStableCount.current < stableTarget) {
       drawOverlay(smoothed, "ready");
       setStatus("ready");
     } else {
@@ -1371,12 +1412,12 @@ function ScanPage() {
       if (performance.now() < armedAtRef.current) {
         // Re-aim cooldown after a saved page — show "ready" but don't snap yet.
         setStatus("ready");
-        captureStableCount.current = Math.min(captureStableCount.current, STABLE_FRAMES - 1);
+        captureStableCount.current = Math.min(captureStableCount.current, stableTarget - 1);
         if (captureGateRef.current) captureGateRef.current.reason = "cooldown";
       } else if (isShaky) {
         // Phone is moving — keep "ready" but don't auto-capture this frame.
         setStatus("ready");
-        captureStableCount.current = Math.min(captureStableCount.current, STABLE_FRAMES - 1);
+        captureStableCount.current = Math.min(captureStableCount.current, stableTarget - 1);
         if (captureGateRef.current) captureGateRef.current.reason = "motion";
       } else if (ambiguous) {
         // Competing candidates — wait for one to win.
@@ -1389,7 +1430,7 @@ function ScanPage() {
         // hi-res-tightness-recompute körs (gated på visibleStableCount)
         // och kan flippa readyForCapture nästa frame.
         setStatus("align");
-        captureStableCount.current = Math.min(captureStableCount.current, STABLE_FRAMES - 1);
+        captureStableCount.current = Math.min(captureStableCount.current, stableTarget - 1);
         if (captureGateRef.current)
           captureGateRef.current.reason = `edge:${reasonNotReady ?? "unknown"}`;
       } else {
@@ -1432,7 +1473,7 @@ function ScanPage() {
         brightness: +meanLum.toFixed(1),
         visibleStable: stableCount.current,
         captureStable: captureStableCount.current,
-        stableTarget: STABLE_FRAMES,
+        stableTarget,
         locked: lockedRef.current,
         blockedBy: captureGateRef.current?.reason ?? null,
       });

@@ -5,6 +5,7 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
 import { dataUrlToBlob } from "@/lib/pdf";
 import { useT } from "@/lib/i18n";
+import { requestMotionPermissionFromGesture } from "@/lib/motion-permission";
 import {
   ArrowLeft,
   Camera,
@@ -450,6 +451,7 @@ function ReviewPage() {
           <PrimaryButton
             variant="secondary"
             onClick={() => {
+              requestMotionPermissionFromGesture();
               scanStore.clear("retake from review");
               navigate({ to: "/scan" });
             }}
