@@ -398,7 +398,7 @@ function PreviewPage() {
                   pages: pages.length,
                 });
               }}
-              className="block max-h-full max-w-full w-auto h-auto object-contain rounded-lg"
+              className="block max-h-full max-w-full w-auto h-auto object-contain"
             />
             {filtering && (
               <div className="absolute inset-3 flex items-center justify-center bg-white/60 backdrop-blur-sm rounded-xl">
