@@ -308,7 +308,15 @@ function ScanPage() {
   };
   const candidateHistoryRef = useRef<CandidateEntry[]>([]);
   const ambiguousFramesRef = useRef(0);
-  const stableCount = useRef(0);
+  // visibleStableCount: progressbar för geometriskt rimlig kandidat. Får
+  // växa även när strikta capture-gates (edge tightness, paper contrast,
+  // confidence, sharpness, brightness) fortfarande missar. Aliaserat som
+  // `stableCount` för att hålla diff:en liten.
+  const stableCount = useRef(0); // = visibleStableCount
+  // captureStableCount: bara kandidater som passerar ALLA strikta gates får
+  // bygga upp denna. Auto-capture triggas endast när
+  // captureStableCount >= STABLE_FRAMES. Nollställs när readyForCapture=false.
+  const captureStableCount = useRef(0);
   const detectCount = useRef(0);
   const missCount = useRef(0);
   const capturedRef = useRef(false);
