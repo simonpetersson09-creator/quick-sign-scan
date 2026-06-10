@@ -1261,8 +1261,17 @@ function ScanPage() {
       lockedRef.current = true;
     }
 
+    // When the motion sensor is unavailable (denied permission, desktop,
+    // unsupported browser) we don't have a stillness signal — compensate
+    // by requiring more consecutive stable visual frames before auto-
+    // capture. Same threshold used everywhere captureStableCount is
+    // compared to STABLE_FRAMES below.
+    const stableTarget = motionAvailableRef.current
+      ? STABLE_FRAMES
+      : STABLE_FRAMES + 8; // ~+0.27s extra hold without gyro confirmation
+
     // Progress 0..1 — fills up as capture-stability builds, hits 1.0 right before capture.
-    const pct = Math.max(0, Math.min(1, captureStableCount.current / STABLE_FRAMES));
+    const pct = Math.max(0, Math.min(1, captureStableCount.current / stableTarget));
     setProgress(pct);
 
 
