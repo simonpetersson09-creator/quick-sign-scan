@@ -2539,7 +2539,24 @@ function ScanPage() {
     if (savedTimer2Ref.current) window.clearTimeout(savedTimer2Ref.current);
     if (savedTimer3Ref.current) window.clearTimeout(savedTimer3Ref.current);
     const storePages = scanStore.getPages().filter(isUsableImageDataUrl);
-    const pages = storePages.length ? storePages : isUsableImageDataUrl(lastThumbnail) ? [lastThumbnail] : [];
+    let pages = storePages;
+    if (!pages.length) {
+      // Defensive: in-memory store was wiped (HMR, memory pressure, transient
+      // route error). Try the persisted handoff BEFORE falling back to a
+      // single lastThumbnail — otherwise multi-page sessions silently lose
+      // every earlier capture and only the most recent page survives.
+      const handoff = scanStore.readPreviewHandoff();
+      const recovered = (handoff?.pages ?? []).filter(isUsableImageDataUrl);
+      if (recovered.length) {
+        pages = recovered;
+        console.warn("[scan] finishScanning recovered pages from preview handoff", {
+          pages: recovered.length,
+        });
+      } else if (isUsableImageDataUrl(lastThumbnail)) {
+        pages = [lastThumbnail];
+        console.error("[scan] finishScanning: store and handoff empty — using single lastThumbnail");
+      }
+    }
     console.info("[scan] scanStore.getPages before Done", {
       pages: pages.length,
       firstPageExists: Boolean(pages[0]),
@@ -2552,6 +2569,7 @@ function ScanPage() {
       setStatus("searching");
       return;
     }
+
     cancelledRef.current = true;
     cameraStartTokenRef.current += 1;
     stopCamera("done-to-preview");
