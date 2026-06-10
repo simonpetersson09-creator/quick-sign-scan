@@ -360,7 +360,7 @@ function PreviewPage() {
       <div className="flex-1 min-h-0 flex items-center justify-center">
         <div
           className="relative flex items-center justify-center min-h-0 h-full"
-          style={{ width: "min(92vw, 400px)" }}
+          style={{ width: "min(96vw, 520px)" }}
         >
           {pages.length > 1 && (
             <button
