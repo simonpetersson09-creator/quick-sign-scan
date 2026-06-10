@@ -66,6 +66,9 @@ function ReviewPage() {
   const [pageIdx, setPageIdx] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  // Natural aspect ratio (w/h) of the current page — drives the exact
+  // contain-box size so the signature overlay maps 1:1 onto the image.
+  const [imgRatio, setImgRatio] = useState(0.707);
   const [approved, setApproved] = useState(false);
   const [sigPos, setSigPos] = useState<{ x: number; y: number } | null>(null);
   const [sigDataUrl, setSigDataUrl] = useState<string | null>(null);

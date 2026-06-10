@@ -23,6 +23,9 @@ function PlacePage() {
   const [sigPos, setSigPos] = useState<{ x: number; y: number }>({ x: 0.5, y: 0.86 });
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  // Natural aspect ratio (w/h) of the current page — drives the exact
+  // contain-box size so the overlay percentages map 1:1 onto the image.
+  const [imgRatio, setImgRatio] = useState(0.707);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -203,7 +206,7 @@ function PlacePage() {
     <AppShell title={t("placeTitle")} back="/preview">
       <p className="text-sm text-muted-foreground mt-1 mb-3">{t("placeHint")}</p>
       <div className="flex-1 flex flex-col items-center justify-center gap-3 min-h-0">
-        <div className="relative flex items-center justify-center min-h-0 flex-1" style={{ width: "min(92vw, 440px)" }}>
+        <div className="relative flex items-center justify-center shrink-0" style={{ width: "min(92vw, 440px)", height: "var(--doc-box-h)" }}>
           {pages.length > 1 && (
             <button
               type="button"
@@ -225,8 +228,10 @@ function PlacePage() {
           style={{ height: "100%", maxWidth: "min(82vw, 360px)" }}
         >
           <div
-            className="relative h-full"
+            className="relative"
             style={{
+              width: `min(calc(min(82vw, 360px) - 1.5rem), calc((var(--doc-box-h) - 1.5rem) * ${imgRatio}))`,
+              height: `min(calc(var(--doc-box-h) - 1.5rem), calc((min(82vw, 360px) - 1.5rem) / ${imgRatio}))`,
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
               transformOrigin: "center center",
               transition: pointer.current.id === null ? "transform 120ms ease" : "none",
@@ -235,7 +240,13 @@ function PlacePage() {
             <img
               src={image}
               alt={t("scannedAlt")}
-              className="block h-full w-auto object-contain pointer-events-none"
+              onLoad={(e) => {
+                const el = e.currentTarget;
+                if (el.naturalWidth && el.naturalHeight) {
+                  setImgRatio(el.naturalWidth / el.naturalHeight);
+                }
+              }}
+              className="absolute inset-0 h-full w-full object-contain pointer-events-none"
               draggable={false}
             />
             <div
