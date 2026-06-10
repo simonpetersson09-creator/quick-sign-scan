@@ -451,6 +451,7 @@ function ReviewPage() {
           <PrimaryButton
             variant="secondary"
             onClick={() => {
+              requestMotionPermissionFromGesture();
               scanStore.clear("retake from review");
               navigate({ to: "/scan" });
             }}
