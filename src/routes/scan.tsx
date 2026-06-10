@@ -2035,29 +2035,37 @@ function ScanPage() {
             maxTopBottom: 0.02,
             maxLeftRight: 0.02,
           });
-          // Skala tillbaka till exakt A4 så aspect inte driftar och preview
-          // inte får letterbox-band uppe/nere. cropToWhiteEdges trimmar bara
-          // ren vit marginal, så att skala upp några procent är visuellt
-          // försumbart och bevarar A4-formen som warpen siktade på.
-          const a4 = document.createElement("canvas");
-          a4.width = TARGET_SHORT;
-          a4.height = TARGET_LONG;
-          const a4ctx = a4.getContext("2d");
-          if (a4ctx) {
-            a4ctx.imageSmoothingEnabled = true;
-            a4ctx.imageSmoothingQuality = "high";
-            a4ctx.drawImage(cropped, 0, 0, a4.width, a4.height);
-            warped = a4;
+          const didCrop = amount.top + amount.right + amount.bottom + amount.left > 0;
+          let rescaledToA4 = false;
+          if (didCrop) {
+            // Endast om vi faktiskt trimmade kanter behöver vi resampla tillbaka
+            // till exakt A4 så aspect inte driftar. Om ingen crop gjordes är
+            // bilden redan A4 från warpQuadToRect — en extra drawImage skulle
+            // bara introducera ett onödigt resample-steg som mjukar upp texten.
+            const a4 = document.createElement("canvas");
+            a4.width = TARGET_SHORT;
+            a4.height = TARGET_LONG;
+            const a4ctx = a4.getContext("2d");
+            if (a4ctx) {
+              a4ctx.imageSmoothingEnabled = true;
+              a4ctx.imageSmoothingQuality = "high";
+              a4ctx.drawImage(cropped, 0, 0, a4.width, a4.height);
+              warped = a4;
+              rescaledToA4 = true;
+            } else {
+              warped = cropped;
+            }
           } else {
             warped = cropped;
           }
           logScanStage("white-edge-crop", {
-            applied: amount.top + amount.right + amount.bottom + amount.left > 0,
+            applied: didCrop,
             cropped: amount,
             sizeAfter: { w: warped.width, h: warped.height },
-            rescaledToA4: Boolean(a4ctx),
+            rescaledToA4,
           });
           logScanCanvas("after-white-edge-crop", warped, debugEnabled);
+
         } catch (e) {
           console.warn("[scan] cropToWhiteEdges failed; continuing", e);
           logScanStage("white-edge-crop", { applied: false, reason: "exception" });
