@@ -385,7 +385,7 @@ function PreviewPage() {
             </button>
           )}
           <div
-            className="relative rounded-2xl overflow-hidden border border-border bg-muted/30 p-3 flex items-center justify-center"
+            className="relative overflow-hidden p-3 flex items-center justify-center"
             style={{ height: "100%", maxWidth: "min(82vw, 360px)" }}
           >
             <img
@@ -398,7 +398,7 @@ function PreviewPage() {
                   pages: pages.length,
                 });
               }}
-              className="block max-h-full max-w-full w-auto h-auto object-contain rounded-lg bg-white"
+              className="block max-h-full max-w-full w-auto h-auto object-contain rounded-lg"
             />
             {filtering && (
               <div className="absolute inset-3 flex items-center justify-center bg-white/60 backdrop-blur-sm rounded-xl">
