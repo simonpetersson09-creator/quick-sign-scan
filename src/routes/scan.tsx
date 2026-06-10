@@ -2328,14 +2328,9 @@ function ScanPage() {
       console.warn("[scan] manual fallback: whitenBackground failed", e);
     }
     try {
-      canvas = unsharpMaskText(canvas, { amount: 0.4, threshold: 4 });
+      canvas = sharpenInk(canvas, { amount: 0.45, threshold: 4, inkGate: 150 });
     } catch (e) {
-      console.warn("[scan] manual fallback: unsharpMaskText failed", e);
-    }
-    try {
-      canvas = boostInkContrast(canvas);
-    } catch (e) {
-      console.warn("[scan] manual fallback: boostInkContrast failed", e);
+      console.warn("[scan] manual fallback: sharpenInk failed", e);
     }
 
     const dataUrl = canvasToSafeImageDataUrl(canvas, 0.92);
