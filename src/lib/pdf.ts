@@ -67,8 +67,8 @@ export async function buildPdf(
     pdf.addImage(imageDataUrl, imgFormat, 0, 0, pageW, pageH, undefined, compression);
 
     if (signature && signature.dataUrl && idx === sigPageIndex) {
-      const sigW = 60; // mm
-      const sigH = 25;
+      const sigW = 45; // mm
+      const sigH = 18;
       const cx = signature.x * pageW;
       const cy = signature.y * pageH;
       const sigFormat = detectImageFormat(signature.dataUrl);

@@ -267,7 +267,7 @@ function PlacePage() {
                 isDraggingSig ? "cursor-grabbing" : "cursor-grab"
               }`}
               style={{
-                width: `${110 / zoom}px`,
+                width: `${85 / zoom}px`,
                 padding: `${5 / zoom}px ${3 / zoom}px`,
               }}
             >
