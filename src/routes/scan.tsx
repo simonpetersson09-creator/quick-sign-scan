@@ -1083,6 +1083,7 @@ function ScanPage() {
           lockedRef.current = false;
           lockBreakFramesRef.current = 0;
           stableCount.current = 0;
+          captureStableCount.current = 0;
           hiResTightConfirmedRef.current = false;
         }
       } else {
