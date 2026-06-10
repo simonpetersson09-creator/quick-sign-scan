@@ -3476,7 +3476,7 @@ export function whitenBackground(canvas: HTMLCanvasElement): HTMLCanvasElement {
   // with L <= T_NONE (clearly text) are left exactly as-is; in between we
   // blend smoothly. This is the safety net that guarantees no faint stroke
   // gets bleached.
-  const T_NONE = 150;
+  const T_NONE = 128;
   const T_FULL = 178;
   for (let y = 0; y < h; y++) {
     const fy = Math.min(sh - 1, y / SCALE);
