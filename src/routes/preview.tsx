@@ -11,7 +11,7 @@ import {
   type QualityMode,
   type QualityReport,
 } from "@/lib/quality";
-import { AlertTriangle } from "lucide-react";
+
 import {
   ArrowRight,
   Plus,
@@ -503,54 +503,6 @@ function PreviewPage() {
         </div>
       )}
 
-      {(() => {
-        const report = qualityByKey[qualityKey];
-        if (!report || report.issues.length === 0) return null;
-        if (dismissedQuality[qualityKey]) return null;
-        return (
-          <div className="mt-4 rounded-xl border border-amber-300/60 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800/60 p-3">
-            <div className="flex items-start gap-2.5">
-              <AlertTriangle className="h-4 w-4 mt-0.5 text-amber-600 dark:text-amber-400 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-foreground">
-                  {t("qualityWarnTitle")}
-                </div>
-                <ul className="mt-0.5 space-y-0.5">
-                  {report.issues.map((issue: QualityIssue) => (
-                    <li
-                      key={issue}
-                      className="text-[13px] text-foreground/75 leading-snug"
-                    >
-                      • {t(`verdict_${issue}`)}
-                    </li>
-                  ))}
-                </ul>
-                <div className="mt-2.5 flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      deletePage(activeIndex);
-                      navigate({ to: "/scan" });
-                    }}
-                    className="inline-flex items-center rounded-full border border-border bg-card px-3 py-1.5 text-[13px] font-medium text-foreground hover:bg-secondary transition"
-                  >
-                    {t("qualityRescan")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setDismissedQuality((prev) => ({ ...prev, [qualityKey]: true }))
-                    }
-                    className="inline-flex items-center rounded-full px-3 py-1.5 text-[13px] font-medium text-foreground/70 hover:text-foreground transition"
-                  >
-                    {t("qualityUseAnyway")}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
 
       <div className="flex-1" />
 
