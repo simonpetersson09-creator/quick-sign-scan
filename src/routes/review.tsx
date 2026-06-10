@@ -126,17 +126,33 @@ function ReviewPage() {
 
     // In-memory store empty (HMR reload, route-chunk reload, BFCache). Recover
     // from the same-tab preview handoff before bouncing to scan — otherwise
-    // pressing "Klar" on /sign can drop the user back to the camera.
+    // pressing "Klar" on /sign can drop the user back to the camera. The
+    // handoff also carries the signature, so restore it into the store too.
+    function adoptHandoff(h: { pages: string[]; activeIndex: number; signatureDataUrl: string | null; signaturePosition: { x: number; y: number } | null }) {
+      const active = h.pages[Math.max(0, Math.min(h.pages.length - 1, h.activeIndex))];
+      const recoveredSig = {
+        dataUrl: sig.dataUrl ?? h.signatureDataUrl,
+        pos: sig.pos ?? h.signaturePosition,
+      };
+      scanStore.set({
+        pages: h.pages,
+        imageDataUrl: active,
+        signatureDataUrl: recoveredSig.dataUrl,
+        signaturePosition: recoveredSig.pos,
+      });
+      adopt(h.pages, active, recoveredSig);
+    }
+
     const sync = scanStore.readPreviewHandoff();
     if (sync?.pages.length) {
-      adopt(sync.pages, sync.pages[Math.max(0, Math.min(sync.pages.length - 1, sync.activeIndex))], sig);
+      adoptHandoff(sync);
       return;
     }
 
     void scanStore.readPreviewHandoffAsync().then((handoff) => {
       if (cancelled) return;
       if (handoff?.pages.length) {
-        adopt(handoff.pages, handoff.pages[Math.max(0, Math.min(handoff.pages.length - 1, handoff.activeIndex))], sig);
+        adoptHandoff(handoff);
         return;
       }
       navigate({ to: "/scan", replace: true });

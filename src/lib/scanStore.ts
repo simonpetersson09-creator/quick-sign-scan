@@ -75,6 +75,8 @@ type PreviewHandoff = {
   pages: string[];
   activeIndex: number;
   createdAt: number;
+  signatureDataUrl: string | null;
+  signaturePosition: { x: number; y: number } | null;
 };
 
 const PREVIEW_HANDOFF_KEY = "docscan.preview-handoff.v1";
@@ -148,7 +150,14 @@ function parsePreviewHandoff(raw: string | null | undefined): PreviewHandoff | n
       typeof parsed.activeIndex === "number"
         ? Math.max(0, Math.min(pages.length - 1, parsed.activeIndex))
         : pages.length - 1;
-    return { pages, activeIndex, createdAt };
+    const signatureDataUrl =
+      typeof parsed.signatureDataUrl === "string" && parsed.signatureDataUrl.startsWith("data:image/")
+        ? parsed.signatureDataUrl
+        : null;
+    const sp = parsed.signaturePosition;
+    const signaturePosition =
+      sp && typeof sp.x === "number" && typeof sp.y === "number" ? { x: sp.x, y: sp.y } : null;
+    return { pages, activeIndex, createdAt, signatureDataUrl, signaturePosition };
   } catch {
     return null;
   }
@@ -220,7 +229,15 @@ function createPreviewHandoffPayload(pages: string[], activeIndex: number) {
   const safePages = pages.filter(isUsablePreviewPage);
   if (!safePages.length) return null;
   const safeActiveIndex = Math.max(0, Math.min(safePages.length - 1, activeIndex));
-  const payload = JSON.stringify({ pages: safePages, activeIndex: safeActiveIndex, createdAt: Date.now() });
+  // Include the signature so a reload between /sign and /review or /send
+  // doesn't silently drop it (pages used to be the only thing recovered).
+  const payload = JSON.stringify({
+    pages: safePages,
+    activeIndex: safeActiveIndex,
+    createdAt: Date.now(),
+    signatureDataUrl: bag.state.signatureDataUrl ?? null,
+    signaturePosition: bag.state.signaturePosition ?? null,
+  });
   return { safePages, safeActiveIndex, payload };
 }
 
@@ -292,7 +309,12 @@ export const scanStore = {
   set: (patch: Partial<ScanSession>) => {
     bag.state = { ...bag.state, ...patch };
     const pages = sessionPages(bag.state);
-    if (pages.length && ("pages" in patch || "imageDataUrl" in patch)) {
+    const touchesHandoff =
+      "pages" in patch ||
+      "imageDataUrl" in patch ||
+      "signatureDataUrl" in patch ||
+      "signaturePosition" in patch;
+    if (pages.length && touchesHandoff) {
       const activeIndex = bag.state.imageDataUrl
         ? Math.max(0, pages.indexOf(bag.state.imageDataUrl))
         : pages.length - 1;
