@@ -75,6 +75,8 @@ type PreviewHandoff = {
   pages: string[];
   activeIndex: number;
   createdAt: number;
+  signatureDataUrl: string | null;
+  signaturePosition: { x: number; y: number } | null;
 };
 
 const PREVIEW_HANDOFF_KEY = "docscan.preview-handoff.v1";
@@ -148,7 +150,14 @@ function parsePreviewHandoff(raw: string | null | undefined): PreviewHandoff | n
       typeof parsed.activeIndex === "number"
         ? Math.max(0, Math.min(pages.length - 1, parsed.activeIndex))
         : pages.length - 1;
-    return { pages, activeIndex, createdAt };
+    const signatureDataUrl =
+      typeof parsed.signatureDataUrl === "string" && parsed.signatureDataUrl.startsWith("data:image/")
+        ? parsed.signatureDataUrl
+        : null;
+    const sp = parsed.signaturePosition;
+    const signaturePosition =
+      sp && typeof sp.x === "number" && typeof sp.y === "number" ? { x: sp.x, y: sp.y } : null;
+    return { pages, activeIndex, createdAt, signatureDataUrl, signaturePosition };
   } catch {
     return null;
   }
