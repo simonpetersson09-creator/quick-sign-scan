@@ -1430,7 +1430,7 @@ function ScanPage() {
         // hi-res-tightness-recompute körs (gated på visibleStableCount)
         // och kan flippa readyForCapture nästa frame.
         setStatus("align");
-        captureStableCount.current = Math.min(captureStableCount.current, STABLE_FRAMES - 1);
+        captureStableCount.current = Math.min(captureStableCount.current, stableTarget - 1);
         if (captureGateRef.current)
           captureGateRef.current.reason = `edge:${reasonNotReady ?? "unknown"}`;
       } else {
