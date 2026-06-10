@@ -1500,6 +1500,7 @@ function ScanPage() {
       // Soft regression — confidence fluctuates frame-to-frame; full reset
       // makes first lock feel arbitrary.
       stableCount.current = Math.max(0, stableCount.current - 2);
+      captureStableCount.current = Math.max(0, captureStableCount.current - 2);
       lockedRef.current = false;
       setStatus("uncertain");
       return;
