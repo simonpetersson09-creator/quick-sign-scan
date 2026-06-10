@@ -319,15 +319,6 @@ function ReviewPage() {
     if (pointers.current.size === 0) singleStart.current = null;
   }
 
-  function changeZoom(next: number) {
-    const z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, +next.toFixed(2)));
-    setZoom(z);
-    setPan((p) => clampPan(p.x, p.y, z));
-  }
-  function resetView() {
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
-  }
 
   function proceed() {
     if (!approved || !ready || !pages.length) return;
