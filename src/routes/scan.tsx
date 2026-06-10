@@ -1332,30 +1332,25 @@ function ScanPage() {
       if (performance.now() < armedAtRef.current) {
         // Re-aim cooldown after a saved page — show "ready" but don't snap yet.
         setStatus("ready");
-        stableCount.current = Math.min(stableCount.current, STABLE_FRAMES - 1);
+        captureStableCount.current = Math.min(captureStableCount.current, STABLE_FRAMES - 1);
         if (captureGateRef.current) captureGateRef.current.reason = "cooldown";
       } else if (isShaky) {
         // Phone is moving — keep "ready" but don't auto-capture this frame.
         setStatus("ready");
-        stableCount.current = Math.min(stableCount.current, STABLE_FRAMES - 1);
+        captureStableCount.current = Math.min(captureStableCount.current, STABLE_FRAMES - 1);
         if (captureGateRef.current) captureGateRef.current.reason = "motion";
       } else if (ambiguous) {
-        // Competing candidates — wait for one to win. With the shorter (3-frame)
-        // memory window we lean a bit harder on the ambiguity window itself:
-        // decrement stableCount by 1 instead of 2 so a true competing
-        // rectangle (laptop, book, keyboard) needs more consecutive clean
-        // frames before capture is allowed, even though a single noisy
-        // frame won't wipe ramp-up.
+        // Competing candidates — wait for one to win.
         setStatus("ready");
-        stableCount.current = Math.max(0, stableCount.current - 1);
+        captureStableCount.current = Math.max(0, captureStableCount.current - 1);
         if (captureGateRef.current) captureGateRef.current.reason = "ambiguous";
       } else if (visibleOnly) {
         // Stabilitet uppnådd men strikt gate (edge tightness / paper
         // contrast / etc.) inte godkänd ännu. Visa ramen och vänta —
-        // hi-res-tightness-recompute körs nu också (gated på stableCount)
+        // hi-res-tightness-recompute körs (gated på visibleStableCount)
         // och kan flippa readyForCapture nästa frame.
         setStatus("align");
-        stableCount.current = Math.min(stableCount.current, STABLE_FRAMES - 1);
+        captureStableCount.current = Math.min(captureStableCount.current, STABLE_FRAMES - 1);
         if (captureGateRef.current)
           captureGateRef.current.reason = `edge:${reasonNotReady ?? "unknown"}`;
       } else {
