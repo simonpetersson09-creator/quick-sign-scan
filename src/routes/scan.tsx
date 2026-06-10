@@ -1917,7 +1917,7 @@ function ScanPage() {
           refinedSrcQuad = refineQuadCorners(refineSource, vw, vh, baseSrcQuad);
           logScanStage("subpixel-refine", {
             applied: true,
-            before: formatQuad(srcQuad),
+            before: formatQuad(baseSrcQuad),
             after: formatQuad(refinedSrcQuad),
           });
         } catch (e) {
