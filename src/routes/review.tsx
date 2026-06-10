@@ -318,25 +318,9 @@ function ReviewPage() {
   }
 
   function onPointerUp(e: React.PointerEvent<HTMLDivElement>) {
-    // Detect tap (single pointer, minimal movement) → toggle fit ↔ 2x zoom.
-    const start = singleStart.current;
-    const wasSingle = pointers.current.size === 1 && !gestureStart.current && start;
     pointers.current.delete(e.pointerId);
     if (pointers.current.size < 2) gestureStart.current = null;
     if (pointers.current.size === 0) singleStart.current = null;
-    if (wasSingle) {
-      const dx = e.clientX - start!.x;
-      const dy = e.clientY - start!.y;
-      if (Math.hypot(dx, dy) < 6) {
-        if (zoom > 1) {
-          setZoom(1);
-          setPan({ x: 0, y: 0 });
-        } else {
-          setZoom(2);
-          setPan({ x: 0, y: 0 });
-        }
-      }
-    }
   }
 
   function changeZoom(next: number) {
