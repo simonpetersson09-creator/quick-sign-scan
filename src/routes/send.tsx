@@ -106,6 +106,8 @@ function SendPage() {
   const [softPromptRemaining, setSoftPromptRemaining] = useState<number | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
+  const [recovering, setRecovering] = useState(true);
+  const [recoveryFailed, setRecoveryFailed] = useState(false);
 
   const pdfMeta = useMemo(() => {
     if (!pdfUrl) return null;
