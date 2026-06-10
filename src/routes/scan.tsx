@@ -1518,6 +1518,7 @@ function ScanPage() {
     if (meta.debug.edgeTightness < tightnessFloor) {
       // Soft regression — hi-res tightness recompute may rescue next frame.
       stableCount.current = Math.max(0, stableCount.current - 2);
+      captureStableCount.current = Math.max(0, captureStableCount.current - 2);
       lockedRef.current = false;
       setStatus("align");
       return;
