@@ -452,32 +452,7 @@ function ReviewPage() {
               </ZoomButton>
             </div>
           )}
-          <div className="inline-flex items-center gap-1 rounded-full border border-border bg-card p-1 shadow-[var(--shadow-soft)]">
-            <ZoomButton
-              onClick={() => changeZoom(zoom - ZOOM_STEP)}
-              disabled={zoom <= MIN_ZOOM}
-              aria-label={t("zoomOut")}
-            >
-              <Minus className="h-4 w-4" />
-            </ZoomButton>
-            <span className="px-3 text-xs font-medium tabular-nums w-12 text-center">
-              {Math.round(zoom * 100)}%
-            </span>
-            <ZoomButton
-              onClick={() => changeZoom(zoom + ZOOM_STEP)}
-              disabled={zoom >= MAX_ZOOM}
-              aria-label={t("zoomIn")}
-            >
-              <Plus className="h-4 w-4" />
-            </ZoomButton>
-            <ZoomButton
-              onClick={resetView}
-              disabled={zoom === 1 && pan.x === 0 && pan.y === 0}
-              aria-label="Återställ"
-            >
-              <Maximize2 className="h-4 w-4" />
-            </ZoomButton>
-          </div>
+          <div className="inline-flex items-center gap-1 rounded-full border border-border bg-card p-1 shadow-[var(--shadow-soft)]" />
         </div>
         {signed && (
           <p className="text-[11px] text-center text-muted-foreground">
