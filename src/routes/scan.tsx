@@ -1235,16 +1235,16 @@ function ScanPage() {
     let captureBlockedBy: string | null = null;
     if (visibleOnly) captureBlockedBy = `edge:${reasonNotReady ?? "unknown"}`;
     else if (!isBrightEnough && lowLightFramesRef.current > 15) captureBlockedBy = "light";
-    else if (stableCount.current < HOLD_FRAMES) captureBlockedBy = "stability:framing";
+    else if (captureStableCount.current < HOLD_FRAMES) captureBlockedBy = "stability:framing";
     else if (!isSharp) captureBlockedBy = "sharpness";
-    else if (stableCount.current < READY_FRAMES) captureBlockedBy = "stability:ready";
-    else if (stableCount.current < STABLE_FRAMES) captureBlockedBy = "stability:stable";
+    else if (captureStableCount.current < READY_FRAMES) captureBlockedBy = "stability:ready";
+    else if (captureStableCount.current < STABLE_FRAMES) captureBlockedBy = "stability:stable";
     else if (cooldownMs > 0) captureBlockedBy = "cooldown";
     else if (isShakyNow) captureBlockedBy = "motion";
     // "ambiguous" is filled in below once it's computed.
     captureGateRef.current = {
       reason: captureBlockedBy,
-      stable: stableCount.current,
+      stable: captureStableCount.current,
       stableTarget: STABLE_FRAMES,
       sharpness: sharpnessRef.current,
       sharpnessMin: SHARPNESS_LIVE_MIN,
