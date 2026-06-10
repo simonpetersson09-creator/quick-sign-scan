@@ -28,7 +28,12 @@ const defaults: AppSettings = {
 // Legacy hard-coded Swedish defaults that previous versions persisted into
 // localStorage. Treat them as "unset" so the current i18n fallback wins and
 // the form shows text in the active language.
-const LEGACY_SUBJECTS = new Set(["Dokument", "Document"]);
+const LEGACY_SUBJECTS = new Set([
+  "Dokument",
+  "Document",
+  "Skannat dokument",
+  "Scanned document",
+]);
 const LEGACY_MESSAGES = new Set([
   "Hej,\n\nBifogar dokumentet.\n\nVänliga hälsningar",
   "Hello,\n\nPlease find the document attached.\n\nKind regards",

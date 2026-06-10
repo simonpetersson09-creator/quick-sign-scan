@@ -79,6 +79,7 @@ function SettingsPage() {
           <input
             value={s.defaultSubject}
             onChange={(e) => update("defaultSubject", e.target.value)}
+            placeholder={t("defaultSubjectInitial")}
             className="input"
           />
         </Field>
@@ -87,6 +88,7 @@ function SettingsPage() {
           <textarea
             value={s.defaultMessage}
             onChange={(e) => update("defaultMessage", e.target.value)}
+            placeholder={t("defaultMessageInitial")}
             rows={5}
             className="input resize-none"
           />
