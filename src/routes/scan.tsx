@@ -1816,19 +1816,108 @@ function ScanPage() {
         scoredBbox: { x: bboxMinX, y: bboxMinY, w: bboxW, h: bboxH },
       });
 
+      // ===== Motion-sync guard (A + B) =====
+      // Live-`srcQuad` was locked BEFORE the burst window opened. The phone
+      // can drift up to ~240 ms worth of motion before bestFrame is chosen,
+      // which leaves the warp running on stale corners → skew/waves.
+      //
+      // A. Re-detect on bestFrame: independent detection (no preferQuad
+      //    bias) at the same DETECT_WIDTH scale used live.
+      // B. Motion-discard: if the new quad disagrees with the live quad by
+      //    more than ~2% of the short side, abort capture, drop the lock,
+      //    show "Håll stilla", and retry on the next stable hold.
+      const refineSource = bestFrame ?? video;
+      let baseSrcQuad: [Point, Point, Point, Point] = srcQuad;
+      const MOTION_DISCARD_FRACTION = 0.02; // of min(vw, vh)
+      const motionThresholdPx = MOTION_DISCARD_FRACTION * Math.min(vw, vh);
+      try {
+        const rdc = document.createElement("canvas");
+        const rdw = DETECT_WIDTH;
+        const rdh = Math.max(1, Math.round((vh / vw) * rdw));
+        rdc.width = rdw;
+        rdc.height = rdh;
+        const rdCtx = rdc.getContext("2d", { willReadFrequently: true })!;
+        rdCtx.drawImage(refineSource, 0, 0, rdw, rdh);
+        const rdData = rdCtx.getImageData(0, 0, rdw, rdh).data;
+        const reDet = detectDocumentQuad(rdData, rdw, rdh, { allowOverlay: false });
+        if (reDet && reDet.corners) {
+          const sx = vw / rdw;
+          const sy = vh / rdh;
+          const reQuadPx = reDet.corners.map((p) => ({
+            x: p.x * sx,
+            y: p.y * sy,
+          })) as [Point, Point, Point, Point];
+          const liveOrdered = orderQuad(srcQuad);
+          const reOrdered = orderQuad(reQuadPx);
+          let maxCornerDelta = 0;
+          for (let i = 0; i < 4; i++) {
+            const d = Math.hypot(
+              liveOrdered[i].x - reOrdered[i].x,
+              liveOrdered[i].y - reOrdered[i].y,
+            );
+            if (d > maxCornerDelta) maxCornerDelta = d;
+          }
+          const liveCx = (liveOrdered[0].x + liveOrdered[1].x + liveOrdered[2].x + liveOrdered[3].x) / 4;
+          const liveCy = (liveOrdered[0].y + liveOrdered[1].y + liveOrdered[2].y + liveOrdered[3].y) / 4;
+          const reCx = (reOrdered[0].x + reOrdered[1].x + reOrdered[2].x + reOrdered[3].x) / 4;
+          const reCy = (reOrdered[0].y + reOrdered[1].y + reOrdered[2].y + reOrdered[3].y) / 4;
+          const centroidDelta = Math.hypot(liveCx - reCx, liveCy - reCy);
+
+          logScanStage("motion-sync/redetect", {
+            applied: true,
+            maxCornerDeltaPx: +maxCornerDelta.toFixed(2),
+            centroidDeltaPx: +centroidDelta.toFixed(2),
+            thresholdPx: +motionThresholdPx.toFixed(2),
+            liveQuad: formatQuad(liveOrdered),
+            redetectedQuad: formatQuad(reOrdered),
+          });
+
+          if (maxCornerDelta > motionThresholdPx) {
+            // Motion-discard. Roll back to scanning state, prompt "Håll stilla".
+            logScanStage("motion-sync/discard", {
+              reason: "max-corner-delta-exceeds-threshold",
+              maxCornerDeltaPx: +maxCornerDelta.toFixed(2),
+              thresholdPx: +motionThresholdPx.toFixed(2),
+            });
+            if (stageTimerRef.current) {
+              window.clearTimeout(stageTimerRef.current);
+              stageTimerRef.current = null;
+            }
+            setCaptureStage(null);
+            capturedRef.current = false;
+            captureStableCount.current = 0;
+            stableCount.current = Math.max(0, stableCount.current - 4);
+            lockedRef.current = false;
+            setStatus("hold");
+            return;
+          }
+
+          // Accept the re-detected quad as the new base for downstream
+          // refine/snap/orient. The live quad is now known-stale.
+          baseSrcQuad = reOrdered;
+        } else {
+          logScanStage("motion-sync/redetect", {
+            applied: false,
+            reason: "no-detection-on-bestframe",
+          });
+        }
+      } catch (e) {
+        console.warn("[scan] motion-sync re-detect failed, keeping live quad", e);
+        logScanStage("motion-sync/redetect", { applied: false, reason: "exception" });
+      }
+
       // Subpixel corner refinement — nudgar hörnen ±5 px till full
       // videoupplösning. Nu PÅ som default vid capture (live-refine är
       // fortfarande av; det är bara capture-pathen som körs här).
       // Stäng av med ?refineCorners=0 för debugging.
       const refineCornersEnabled = urlParams.get("refineCorners") !== "0";
-      const refineSource = bestFrame ?? video;
-      let refinedSrcQuad = srcQuad;
+      let refinedSrcQuad = baseSrcQuad;
       if (refineCornersEnabled) {
         try {
-          refinedSrcQuad = refineQuadCorners(refineSource, vw, vh, srcQuad);
+          refinedSrcQuad = refineQuadCorners(refineSource, vw, vh, baseSrcQuad);
           logScanStage("subpixel-refine", {
             applied: true,
-            before: formatQuad(srcQuad),
+            before: formatQuad(baseSrcQuad),
             after: formatQuad(refinedSrcQuad),
           });
         } catch (e) {
