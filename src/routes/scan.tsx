@@ -1361,7 +1361,7 @@ function ScanPage() {
       else if (tilted) setStatus("tilt");
       else if (looseEdges) setStatus("align");
       else setStatus("hold");
-    } else if (captureStableCount.current < STABLE_FRAMES) {
+    } else if (captureStableCount.current < stableTarget) {
       drawOverlay(smoothed, "ready");
       setStatus("ready");
     } else {
