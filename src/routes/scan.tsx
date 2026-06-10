@@ -2625,6 +2625,23 @@ function ScanPage() {
 
   const statusActive = status === "ready" || status === "capturing" || status === "saved";
 
+  // A4 guide frame: visible only while user is still positioning the document.
+  // Fades out once detection is locking on (align/hold/ready/...).
+  const guideVisible =
+    status === "starting" ||
+    status === "searching" ||
+    status === "uncertain" ||
+    status === "tooFar" ||
+    status === "tooClose" ||
+    status === "moveBack" ||
+    status === "lowLight";
+  const guideHint =
+    status === "tooClose" || status === "moveBack"
+      ? t("guideFurther")
+      : status === "tooFar"
+        ? t("guideCloser")
+        : t("guidePlace");
+
   return (
     <div className="fixed inset-0 bg-black text-white flex flex-col">
       <div ref={containerRef} className="absolute inset-0">
@@ -2763,7 +2780,37 @@ function ScanPage() {
           ))}
         </svg>
 
+        {/* A4 framing guide — purely visual, never affects detection/capture/warp.
+            Centered, A4 aspect (1:√2), fades out once detection is locking on. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-[15] flex items-center justify-center px-8"
+          style={{
+            opacity: guideVisible ? 0.55 : 0,
+            transition: "opacity 320ms ease",
+          }}
+        >
+          <div
+            className="relative"
+            style={{
+              aspectRatio: "1 / 1.4142",
+              maxHeight: "78%",
+              width: "min(72%, calc(78vh / 1.4142))",
+              border: "1px solid rgba(255,255,255,0.55)",
+              borderRadius: 2,
+              boxShadow: "0 0 0 1px rgba(0,0,0,0.18)",
+            }}
+          >
+            <span
+              className="absolute left-1/2 -translate-x-1/2 -bottom-8 whitespace-nowrap rounded-full bg-black/45 px-3 py-1 text-[12px] font-medium text-white/90 backdrop-blur-sm"
+            >
+              {guideHint}
+            </span>
+          </div>
+        </div>
+
       </div>
+
 
       {/* Top bar */}
       <div className="relative pt-safe px-5 flex items-center justify-between">
