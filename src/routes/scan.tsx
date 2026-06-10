@@ -1161,22 +1161,39 @@ function ScanPage() {
       blurFramesRef.current++;
       // Soft regression: a single blurry frame shouldn't wipe ~0.3s of progress.
       stableCount.current = Math.max(0, stableCount.current - 2);
+      captureStableCount.current = Math.max(0, captureStableCount.current - 2);
     } else {
       blurFramesRef.current = 0;
     }
     if (!isBrightEnough) {
       // Soft regression — exposure metering naturally causes 1-2 dim frames.
       stableCount.current = Math.max(0, stableCount.current - 2);
+      captureStableCount.current = Math.max(0, captureStableCount.current - 2);
+    }
+
+    // ===== Update captureStableCount =====
+    // Visible-stability (stableCount) byggs upp så snart geometrin är
+    // konsekvent. Capture-stabiliteten kräver dessutom att detektionen
+    // är capture-grade: readyForCapture, skarp och tillräckligt ljus.
+    // Nollas direkt om readyForCapture flippar bort.
+    const captureCandidate = readyForCapture && isSharp && isBrightEnough;
+    if (!readyForCapture) {
+      captureStableCount.current = 0;
+    } else if (captureCandidate && delta < STABLE_DELTA) {
+      captureStableCount.current++;
+    } else {
+      captureStableCount.current = Math.max(0, captureStableCount.current - 1);
     }
 
     // Engage lock once we've reached the READY threshold with good conditions.
-    if (stableCount.current >= READY_FRAMES && isSharp && isBrightEnough) {
+    if (captureStableCount.current >= READY_FRAMES && isSharp && isBrightEnough) {
       lockedRef.current = true;
     }
 
-    // Progress 0..1 — fills up as the document stays stable, hits 1.0 right before capture.
-    const pct = Math.max(0, Math.min(1, stableCount.current / STABLE_FRAMES));
+    // Progress 0..1 — fills up as capture-stability builds, hits 1.0 right before capture.
+    const pct = Math.max(0, Math.min(1, captureStableCount.current / STABLE_FRAMES));
     setProgress(pct);
+
 
     if (detectCount.current < DETECT_FRAMES) {
       drawOverlay(smoothed, "search");
