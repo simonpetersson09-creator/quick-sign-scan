@@ -1533,6 +1533,7 @@ function ScanPage() {
     );
     if (a4Diff > A4_RATIO_TOLERANCE) {
       stableCount.current = 0;
+      captureStableCount.current = 0;
       lockedRef.current = false;
       setStatus("align");
       return;
