@@ -3529,11 +3529,6 @@ export function whitenBackground(canvas: HTMLCanvasElement): HTMLCanvasElement {
         or = lifted;
         og = lifted;
         ob = lifted;
-        if (lifted >= 218) {
-          or = 255;
-          og = 255;
-          ob = 255;
-        }
       }
 
       d[i] = or;
