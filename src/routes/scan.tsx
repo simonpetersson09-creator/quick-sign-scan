@@ -24,8 +24,7 @@ import {
   autoStraighten,
 
   grayWorldWhiteBalance,
-  boostInkContrast,
-  unsharpMaskText,
+  sharpenInk,
   cropToWhiteEdges,
   measureWarpQuadGeometry,
 } from "@/lib/perspective";
@@ -2034,29 +2033,37 @@ function ScanPage() {
             maxTopBottom: 0.02,
             maxLeftRight: 0.02,
           });
-          // Skala tillbaka till exakt A4 så aspect inte driftar och preview
-          // inte får letterbox-band uppe/nere. cropToWhiteEdges trimmar bara
-          // ren vit marginal, så att skala upp några procent är visuellt
-          // försumbart och bevarar A4-formen som warpen siktade på.
-          const a4 = document.createElement("canvas");
-          a4.width = TARGET_SHORT;
-          a4.height = TARGET_LONG;
-          const a4ctx = a4.getContext("2d");
-          if (a4ctx) {
-            a4ctx.imageSmoothingEnabled = true;
-            a4ctx.imageSmoothingQuality = "high";
-            a4ctx.drawImage(cropped, 0, 0, a4.width, a4.height);
-            warped = a4;
+          const didCrop = amount.top + amount.right + amount.bottom + amount.left > 0;
+          let rescaledToA4 = false;
+          if (didCrop) {
+            // Endast om vi faktiskt trimmade kanter behöver vi resampla tillbaka
+            // till exakt A4 så aspect inte driftar. Om ingen crop gjordes är
+            // bilden redan A4 från warpQuadToRect — en extra drawImage skulle
+            // bara introducera ett onödigt resample-steg som mjukar upp texten.
+            const a4 = document.createElement("canvas");
+            a4.width = TARGET_SHORT;
+            a4.height = TARGET_LONG;
+            const a4ctx = a4.getContext("2d");
+            if (a4ctx) {
+              a4ctx.imageSmoothingEnabled = true;
+              a4ctx.imageSmoothingQuality = "high";
+              a4ctx.drawImage(cropped, 0, 0, a4.width, a4.height);
+              warped = a4;
+              rescaledToA4 = true;
+            } else {
+              warped = cropped;
+            }
           } else {
             warped = cropped;
           }
           logScanStage("white-edge-crop", {
-            applied: amount.top + amount.right + amount.bottom + amount.left > 0,
+            applied: didCrop,
             cropped: amount,
             sizeAfter: { w: warped.width, h: warped.height },
-            rescaledToA4: Boolean(a4ctx),
+            rescaledToA4,
           });
           logScanCanvas("after-white-edge-crop", warped, debugEnabled);
+
         } catch (e) {
           console.warn("[scan] cropToWhiteEdges failed; continuing", e);
           logScanStage("white-edge-crop", { applied: false, reason: "exception" });
@@ -2080,7 +2087,7 @@ function ScanPage() {
           const result = autoStraighten(warped, {
             maxAngleDeg: 5,
             stepDeg: 0.25,
-            minApplyDeg: 0.3,
+            minApplyDeg: 0.6,
             targetWidth: 600,
             minConfidence: 1.08,
           });
@@ -2163,36 +2170,28 @@ function ScanPage() {
           console.warn("[scan] whitenBackground failed; keeping warped frame", e);
           logScanStage("whiten-background", { applied: false, reason: "exception" });
         }
-        // Gentle unsharp mask on luminance — sharpens text without colour
-        // fringing or noise amplification on the now-white paper.
-        try {
-          warped = unsharpMaskText(warped, { amount: 0.4, threshold: 4 });
-          logScanCanvas("after-unsharp-mask", warped, debugEnabled);
-          logScanStage("unsharp-mask", { applied: true, amount: 0.4, threshold: 4 });
-        } catch (e) {
-          console.warn("[scan] unsharpMaskText failed; continuing", e);
-          logScanStage("unsharp-mask", { applied: false, reason: "exception" });
+        // Sammanslagen sharpening: ett enda pass (sharpenInk) som ersätter
+        // tidigare unsharpMaskText + boostInkContrast. Samma 3x3 Gaussian
+        // body men gated till bläckpixlar (L<=150) med amount ≈ 0.45. Undviker
+        // dubbel sharpening/ringing/halos kring text som uppstod när båda
+        // passen tidigare träffade samma pixlar.
+        if (disableInkBoost) {
+          logScanStage("sharpen-ink", {
+            applied: false,
+            reason: rawWarpOnly ? "raw-warp-only" : "feature-flag",
+          });
+        } else {
+          try {
+            warped = sharpenInk(warped, { amount: 0.45, threshold: 4, inkGate: 150 });
+            logScanCanvas("after-sharpen-ink", warped, debugEnabled);
+            logScanStage("sharpen-ink", { applied: true, amount: 0.45, inkGate: 150 });
+          } catch (e) {
+            console.warn("[scan] sharpenInk failed; keeping previous frame", e);
+            logScanStage("sharpen-ink", { applied: false, reason: "exception" });
+          }
         }
       }
 
-      // Local ink-contrast boost — mild unsharp mask gated to dark pixels
-      // (L<=150). Sharpens thin/light text (footers, body 8–9pt) without
-      // amplifying background sensor noise on the now-white paper.
-      if (disableInkBoost) {
-        logScanStage("ink-boost", {
-          applied: false,
-          reason: rawWarpOnly ? "raw-warp-only" : "feature-flag",
-        });
-      } else {
-        try {
-          warped = boostInkContrast(warped);
-          logScanCanvas("after-ink-boost", warped, debugEnabled);
-          logScanStage("ink-boost", { applied: true });
-        } catch (e) {
-          console.warn("[scan] boostInkContrast failed; keeping previous frame", e);
-          logScanStage("ink-boost", { applied: false, reason: "exception" });
-        }
-      }
 
       // Post-capture sharpness gate. If the warped doc is blurry we abandon
       // this capture and let auto-focus retry — better to wait a second
@@ -2327,14 +2326,9 @@ function ScanPage() {
       console.warn("[scan] manual fallback: whitenBackground failed", e);
     }
     try {
-      canvas = unsharpMaskText(canvas, { amount: 0.4, threshold: 4 });
+      canvas = sharpenInk(canvas, { amount: 0.45, threshold: 4, inkGate: 150 });
     } catch (e) {
-      console.warn("[scan] manual fallback: unsharpMaskText failed", e);
-    }
-    try {
-      canvas = boostInkContrast(canvas);
-    } catch (e) {
-      console.warn("[scan] manual fallback: boostInkContrast failed", e);
+      console.warn("[scan] manual fallback: sharpenInk failed", e);
     }
 
     const dataUrl = canvasToSafeImageDataUrl(canvas, 0.92);
