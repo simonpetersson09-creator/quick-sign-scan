@@ -641,12 +641,20 @@ function ScanPage() {
           // detection / capture. Without this, the first ticks of the RAF
           // loop hit a 0x0 video and we draw a blank canvas.
           const waitReady = new Promise<void>((resolve) => {
-            if (videoEl.readyState >= 2 && videoEl.videoWidth > 0) {
+            if (
+              videoEl.readyState >= 2 &&
+              videoEl.videoWidth > 0 &&
+              videoEl.videoHeight > 0
+            ) {
               resolve();
               return;
             }
             const onReady = () => {
-              if (videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
+              if (
+                videoEl.readyState >= 2 &&
+                videoEl.videoWidth > 0 &&
+                videoEl.videoHeight > 0
+              ) {
                 videoEl.removeEventListener("loadedmetadata", onReady);
                 videoEl.removeEventListener("canplay", onReady);
                 resolve();
@@ -663,12 +671,43 @@ function ScanPage() {
           // Race readiness against a short timeout — if metadata never arrives
           // we still let detect() bail safely on its own readyState check.
           await Promise.race([waitReady, new Promise<void>((r) => setTimeout(r, 4000))]);
+          // Wait for the FIRST actually decoded frame before flipping
+          // cameraReady. Without this the <video> can briefly render the
+          // default 300x150 intrinsic size (object-cover then makes that look
+          // zoomed-in) and on iOS Safari the first preview frame is often
+          // delivered at a lower resolution than the negotiated stream.
+          // requestVideoFrameCallback guarantees a real composited frame.
+          await new Promise<void>((resolve) => {
+            const vEl = videoEl as HTMLVideoElement & {
+              requestVideoFrameCallback?: (cb: () => void) => number;
+            };
+            let done = false;
+            const finish = () => {
+              if (done) return;
+              done = true;
+              resolve();
+            };
+            if (typeof vEl.requestVideoFrameCallback === "function") {
+              vEl.requestVideoFrameCallback(() => finish());
+              // Safety net: don't block start forever if rVFC never fires.
+              setTimeout(finish, 1500);
+            } else {
+              // Fallback: rAF + small timeout to let the compositor paint
+              // at least one real frame.
+              requestAnimationFrame(() => setTimeout(finish, 50));
+              setTimeout(finish, 1500);
+            }
+          });
           if (isStaleStart()) {
             stopDetachedVideoStream(stream, "startCamera-cancelled-after-video-ready");
             streamRef.current = null;
             return;
           }
-          setCameraReady(videoEl.videoWidth > 0 && videoEl.videoHeight > 0);
+          setCameraReady(
+            videoEl.readyState >= 2 &&
+              videoEl.videoWidth > 0 &&
+              videoEl.videoHeight > 0,
+          );
         }
         if (isStaleStart()) {
           stopDetachedVideoStream(stream, "startCamera-cancelled-before-loop");
