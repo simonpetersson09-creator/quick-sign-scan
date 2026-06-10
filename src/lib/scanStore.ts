@@ -48,6 +48,7 @@ export interface ScanSession {
   pdfDataUrl: string | null;
   signatureDataUrl: string | null;
   signaturePosition: { x: number; y: number } | null; // normalized 0..1
+  signaturePageIndex: number | null; // which page the signature is placed on
   /** Per-stage thumbnails from the last capture, when ?stagedump=1 is on. */
   debugStages: ScanDebugStage[] | null;
 }
@@ -61,6 +62,7 @@ function createInitial(): ScanSession {
     pdfDataUrl: null,
     signatureDataUrl: null,
     signaturePosition: null,
+    signaturePageIndex: null,
     debugStages: null,
   };
 }
