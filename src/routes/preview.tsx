@@ -287,6 +287,7 @@ function PreviewPage() {
   }
 
   function addPage() {
+    requestMotionPermissionFromGesture();
     navigate({ to: "/scan" });
   }
 
