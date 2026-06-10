@@ -1899,7 +1899,18 @@ function ScanPage() {
             captureStableCount.current = 0;
             stableCount.current = Math.max(0, stableCount.current - 4);
             lockedRef.current = false;
-            setStatus("hold");
+            // Force the progress bar back down immediately so the UI doesn't
+            // sit at 100 % while we wait for the next processFrame tick.
+            setProgress(0);
+            // 450 ms cooldown: capture-stability cannot accumulate and
+            // auto-capture cannot fire during this window. Prevents the
+            // exact-same frame from re-triggering capture and gives the
+            // user a moment to actually steady the phone.
+            captureCooldownUntilRef.current = performance.now() + 450;
+            // Use "align" rather than "hold": "hold" reads as "we're about
+            // to capture", but we just rejected a capture. processFrame will
+            // recompute the correct status on the next tick anyway.
+            setStatus("align");
             return;
           }
 
