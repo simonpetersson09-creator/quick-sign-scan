@@ -1262,7 +1262,7 @@ function ScanPage() {
     if (!isBrightEnough && lowLightFramesRef.current > 15) {
       drawOverlay(smoothed, "hold");
       setStatus("lowLight");
-    } else if (stableCount.current < HOLD_FRAMES) {
+    } else if (captureStableCount.current < HOLD_FRAMES) {
       drawOverlay(smoothed, "hold");
       // While the user is still framing, prefer the most actionable hint.
       if (tooFar) setStatus("tooFar");
@@ -1272,7 +1272,7 @@ function ScanPage() {
     } else if (!isSharp) {
       drawOverlay(smoothed, "hold");
       setStatus(blurFramesRef.current > BLUR_HINT_FRAMES ? "moveBack" : "focusing");
-    } else if (stableCount.current < READY_FRAMES) {
+    } else if (captureStableCount.current < READY_FRAMES) {
       drawOverlay(smoothed, "hold");
       // Even when motion is stable, surface a framing problem before
       // the user keeps holding the phone for nothing.
@@ -1281,7 +1281,7 @@ function ScanPage() {
       else if (tilted) setStatus("tilt");
       else if (looseEdges) setStatus("align");
       else setStatus("hold");
-    } else if (stableCount.current < STABLE_FRAMES) {
+    } else if (captureStableCount.current < STABLE_FRAMES) {
       drawOverlay(smoothed, "ready");
       setStatus("ready");
     } else {
