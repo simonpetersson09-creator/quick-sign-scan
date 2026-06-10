@@ -189,11 +189,11 @@ function PlacePage() {
   }
 
   function goSign() {
-    scanStore.set({ signaturePosition: sigPos });
+    scanStore.set({ signaturePosition: sigPos, signaturePageIndex: pageIndex });
     navigate({ to: "/sign" });
   }
   function goSend() {
-    scanStore.set({ signatureDataUrl: null, signaturePosition: null });
+    scanStore.set({ signatureDataUrl: null, signaturePosition: null, signaturePageIndex: null });
     navigate({ to: "/review" });
   }
 
