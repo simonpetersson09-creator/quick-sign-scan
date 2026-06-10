@@ -2172,36 +2172,28 @@ function ScanPage() {
           console.warn("[scan] whitenBackground failed; keeping warped frame", e);
           logScanStage("whiten-background", { applied: false, reason: "exception" });
         }
-        // Gentle unsharp mask on luminance — sharpens text without colour
-        // fringing or noise amplification on the now-white paper.
-        try {
-          warped = unsharpMaskText(warped, { amount: 0.4, threshold: 4 });
-          logScanCanvas("after-unsharp-mask", warped, debugEnabled);
-          logScanStage("unsharp-mask", { applied: true, amount: 0.4, threshold: 4 });
-        } catch (e) {
-          console.warn("[scan] unsharpMaskText failed; continuing", e);
-          logScanStage("unsharp-mask", { applied: false, reason: "exception" });
+        // Sammanslagen sharpening: ett enda pass (sharpenInk) som ersätter
+        // tidigare unsharpMaskText + boostInkContrast. Samma 3x3 Gaussian
+        // body men gated till bläckpixlar (L<=150) med amount ≈ 0.45. Undviker
+        // dubbel sharpening/ringing/halos kring text som uppstod när båda
+        // passen tidigare träffade samma pixlar.
+        if (disableInkBoost) {
+          logScanStage("sharpen-ink", {
+            applied: false,
+            reason: rawWarpOnly ? "raw-warp-only" : "feature-flag",
+          });
+        } else {
+          try {
+            warped = sharpenInk(warped, { amount: 0.45, threshold: 4, inkGate: 150 });
+            logScanCanvas("after-sharpen-ink", warped, debugEnabled);
+            logScanStage("sharpen-ink", { applied: true, amount: 0.45, inkGate: 150 });
+          } catch (e) {
+            console.warn("[scan] sharpenInk failed; keeping previous frame", e);
+            logScanStage("sharpen-ink", { applied: false, reason: "exception" });
+          }
         }
       }
 
-      // Local ink-contrast boost — mild unsharp mask gated to dark pixels
-      // (L<=150). Sharpens thin/light text (footers, body 8–9pt) without
-      // amplifying background sensor noise on the now-white paper.
-      if (disableInkBoost) {
-        logScanStage("ink-boost", {
-          applied: false,
-          reason: rawWarpOnly ? "raw-warp-only" : "feature-flag",
-        });
-      } else {
-        try {
-          warped = boostInkContrast(warped);
-          logScanCanvas("after-ink-boost", warped, debugEnabled);
-          logScanStage("ink-boost", { applied: true });
-        } catch (e) {
-          console.warn("[scan] boostInkContrast failed; keeping previous frame", e);
-          logScanStage("ink-boost", { applied: false, reason: "exception" });
-        }
-      }
 
       // Post-capture sharpness gate. If the warped doc is blurry we abandon
       // this capture and let auto-focus retry — better to wait a second
