@@ -2089,7 +2089,7 @@ function ScanPage() {
           const result = autoStraighten(warped, {
             maxAngleDeg: 5,
             stepDeg: 0.25,
-            minApplyDeg: 0.3,
+            minApplyDeg: 0.6,
             targetWidth: 600,
             minConfidence: 1.08,
           });
