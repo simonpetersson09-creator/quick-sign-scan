@@ -225,7 +225,7 @@ function PlacePage() {
           style={{ height: "100%", maxWidth: "min(82vw, 360px)" }}
         >
           <div
-            className="relative max-h-full max-w-full"
+            className="relative h-full"
             style={{
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
               transformOrigin: "center center",
@@ -235,7 +235,7 @@ function PlacePage() {
             <img
               src={image}
               alt={t("scannedAlt")}
-              className="block max-h-full max-w-full w-auto h-auto object-contain pointer-events-none"
+              className="block h-full w-auto object-contain pointer-events-none"
               draggable={false}
             />
             <div
