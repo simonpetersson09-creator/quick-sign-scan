@@ -1252,7 +1252,13 @@ function ScanPage() {
     // är capture-grade: readyForCapture, skarp och tillräckligt ljus.
     // Nollas direkt om readyForCapture flippar bort.
     const captureCandidate = readyForCapture && isSharp && isBrightEnough;
-    if (!readyForCapture) {
+    const inCaptureCooldown = now < captureCooldownUntilRef.current;
+    if (inCaptureCooldown) {
+      // Post-discard cooldown: progress must visibly drop and the user must
+      // produce a fresh stable hold before we can fire again.
+      captureStableCount.current = 0;
+      lockedRef.current = false;
+    } else if (!readyForCapture) {
       captureStableCount.current = 0;
     } else if (captureCandidate && delta < STABLE_DELTA) {
       captureStableCount.current++;
