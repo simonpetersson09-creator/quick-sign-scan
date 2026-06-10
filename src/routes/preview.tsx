@@ -360,7 +360,7 @@ function PreviewPage() {
       <div className="flex-1 min-h-0 flex items-center justify-center">
         <div
           className="relative flex items-center justify-center min-h-0 h-full"
-          style={{ width: "min(96vw, 520px)" }}
+          style={{ width: "min(92vw, 440px)" }}
         >
           {pages.length > 1 && (
             <button
@@ -379,7 +379,7 @@ function PreviewPage() {
           )}
           <div
             className="relative rounded-2xl overflow-hidden border border-border bg-muted/30 p-3 flex items-center justify-center"
-            style={{ height: "100%", maxWidth: "min(92vw, 480px)" }}
+            style={{ height: "100%", maxWidth: "min(82vw, 360px)" }}
           >
             <img
               src={displayUrl ?? originalImage}
