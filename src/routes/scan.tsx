@@ -1417,7 +1417,7 @@ function ScanPage() {
       } else if (isShaky) {
         // Phone is moving — keep "ready" but don't auto-capture this frame.
         setStatus("ready");
-        captureStableCount.current = Math.min(captureStableCount.current, STABLE_FRAMES - 1);
+        captureStableCount.current = Math.min(captureStableCount.current, stableTarget - 1);
         if (captureGateRef.current) captureGateRef.current.reason = "motion";
       } else if (ambiguous) {
         // Competing candidates — wait for one to win.
