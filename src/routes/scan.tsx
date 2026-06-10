@@ -2303,6 +2303,7 @@ function ScanPage() {
 
     // Reset detection state so auto-capture starts fresh for the next page.
     stableCount.current = 0;
+    captureStableCount.current = 0;
     detectCount.current = 0;
     missCount.current = 0;
     smoothQuad.current = null;
