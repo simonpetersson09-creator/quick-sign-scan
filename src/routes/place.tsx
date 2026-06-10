@@ -221,8 +221,8 @@ function PlacePage() {
           onPointerMove={onMove}
           onPointerUp={onUp}
           onPointerCancel={onUp}
-          className="relative overflow-hidden touch-none select-none"
-          style={{ height: "100%", width: "auto", aspectRatio: "1 / 1.414", maxWidth: "min(82vw, 360px)" }}
+          className="relative overflow-hidden touch-none select-none p-3 flex items-center justify-center"
+          style={{ height: "100%", maxWidth: "min(82vw, 360px)" }}
         >
           <div
             className="absolute inset-0 p-3"
