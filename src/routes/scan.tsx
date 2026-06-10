@@ -1318,7 +1318,7 @@ function ScanPage() {
     else if (captureStableCount.current < HOLD_FRAMES) captureBlockedBy = "stability:framing";
     else if (!isSharp) captureBlockedBy = "sharpness";
     else if (captureStableCount.current < READY_FRAMES) captureBlockedBy = "stability:ready";
-    else if (captureStableCount.current < STABLE_FRAMES) captureBlockedBy = "stability:stable";
+    else if (captureStableCount.current < stableTarget) captureBlockedBy = "stability:stable";
     else if (cooldownMs > 0) captureBlockedBy = "cooldown";
     else if (isShakyNow) captureBlockedBy = "motion";
     // "ambiguous" is filled in below once it's computed.
