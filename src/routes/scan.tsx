@@ -323,6 +323,11 @@ function ScanPage() {
   const detectCount = useRef(0);
   const missCount = useRef(0);
   const capturedRef = useRef(false);
+  // Cooldown timestamp (performance.now ms). While now() < cooldown, capture
+  // stability cannot accumulate and auto-capture cannot fire. Set after a
+  // motion-discard so the next stable hold actually re-verifies stillness
+  // instead of re-triggering capture in the same frame.
+  const captureCooldownUntilRef = useRef(0);
   const sharpnessRef = useRef(0);
   const blurFramesRef = useRef(0);
   const captureRetryRef = useRef(0);
