@@ -21,7 +21,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Palette,
-  Contrast,
+  
   Circle,
   Loader2,
 } from "lucide-react";
