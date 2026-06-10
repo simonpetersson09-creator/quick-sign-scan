@@ -1117,7 +1117,7 @@ const ENABLE_PAPER_INTERIOR_PRIOR = false;
 // "line-segment + intersection" pattern Office Lens / VisionKit use.
 // Pure addition — the generated quads are evaluated by evaluateEdgeQuad
 // alongside the contour-based candidates, never replace them.
-const ENABLE_HOUGH_LINE_DETECTION = true;
+const ENABLE_HOUGH_LINE_DETECTION = false;
 const HOUGH_THETA_STEP_DEG = 1.5;     // ~120 angle bins over 0..180°
 const HOUGH_RHO_STEP_PX = 2;          // 2px rho quantization
 const HOUGH_TOP_LINES_PER_SIDE = 3;   // pick top-3 per top/bottom/left/right
