@@ -2470,25 +2470,48 @@ function ScanPage() {
           disablePictureInPicture
           onLoadedMetadata={(e) => {
             const v = e.currentTarget;
-            if (v.videoWidth > 0 && v.videoHeight > 0) {
-              setCameraReady(true);
-              if (debugEnabled) {
-                setDebugInfo((d) => ({
-                  ...d,
-                  vw: v.videoWidth,
-                  vh: v.videoHeight,
-                  dpr: window.devicePixelRatio || 1,
-                  ready: true,
-                }));
-              }
+            if (debugEnabled && v.videoWidth > 0 && v.videoHeight > 0) {
+              setDebugInfo((d) => ({
+                ...d,
+                vw: v.videoWidth,
+                vh: v.videoHeight,
+                dpr: window.devicePixelRatio || 1,
+                ready: true,
+              }));
             }
           }}
           onCanPlay={(e) => {
-            const v = e.currentTarget;
-            if (v.videoWidth > 0 && v.videoHeight > 0) setCameraReady(true);
+            // Belt-and-suspenders: if startCamera's frame-await path was
+            // skipped (e.g. stream re-attached), still wait for the first
+            // real composited frame before revealing the video.
+            const v = e.currentTarget as HTMLVideoElement & {
+              requestVideoFrameCallback?: (cb: () => void) => number;
+            };
+            if (v.videoWidth <= 0 || v.videoHeight <= 0 || v.readyState < 2) return;
+            const reveal = () => {
+              if (v.videoWidth > 0 && v.videoHeight > 0 && v.readyState >= 2) {
+                setCameraReady(true);
+              }
+            };
+            if (typeof v.requestVideoFrameCallback === "function") {
+              v.requestVideoFrameCallback(() => reveal());
+            } else {
+              requestAnimationFrame(() => setTimeout(reveal, 50));
+            }
           }}
-          className="absolute inset-0 w-full h-full object-cover"
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-150 ${
+            cameraReady ? "opacity-100" : "opacity-0"
+          }`}
         />
+        {/* Black placeholder with spinner shown while the camera stream
+            negotiates dimensions and decodes its first real frame. Without
+            this the <video> would briefly render its default 300x150
+            intrinsic size and object-cover would make that look zoomed-in. */}
+        {!cameraReady && (
+          <div className="absolute inset-0 z-[1] flex items-center justify-center bg-black">
+            <Loader2 className="h-8 w-8 animate-spin text-white/70" />
+          </div>
+        )}
         <div className="absolute inset-0 bg-black/20 pointer-events-none" />
         {/* Tap-to-cancel layer — only catches taps during ready countdown so user can abort auto-capture */}
         {status === "ready" && (
