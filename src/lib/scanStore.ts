@@ -229,7 +229,15 @@ function createPreviewHandoffPayload(pages: string[], activeIndex: number) {
   const safePages = pages.filter(isUsablePreviewPage);
   if (!safePages.length) return null;
   const safeActiveIndex = Math.max(0, Math.min(safePages.length - 1, activeIndex));
-  const payload = JSON.stringify({ pages: safePages, activeIndex: safeActiveIndex, createdAt: Date.now() });
+  // Include the signature so a reload between /sign and /review or /send
+  // doesn't silently drop it (pages used to be the only thing recovered).
+  const payload = JSON.stringify({
+    pages: safePages,
+    activeIndex: safeActiveIndex,
+    createdAt: Date.now(),
+    signatureDataUrl: bag.state.signatureDataUrl ?? null,
+    signaturePosition: bag.state.signaturePosition ?? null,
+  });
   return { safePages, safeActiveIndex, payload };
 }
 
@@ -301,7 +309,12 @@ export const scanStore = {
   set: (patch: Partial<ScanSession>) => {
     bag.state = { ...bag.state, ...patch };
     const pages = sessionPages(bag.state);
-    if (pages.length && ("pages" in patch || "imageDataUrl" in patch)) {
+    const touchesHandoff =
+      "pages" in patch ||
+      "imageDataUrl" in patch ||
+      "signatureDataUrl" in patch ||
+      "signaturePosition" in patch;
+    if (pages.length && touchesHandoff) {
       const activeIndex = bag.state.imageDataUrl
         ? Math.max(0, pages.indexOf(bag.state.imageDataUrl))
         : pages.length - 1;
