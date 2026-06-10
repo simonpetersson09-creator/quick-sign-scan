@@ -543,6 +543,7 @@ function ReviewPage() {
           <ArrowLeft className="h-3.5 w-3.5" /> {t("backToSign")}
         </button>
       </div>
+      </div>
     </AppShell>
   );
 }
