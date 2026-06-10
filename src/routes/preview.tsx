@@ -359,7 +359,7 @@ function PreviewPage() {
   }
   return (
     <AppShell title={t("previewTitle")} back="/scan" className="h-dvh overflow-hidden">
-      <p className="text-sm text-muted-foreground mt-1 mb-3">
+      <p className="text-sm text-muted-foreground mt-1 mb-3 text-center">
         {pages.length} {pages.length === 1 ? t("pageSingular") : t("pagePlural")} ·{" "}
         {t("previewHint")}
       </p>
