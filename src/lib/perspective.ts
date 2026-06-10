@@ -3566,7 +3566,7 @@ export function whitenBackground(canvas: HTMLCanvasElement): HTMLCanvasElement {
     const L = postLum[j];
     if (L < 128 || L >= 238) continue;
     const detail = Math.abs(L - blurLum[j]);
-    if (detail > 7) continue;
+    if (detail > 4) continue;
     const r = d[i];
     const g = d[i + 1];
     const b = d[i + 2];
@@ -3576,7 +3576,7 @@ export function whitenBackground(canvas: HTMLCanvasElement): HTMLCanvasElement {
     if (sat > 24) continue;
     const detailProtect = 1 - detail / 8;
     const satProtect = 1 - sat / 25;
-    const strength = 0.72 * detailProtect * satProtect;
+    const strength = 0.35 * detailProtect * satProtect;
     const lift = (255 - L) * strength;
     d[i] = Math.min(255, r + lift);
     d[i + 1] = Math.min(255, g + lift);
