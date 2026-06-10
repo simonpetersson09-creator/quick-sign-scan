@@ -2625,6 +2625,23 @@ function ScanPage() {
 
   const statusActive = status === "ready" || status === "capturing" || status === "saved";
 
+  // A4 guide frame: visible only while user is still positioning the document.
+  // Fades out once detection is locking on (align/hold/ready/...).
+  const guideVisible =
+    status === "starting" ||
+    status === "searching" ||
+    status === "uncertain" ||
+    status === "tooFar" ||
+    status === "tooClose" ||
+    status === "moveBack" ||
+    status === "lowLight";
+  const guideHint =
+    status === "tooClose" || status === "moveBack"
+      ? t("guideFurther")
+      : status === "tooFar"
+        ? t("guideCloser")
+        : t("guidePlace");
+
   return (
     <div className="fixed inset-0 bg-black text-white flex flex-col">
       <div ref={containerRef} className="absolute inset-0">
