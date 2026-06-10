@@ -1325,7 +1325,7 @@ function ScanPage() {
     captureGateRef.current = {
       reason: captureBlockedBy,
       stable: captureStableCount.current,
-      stableTarget: STABLE_FRAMES,
+      stableTarget,
       sharpness: sharpnessRef.current,
       sharpnessMin: SHARPNESS_LIVE_MIN,
       brightness: brightnessRef.current,
