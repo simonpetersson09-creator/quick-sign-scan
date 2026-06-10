@@ -13,10 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Mail,
-  Maximize2,
-  Minus,
   PenLine,
-  Plus,
 } from "lucide-react";
 
 export const Route = createFileRoute("/review")({
