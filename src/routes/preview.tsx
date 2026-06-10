@@ -21,7 +21,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Palette,
-  Contrast,
+  
   Circle,
   Loader2,
 } from "lucide-react";
@@ -326,7 +326,6 @@ function PreviewPage() {
     () => [
       { mode: "color", label: t("filterColor"), Icon: Palette },
       { mode: "gray", label: t("filterGray"), Icon: Circle },
-      { mode: "bw", label: t("filterBw"), Icon: Contrast },
     ],
     [t],
   );
