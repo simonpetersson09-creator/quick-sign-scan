@@ -338,7 +338,7 @@ function ReviewPage() {
     navigate({ to: "/send" });
   }
 
-  const isLastPage = pageIdx === pages.length - 1;
+  const isSigPage = sigPageIndex != null ? pageIdx === sigPageIndex : pageIdx === pages.length - 1;
   const currentImg = pages[pageIdx];
 
   return (
@@ -387,7 +387,7 @@ function ReviewPage() {
                   draggable={false}
                 />
               )}
-              {isLastPage && sigDataUrl && sigPos && (
+              {isSigPage && sigDataUrl && sigPos && (
                 <div
                   onPointerDown={onSigDown}
                   onPointerMove={onSigMove}
