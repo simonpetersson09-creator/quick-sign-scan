@@ -947,6 +947,7 @@ function ScanPage() {
 
     if (!corners) {
       stableCount.current = 0;
+      captureStableCount.current = 0;
       detectCount.current = Math.max(0, detectCount.current - 1);
       detectionMeta.current = null;
       missCount.current++;
