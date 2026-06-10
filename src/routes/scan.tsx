@@ -26,6 +26,7 @@ import {
   grayWorldWhiteBalance,
   boostInkContrast,
   unsharpMaskText,
+  sharpenInk,
   cropToWhiteEdges,
   measureWarpQuadGeometry,
 } from "@/lib/perspective";
