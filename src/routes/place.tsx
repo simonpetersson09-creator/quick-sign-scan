@@ -205,8 +205,11 @@ function PlacePage() {
   return (
     <AppShell title={t("placeTitle")} back="/preview">
       <p className="text-sm text-muted-foreground mt-1 mb-3">{t("placeHint")}</p>
-      <div className="flex-1 flex flex-col items-center justify-center gap-3 min-h-0">
-        <div className="relative flex items-center justify-center shrink-0" style={{ width: "min(92vw, 440px)", height: "var(--doc-box-h)" }}>
+      <div
+        className="flex-1 flex flex-col items-center justify-center gap-3 min-h-0"
+        style={{ ["--doc-box-h" as string]: "min(calc(min(70vw, 300px) * 1.45), calc(100dvh - 26rem))" }}
+      >
+        <div className="relative flex items-center justify-center shrink-0" style={{ width: "min(78vw, 360px)", height: "var(--doc-box-h)" }}>
           {pages.length > 1 && (
             <button
               type="button"
@@ -225,13 +228,13 @@ function PlacePage() {
           onPointerUp={onUp}
           onPointerCancel={onUp}
           className="relative overflow-hidden touch-none select-none p-3 flex items-center justify-center"
-          style={{ height: "100%", maxWidth: "min(82vw, 360px)" }}
+          style={{ height: "100%", maxWidth: "min(70vw, 300px)" }}
         >
           <div
             className="relative"
             style={{
-              width: `min(calc(min(82vw, 360px) - 1.5rem), calc((var(--doc-box-h) - 1.5rem) * ${imgRatio}))`,
-              height: `min(calc(var(--doc-box-h) - 1.5rem), calc((min(82vw, 360px) - 1.5rem) / ${imgRatio}))`,
+              width: `min(calc(min(70vw, 300px) - 1.5rem), calc((var(--doc-box-h) - 1.5rem) * ${imgRatio}))`,
+              height: `min(calc(var(--doc-box-h) - 1.5rem), calc((min(70vw, 300px) - 1.5rem) / ${imgRatio}))`,
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
               transformOrigin: "center center",
               transition: pointer.current.id === null ? "transform 120ms ease" : "none",
