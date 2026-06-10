@@ -1911,6 +1911,13 @@ function ScanPage() {
             // to capture", but we just rejected a capture. processFrame will
             // recompute the correct status on the next tick anyway.
             setStatus("align");
+            // CRITICAL: re-arm the RAF loop. capture() set capturedRef=true
+            // which caused tick() to stop re-scheduling itself (see loop()).
+            // Without this, detect() never runs again, overlay/status freeze,
+            // and recovery is impossible without a manual interaction.
+            if (rafRef.current) cancelAnimationFrame(rafRef.current);
+            rafRef.current = null;
+            loop();
             return;
           }
 
