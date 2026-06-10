@@ -2746,7 +2746,7 @@ function ScanPage() {
             );
           })()}
           <div>
-            detect: {detectCount.current} / stable: {stableCount.current}
+            detect: {detectCount.current} / vis: {stableCount.current} / cap: {captureStableCount.current}
           </div>
           <div>conf: {detectionMeta.current?.confidence?.toFixed(2) ?? "—"}</div>
           <div>
