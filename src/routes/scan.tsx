@@ -767,10 +767,14 @@ function ScanPage() {
     cancelledRef.current = false;
     startCamera();
 
-    // Listen to device motion as a stillness signal. iOS 13+ requires an
-    // explicit permission request (gated behind a user gesture) — we ask
-    // once on mount and silently fall back if denied; the scanner still
-    // works without gyro data, just without this extra gate.
+    // Listen to device motion as a stillness signal. iOS 13+ requires
+    // DeviceMotionEvent.requestPermission() to be invoked synchronously
+    // inside a user gesture. The "Skanna dokument" entry buttons call
+    // requestMotionPermissionFromGesture() on click; here we only attach
+    // the listener if permission is (or will be) granted. If permission
+    // is denied, missing, or unsupported, motionAvailableRef stays false
+    // and detect() falls back to stricter visual stability gates — we
+    // never block scanning over a missing motion sensor.
     const onMotion = (e: DeviceMotionEvent) => {
       const a = e.acceleration ?? e.accelerationIncludingGravity;
       if (!a) return;
@@ -780,21 +784,45 @@ function ScanPage() {
       // sustained calm wins quickly.
       motionMagRef.current = motionMagRef.current * 0.7 + mag * 0.3;
     };
-    type IOSMotionEvent = typeof DeviceMotionEvent & {
-      requestPermission?: () => Promise<"granted" | "denied">;
-    };
-    const dme = (typeof DeviceMotionEvent !== "undefined"
-      ? (DeviceMotionEvent as IOSMotionEvent)
-      : null);
-    if (dme?.requestPermission) {
-      dme.requestPermission()
-        .then((res) => {
-          if (res === "granted") window.addEventListener("devicemotion", onMotion);
-        })
-        .catch(() => {});
-    } else if (typeof window !== "undefined" && "DeviceMotionEvent" in window) {
+    let motionAttached = false;
+    const attachMotion = () => {
+      if (motionAttached) return;
+      motionAttached = true;
       window.addEventListener("devicemotion", onMotion);
+    };
+    const state = getMotionPermissionState();
+    if (state === "granted") {
+      attachMotion();
+    } else if (state === "pending") {
+      // A click handler already kicked off the iOS prompt — poll briefly
+      // and attach once the user accepts. No-op if they deny.
+      const start = performance.now();
+      const poll = window.setInterval(() => {
+        const s = getMotionPermissionState();
+        if (s === "granted") {
+          window.clearInterval(poll);
+          attachMotion();
+        } else if (s !== "pending" || performance.now() - start > 8000) {
+          window.clearInterval(poll);
+        }
+      }, 250);
+    } else if (state === "unknown") {
+      // Last-ditch best-effort: try requesting now. On iOS without a
+      // gesture this resolves to "denied" silently — the fallback path
+      // in detect() handles that case gracefully.
+      requestMotionPermissionFromGesture();
+      const start = performance.now();
+      const poll = window.setInterval(() => {
+        const s = getMotionPermissionState();
+        if (s === "granted") {
+          window.clearInterval(poll);
+          attachMotion();
+        } else if (s !== "pending" || performance.now() - start > 4000) {
+          window.clearInterval(poll);
+        }
+      }, 250);
     }
+    // state === "denied" or "unsupported": skip — fallback gates handle it.
 
     return () => {
       cancelledRef.current = true;
