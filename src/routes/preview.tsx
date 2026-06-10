@@ -5,6 +5,7 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore, type ScanDebugStage } from "@/lib/scanStore";
 import { useT } from "@/lib/i18n";
 import { applyFilter, type FilterMode } from "@/lib/imageFilters";
+import { requestMotionPermissionFromGesture } from "@/lib/motion-permission";
 import {
   analyzeDocumentQuality,
   type QualityIssue,
