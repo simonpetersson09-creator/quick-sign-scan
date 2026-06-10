@@ -2907,7 +2907,7 @@ function ScanPage() {
           }}
         >
           <div
-            className="relative overflow-hidden rounded-xl bg-white shadow-2xl"
+            className="relative overflow-hidden bg-white shadow-2xl"
             style={{
               width: "min(70vw, 280px)",
               aspectRatio: "1 / 1.4142",
