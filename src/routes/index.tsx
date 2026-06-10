@@ -6,6 +6,7 @@ import { scanStore } from "@/lib/scanStore";
 import { pdfFileToImages } from "@/lib/pdfToImages";
 import { usePremium, useUsage } from "@/hooks/usePremium";
 import { WelcomeCard } from "@/components/WelcomeCard";
+import { requestMotionPermissionFromGesture } from "@/lib/motion-permission";
 
 const MAX_PDF_PAGES = 20;
 
