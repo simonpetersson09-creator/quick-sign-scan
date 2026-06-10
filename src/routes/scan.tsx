@@ -308,7 +308,15 @@ function ScanPage() {
   };
   const candidateHistoryRef = useRef<CandidateEntry[]>([]);
   const ambiguousFramesRef = useRef(0);
-  const stableCount = useRef(0);
+  // visibleStableCount: progressbar för geometriskt rimlig kandidat. Får
+  // växa även när strikta capture-gates (edge tightness, paper contrast,
+  // confidence, sharpness, brightness) fortfarande missar. Aliaserat som
+  // `stableCount` för att hålla diff:en liten.
+  const stableCount = useRef(0); // = visibleStableCount
+  // captureStableCount: bara kandidater som passerar ALLA strikta gates får
+  // bygga upp denna. Auto-capture triggas endast när
+  // captureStableCount >= STABLE_FRAMES. Nollställs när readyForCapture=false.
+  const captureStableCount = useRef(0);
   const detectCount = useRef(0);
   const missCount = useRef(0);
   const capturedRef = useRef(false);
@@ -510,6 +518,7 @@ function ScanPage() {
       brightnessRef.current = 255;
       lowLightFramesRef.current = 0;
       stableCount.current = 0;
+      captureStableCount.current = 0;
       detectCount.current = 0;
       missCount.current = 0;
       smoothQuad.current = null;
@@ -938,6 +947,7 @@ function ScanPage() {
 
     if (!corners) {
       stableCount.current = 0;
+      captureStableCount.current = 0;
       detectCount.current = Math.max(0, detectCount.current - 1);
       detectionMeta.current = null;
       missCount.current++;
@@ -1073,6 +1083,7 @@ function ScanPage() {
           lockedRef.current = false;
           lockBreakFramesRef.current = 0;
           stableCount.current = 0;
+          captureStableCount.current = 0;
           hiResTightConfirmedRef.current = false;
         }
       } else {
@@ -1150,22 +1161,39 @@ function ScanPage() {
       blurFramesRef.current++;
       // Soft regression: a single blurry frame shouldn't wipe ~0.3s of progress.
       stableCount.current = Math.max(0, stableCount.current - 2);
+      captureStableCount.current = Math.max(0, captureStableCount.current - 2);
     } else {
       blurFramesRef.current = 0;
     }
     if (!isBrightEnough) {
       // Soft regression — exposure metering naturally causes 1-2 dim frames.
       stableCount.current = Math.max(0, stableCount.current - 2);
+      captureStableCount.current = Math.max(0, captureStableCount.current - 2);
+    }
+
+    // ===== Update captureStableCount =====
+    // Visible-stability (stableCount) byggs upp så snart geometrin är
+    // konsekvent. Capture-stabiliteten kräver dessutom att detektionen
+    // är capture-grade: readyForCapture, skarp och tillräckligt ljus.
+    // Nollas direkt om readyForCapture flippar bort.
+    const captureCandidate = readyForCapture && isSharp && isBrightEnough;
+    if (!readyForCapture) {
+      captureStableCount.current = 0;
+    } else if (captureCandidate && delta < STABLE_DELTA) {
+      captureStableCount.current++;
+    } else {
+      captureStableCount.current = Math.max(0, captureStableCount.current - 1);
     }
 
     // Engage lock once we've reached the READY threshold with good conditions.
-    if (stableCount.current >= READY_FRAMES && isSharp && isBrightEnough) {
+    if (captureStableCount.current >= READY_FRAMES && isSharp && isBrightEnough) {
       lockedRef.current = true;
     }
 
-    // Progress 0..1 — fills up as the document stays stable, hits 1.0 right before capture.
-    const pct = Math.max(0, Math.min(1, stableCount.current / STABLE_FRAMES));
+    // Progress 0..1 — fills up as capture-stability builds, hits 1.0 right before capture.
+    const pct = Math.max(0, Math.min(1, captureStableCount.current / STABLE_FRAMES));
     setProgress(pct);
+
 
     if (detectCount.current < DETECT_FRAMES) {
       drawOverlay(smoothed, "search");
@@ -1207,16 +1235,16 @@ function ScanPage() {
     let captureBlockedBy: string | null = null;
     if (visibleOnly) captureBlockedBy = `edge:${reasonNotReady ?? "unknown"}`;
     else if (!isBrightEnough && lowLightFramesRef.current > 15) captureBlockedBy = "light";
-    else if (stableCount.current < HOLD_FRAMES) captureBlockedBy = "stability:framing";
+    else if (captureStableCount.current < HOLD_FRAMES) captureBlockedBy = "stability:framing";
     else if (!isSharp) captureBlockedBy = "sharpness";
-    else if (stableCount.current < READY_FRAMES) captureBlockedBy = "stability:ready";
-    else if (stableCount.current < STABLE_FRAMES) captureBlockedBy = "stability:stable";
+    else if (captureStableCount.current < READY_FRAMES) captureBlockedBy = "stability:ready";
+    else if (captureStableCount.current < STABLE_FRAMES) captureBlockedBy = "stability:stable";
     else if (cooldownMs > 0) captureBlockedBy = "cooldown";
     else if (isShakyNow) captureBlockedBy = "motion";
     // "ambiguous" is filled in below once it's computed.
     captureGateRef.current = {
       reason: captureBlockedBy,
-      stable: stableCount.current,
+      stable: captureStableCount.current,
       stableTarget: STABLE_FRAMES,
       sharpness: sharpnessRef.current,
       sharpnessMin: SHARPNESS_LIVE_MIN,
@@ -1234,7 +1262,7 @@ function ScanPage() {
     if (!isBrightEnough && lowLightFramesRef.current > 15) {
       drawOverlay(smoothed, "hold");
       setStatus("lowLight");
-    } else if (stableCount.current < HOLD_FRAMES) {
+    } else if (captureStableCount.current < HOLD_FRAMES) {
       drawOverlay(smoothed, "hold");
       // While the user is still framing, prefer the most actionable hint.
       if (tooFar) setStatus("tooFar");
@@ -1244,7 +1272,7 @@ function ScanPage() {
     } else if (!isSharp) {
       drawOverlay(smoothed, "hold");
       setStatus(blurFramesRef.current > BLUR_HINT_FRAMES ? "moveBack" : "focusing");
-    } else if (stableCount.current < READY_FRAMES) {
+    } else if (captureStableCount.current < READY_FRAMES) {
       drawOverlay(smoothed, "hold");
       // Even when motion is stable, surface a framing problem before
       // the user keeps holding the phone for nothing.
@@ -1253,7 +1281,7 @@ function ScanPage() {
       else if (tilted) setStatus("tilt");
       else if (looseEdges) setStatus("align");
       else setStatus("hold");
-    } else if (stableCount.current < STABLE_FRAMES) {
+    } else if (captureStableCount.current < STABLE_FRAMES) {
       drawOverlay(smoothed, "ready");
       setStatus("ready");
     } else {
@@ -1304,30 +1332,25 @@ function ScanPage() {
       if (performance.now() < armedAtRef.current) {
         // Re-aim cooldown after a saved page — show "ready" but don't snap yet.
         setStatus("ready");
-        stableCount.current = Math.min(stableCount.current, STABLE_FRAMES - 1);
+        captureStableCount.current = Math.min(captureStableCount.current, STABLE_FRAMES - 1);
         if (captureGateRef.current) captureGateRef.current.reason = "cooldown";
       } else if (isShaky) {
         // Phone is moving — keep "ready" but don't auto-capture this frame.
         setStatus("ready");
-        stableCount.current = Math.min(stableCount.current, STABLE_FRAMES - 1);
+        captureStableCount.current = Math.min(captureStableCount.current, STABLE_FRAMES - 1);
         if (captureGateRef.current) captureGateRef.current.reason = "motion";
       } else if (ambiguous) {
-        // Competing candidates — wait for one to win. With the shorter (3-frame)
-        // memory window we lean a bit harder on the ambiguity window itself:
-        // decrement stableCount by 1 instead of 2 so a true competing
-        // rectangle (laptop, book, keyboard) needs more consecutive clean
-        // frames before capture is allowed, even though a single noisy
-        // frame won't wipe ramp-up.
+        // Competing candidates — wait for one to win.
         setStatus("ready");
-        stableCount.current = Math.max(0, stableCount.current - 1);
+        captureStableCount.current = Math.max(0, captureStableCount.current - 1);
         if (captureGateRef.current) captureGateRef.current.reason = "ambiguous";
       } else if (visibleOnly) {
         // Stabilitet uppnådd men strikt gate (edge tightness / paper
         // contrast / etc.) inte godkänd ännu. Visa ramen och vänta —
-        // hi-res-tightness-recompute körs nu också (gated på stableCount)
+        // hi-res-tightness-recompute körs (gated på visibleStableCount)
         // och kan flippa readyForCapture nästa frame.
         setStatus("align");
-        stableCount.current = Math.min(stableCount.current, STABLE_FRAMES - 1);
+        captureStableCount.current = Math.min(captureStableCount.current, STABLE_FRAMES - 1);
         if (captureGateRef.current)
           captureGateRef.current.reason = `edge:${reasonNotReady ?? "unknown"}`;
       } else {
@@ -1368,7 +1391,8 @@ function ScanPage() {
         areaRatio: +areaRatio.toFixed(3),
         sharpness: +sharpness.toFixed(1),
         brightness: +meanLum.toFixed(1),
-        stable: stableCount.current,
+        visibleStable: stableCount.current,
+        captureStable: captureStableCount.current,
         stableTarget: STABLE_FRAMES,
         locked: lockedRef.current,
         blockedBy: captureGateRef.current?.reason ?? null,
@@ -1476,6 +1500,7 @@ function ScanPage() {
       // Soft regression — confidence fluctuates frame-to-frame; full reset
       // makes first lock feel arbitrary.
       stableCount.current = Math.max(0, stableCount.current - 2);
+      captureStableCount.current = Math.max(0, captureStableCount.current - 2);
       lockedRef.current = false;
       setStatus("uncertain");
       return;
@@ -1493,6 +1518,7 @@ function ScanPage() {
     if (meta.debug.edgeTightness < tightnessFloor) {
       // Soft regression — hi-res tightness recompute may rescue next frame.
       stableCount.current = Math.max(0, stableCount.current - 2);
+      captureStableCount.current = Math.max(0, captureStableCount.current - 2);
       lockedRef.current = false;
       setStatus("align");
       return;
@@ -1507,6 +1533,7 @@ function ScanPage() {
     );
     if (a4Diff > A4_RATIO_TOLERANCE) {
       stableCount.current = 0;
+      captureStableCount.current = 0;
       lockedRef.current = false;
       setStatus("align");
       return;
@@ -2276,6 +2303,7 @@ function ScanPage() {
 
     // Reset detection state so auto-capture starts fresh for the next page.
     stableCount.current = 0;
+    captureStableCount.current = 0;
     detectCount.current = 0;
     missCount.current = 0;
     smoothQuad.current = null;
@@ -2430,6 +2458,7 @@ function ScanPage() {
             aria-label={t("cancel")}
             onClick={() => {
               stableCount.current = 0;
+              captureStableCount.current = 0;
               lockedRef.current = false;
               setProgress(0);
               setStatus("align");
@@ -2717,7 +2746,7 @@ function ScanPage() {
             );
           })()}
           <div>
-            detect: {detectCount.current} / stable: {stableCount.current}
+            detect: {detectCount.current} / vis: {stableCount.current} / cap: {captureStableCount.current}
           </div>
           <div>conf: {detectionMeta.current?.confidence?.toFixed(2) ?? "—"}</div>
           <div>
