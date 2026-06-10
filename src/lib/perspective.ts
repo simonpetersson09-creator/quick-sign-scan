@@ -4239,7 +4239,7 @@ export function autoStraighten(
 ): { canvas: HTMLCanvasElement; angleDeg: number; applied: boolean; confidence: number; reason?: string } {
   const maxAngleDeg = options.maxAngleDeg ?? 3;
   const stepDeg = options.stepDeg ?? 0.25;
-  const minApplyDeg = options.minApplyDeg ?? 0.3;
+  const minApplyDeg = options.minApplyDeg ?? 0.7;
   const targetWidth = options.targetWidth ?? 600;
   const minConfidence = options.minConfidence ?? 1.15;
 
