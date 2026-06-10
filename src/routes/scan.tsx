@@ -2458,6 +2458,7 @@ function ScanPage() {
             aria-label={t("cancel")}
             onClick={() => {
               stableCount.current = 0;
+              captureStableCount.current = 0;
               lockedRef.current = false;
               setProgress(0);
               setStatus("align");
