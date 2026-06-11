@@ -201,11 +201,17 @@ function applyReceipt(r: CdvReceipt) {
   const entry = r.collection?.find((e) => e.productId === PRODUCT_ID);
   if (!entry) return;
   if (entry.isExpired) {
-    setStatus({ state: "inactive", priceLabel: getPriceLabel() ?? undefined });
+    setStatus(
+      { state: "inactive", priceLabel: getPriceLabel() ?? undefined },
+      { fromReceipt: true },
+    );
     return;
   }
   const expiry = entry.expiryDate ? new Date(entry.expiryDate) : null;
-  setStatus({ state: "active", expiryDate: expiry, willRenew: entry.willRenew });
+  setStatus(
+    { state: "active", expiryDate: expiry, willRenew: entry.willRenew },
+    { fromReceipt: true },
+  );
 }
 
 function refreshFromStore() {
@@ -219,7 +225,13 @@ function refreshFromStore() {
     false;
   if (owned) {
     if (current.state !== "active") setStatus({ state: "active" });
-  } else {
+    return;
+  }
+  // Do NOT downgrade an active subscription here. `owned` can be false
+  // transiently before StoreKit loads/verifies the receipt. The
+  // verified/unverified callbacks are the single source of truth for
+  // moving active → inactive (they pass fromReceipt:true).
+  if (current.state !== "active") {
     setStatus({ state: "inactive", priceLabel: getPriceLabel() ?? undefined });
   }
 }
