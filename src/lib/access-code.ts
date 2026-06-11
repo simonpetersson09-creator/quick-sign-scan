@@ -73,8 +73,13 @@ export function clearAccessCode() {
 export function hasUsableAccessCode(): boolean {
   // Dev / preview build — no gate so development stays friction-free.
   if (isDev()) return true;
-  // Capacitor build always carries a baked-in code; the gate should never show.
-  if (isCapacitor()) return true;
+  // A code baked into the bundle at build time (Capacitor / iOS path when
+  // VITE_APP_ACCESS_CODE was provided) is always usable.
   if (BUILD_TIME_CODE && BUILD_TIME_CODE.length > 0) return true;
+  // Otherwise (web build, or Capacitor build that was built WITHOUT
+  // VITE_APP_ACCESS_CODE), require the user to enter a code via the gate.
+  // We intentionally do NOT short-circuit on isCapacitor() — without an
+  // actual code in localStorage, the x-app-access header would be empty and
+  // every send would fail with bad_access_code on the server.
   return !!getAccessCode();
 }
