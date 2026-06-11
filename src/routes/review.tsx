@@ -349,95 +349,98 @@ function ReviewPage() {
       </div>
 
       {/* Page preview — image-based so iOS Safari shows full page at fit-to-page. */}
-      <div className="flex flex-col items-center justify-center gap-3">
+      <div className="flex flex-col items-center justify-center gap-2">
         <div className="relative flex items-center justify-center shrink-0" style={{ width: "min(94vw, 460px)", height: "var(--doc-box-h)" }}>
-        <div
-          ref={containerRef}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          className="relative overflow-hidden touch-none select-none p-3 flex items-center justify-center"
-          style={{ height: "100%", maxWidth: "min(88vw, 400px)" }}
-        >
+          {pages.length > 1 && (
+            <button
+              type="button"
+              onClick={() => setPageIdx((i) => Math.max(0, i - 1))}
+              disabled={pageIdx === 0}
+              aria-label="Föregående sida"
+              className="absolute left-0 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full bg-card/90 backdrop-blur border border-border shadow-[var(--shadow-soft)] text-foreground/80 hover:bg-secondary disabled:opacity-30 disabled:pointer-events-none transition"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+          )}
           <div
-            className="relative"
-            style={{
-              width: `min(calc(min(88vw, 400px) - 1.5rem), calc((var(--doc-box-h) - 1.5rem) * ${imgRatio}))`,
-              height: `min(calc(var(--doc-box-h) - 1.5rem), calc((min(88vw, 400px) - 1.5rem) / ${imgRatio}))`,
-              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-              transformOrigin: "center center",
-              transition: pointers.current.size === 0 ? "transform 120ms ease" : "none",
-            }}
+            ref={containerRef}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+            className="relative overflow-hidden touch-none select-none p-3 flex items-center justify-center"
+            style={{ height: "100%", maxWidth: "min(88vw, 400px)" }}
           >
-            {currentImg && (
-              <img
-                ref={imgRef}
-                src={currentImg}
-                alt={t("scannedAlt")}
-                onLoad={(e) => {
-                  const el = e.currentTarget;
-                  if (el.naturalWidth && el.naturalHeight) {
-                    setImgRatio(el.naturalWidth / el.naturalHeight);
-                  }
-                }}
-                className="absolute inset-0 h-full w-full object-contain pointer-events-none"
-                draggable={false}
-              />
-            )}
-            {isSigPage && sigDataUrl && sigPos && (
-              <div
-                onPointerDown={onSigDown}
-                onPointerMove={onSigMove}
-                onPointerUp={onSigUp}
-                onPointerCancel={onSigUp}
-                role="button"
-                aria-label="Flytta signatur"
-                className={`absolute touch-none select-none transition ${
-                  isDraggingSig ? "cursor-grabbing" : "cursor-grab"
-                }`}
-                style={{
-                  left: `${sigPos.x * 100}%`,
-                  top: `${sigPos.y * 100}%`,
-                  width: "28%",
-                  transform: "translate(-50%, -50%)",
-                }}
-              >
+            <div
+              className="relative"
+              style={{
+                width: `min(calc(min(88vw, 400px) - 1.5rem), calc((var(--doc-box-h) - 1.5rem) * ${imgRatio}))`,
+                height: `min(calc(var(--doc-box-h) - 1.5rem), calc((min(88vw, 400px) - 1.5rem) / ${imgRatio}))`,
+                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                transformOrigin: "center center",
+                transition: pointers.current.size === 0 ? "transform 120ms ease" : "none",
+              }}
+            >
+              {currentImg && (
                 <img
-                  src={sigDataUrl}
-                  alt=""
-                  className="block w-full h-auto pointer-events-none"
+                  ref={imgRef}
+                  src={currentImg}
+                  alt={t("scannedAlt")}
+                  onLoad={(e) => {
+                    const el = e.currentTarget;
+                    if (el.naturalWidth && el.naturalHeight) {
+                      setImgRatio(el.naturalWidth / el.naturalHeight);
+                    }
+                  }}
+                  className="absolute inset-0 h-full w-full object-contain pointer-events-none"
                   draggable={false}
                 />
-              </div>
-            )}
-          </div>
-        </div>
-        </div>
-
-
-        {pages.length > 1 && (
-          <div className="flex items-center gap-2">
-            <div className="inline-flex items-center gap-1 rounded-full border border-border bg-card p-1 shadow-[var(--shadow-soft)]">
-              <ZoomButton
-                onClick={() => setPageIdx((i) => Math.max(0, i - 1))}
-                disabled={pageIdx === 0}
-                aria-label="Föregående sida"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </ZoomButton>
-              <span className="px-2 text-xs font-medium tabular-nums">
-                {pageIdx + 1}/{pages.length}
-              </span>
-              <ZoomButton
-                onClick={() => setPageIdx((i) => Math.min(pages.length - 1, i + 1))}
-                disabled={pageIdx === pages.length - 1}
-                aria-label="Nästa sida"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </ZoomButton>
+              )}
+              {isSigPage && sigDataUrl && sigPos && (
+                <div
+                  onPointerDown={onSigDown}
+                  onPointerMove={onSigMove}
+                  onPointerUp={onSigUp}
+                  onPointerCancel={onSigUp}
+                  role="button"
+                  aria-label="Flytta signatur"
+                  className={`absolute touch-none select-none transition ${
+                    isDraggingSig ? "cursor-grabbing" : "cursor-grab"
+                  }`}
+                  style={{
+                    left: `${sigPos.x * 100}%`,
+                    top: `${sigPos.y * 100}%`,
+                    width: "28%",
+                    transform: "translate(-50%, -50%)",
+                  }}
+                >
+                  <img
+                    src={sigDataUrl}
+                    alt=""
+                    className="block w-full h-auto pointer-events-none"
+                    draggable={false}
+                  />
+                </div>
+              )}
             </div>
           </div>
+          {pages.length > 1 && (
+            <button
+              type="button"
+              onClick={() => setPageIdx((i) => Math.min(pages.length - 1, i + 1))}
+              disabled={pageIdx === pages.length - 1}
+              aria-label="Nästa sida"
+              className="absolute right-0 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full bg-card/90 backdrop-blur border border-border shadow-[var(--shadow-soft)] text-foreground/80 hover:bg-secondary disabled:opacity-30 disabled:pointer-events-none transition"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          )}
+        </div>
+
+        {pages.length > 1 && (
+          <span className="text-xs font-medium tabular-nums text-muted-foreground">
+            {pageIdx + 1}/{pages.length}
+          </span>
         )}
         {signed && (
           <p className="text-[11px] text-center text-muted-foreground">
@@ -447,7 +450,7 @@ function ReviewPage() {
       </div>
 
       {/* Approval + actions */}
-      <div className="pt-5 flex flex-col gap-3">
+      <div className="pt-3 flex flex-col gap-3">
         <label className="flex items-start gap-3 px-1 select-none cursor-pointer">
           <span
             className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition ${
