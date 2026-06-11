@@ -69,15 +69,17 @@ function isDev(): boolean {
 function isDevOrPreviewRequest(req: Request | undefined): boolean {
   if (isDev()) return true;
   if (!req) return false;
-  const hostHeader =
-    req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "";
+  // SECURITY: derive the host from req.url only — never from client-supplied
+  // headers like x-forwarded-host or host. Those are attacker-controlled on
+  // direct HTTP calls and previously allowed bypassing the access-code gate
+  // by spoofing a Lovable preview hostname.
   let urlHost = "";
   try {
     if (req.url) urlHost = new URL(req.url).host;
   } catch {
     urlHost = "";
   }
-  const host = (hostHeader || urlHost).toLowerCase();
+  const host = urlHost.toLowerCase();
   if (!host) return false;
   if (host.startsWith("localhost") || host.startsWith("127.0.0.1")) return true;
   // Lovable preview subdomains, e.g. id-preview--<uuid>.lovable.app
