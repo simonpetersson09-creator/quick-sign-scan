@@ -165,7 +165,12 @@ export async function initPremium(): Promise<void> {
         applyReceipt(r);
       })
       .unverified(() => {
-        // Treat unverified as inactive; user can try Restore.
+        // Explicit receipt-level signal that the user is NOT premium.
+        // Allowed to clear cache.
+        setStatus(
+          { state: "inactive", priceLabel: getPriceLabel() ?? undefined },
+          { fromReceipt: true },
+        );
       })
       .finished(() => {
         refreshFromStore();
