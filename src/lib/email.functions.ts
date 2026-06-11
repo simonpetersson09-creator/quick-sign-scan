@@ -37,6 +37,31 @@ function isDev(): boolean {
   return typeof import.meta.env !== "undefined" && !!import.meta.env.DEV;
 }
 
+// True when the incoming request comes from a local dev server or a Lovable
+// preview deployment. The worker bundle is always built in production mode
+// even for preview, so `import.meta.env.DEV` alone is unreliable — we have
+// to inspect the request host. Keeps preview parity with the client, which
+// skips the AccessCodeGate when `isDev()` is true.
+function isDevOrPreviewRequest(req: Request | undefined): boolean {
+  if (isDev()) return true;
+  if (!req) return false;
+  const hostHeader =
+    req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "";
+  let urlHost = "";
+  try {
+    if (req.url) urlHost = new URL(req.url).host;
+  } catch {
+    urlHost = "";
+  }
+  const host = (hostHeader || urlHost).toLowerCase();
+  if (!host) return false;
+  if (host.startsWith("localhost") || host.startsWith("127.0.0.1")) return true;
+  // Lovable preview subdomains, e.g. id-preview--<uuid>.lovable.app
+  if (/^id-preview--[a-z0-9-]+\.lovable\.app$/.test(host)) return true;
+  if (/--[a-z0-9-]+-dev\.lovable\.app$/.test(host)) return true;
+  return false;
+}
+
 export const SendErrorCodes = [
   "attachment_too_large",
   "invalid_recipient",
@@ -253,7 +278,7 @@ export const sendScanEmail = createServerFn({ method: "POST" })
     // rejected before doing any work — and the failure is still counted
     // toward the rate limiter below so repeated guessing gets throttled.
     // Dev / preview builds bypass this check so development stays friction-free.
-    if (!isDev()) {
+    if (!isDevOrPreviewRequest(req)) {
       const expectedAccessCode = process.env.APP_ACCESS_CODE;
       if (!expectedAccessCode) {
         console.error(
