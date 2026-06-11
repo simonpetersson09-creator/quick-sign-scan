@@ -7,6 +7,12 @@ import {
   type PremiumStatus,
 } from "@/lib/premium";
 
+// Apple's standard EULA — used when the app doesn't ship a custom EULA.
+// Replace with your own Terms of Use URL when you have one.
+const TERMS_URL = "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
+// TODO: replace with your own hosted Privacy Policy URL before App Store submission.
+const PRIVACY_URL = "https://quick-sign-scan.lovable.app/privacy";
+
 interface Props {
   status: PremiumStatus;
   freeRemaining: number;
