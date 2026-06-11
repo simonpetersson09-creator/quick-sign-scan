@@ -343,8 +343,13 @@ function SendPage() {
       if (result.ok) {
         let postSendRemaining: number | null = null;
         if (!isPremium) {
-          const sentNow = usage.incrementSent();
-          postSendRemaining = Math.max(0, limit - sentNow);
+          // Dedupe: if this doc was already counted (e.g. user downloaded
+          // before sending), do NOT charge a second free document.
+          const alreadyConsumed = consumedThisSessionRef.current;
+          if (!alreadyConsumed) {
+            consumeQuotaOnce();
+          }
+          postSendRemaining = Math.max(0, limit - usage.getSentCount());
         }
         setDone(true);
         // Soft prompt only when exactly 1 free doc remains after this send.
