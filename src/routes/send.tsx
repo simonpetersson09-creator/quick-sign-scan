@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -43,7 +43,15 @@ function SendPage() {
   const premium = usePremium();
   const { remaining, limit } = useUsage();
   const isPremium = premium.state === "active";
-  const blocked = !isPremium && remaining <= 0;
+  // Tracks whether this document (this /send session) has already been
+  // counted against the free quota — either by sending OR by downloading.
+  // Prevents double-counting when the user does both for the same doc.
+  const consumedThisSessionRef = useRef(false);
+  // Block when out of free docs AND nothing has been consumed for this
+  // document yet. If the user has already consumed (e.g. downloaded),
+  // they're allowed to also send the same document without re-blocking.
+  const blocked =
+    !isPremium && remaining <= 0 && !consumedThisSessionRef.current;
   // Read settings on mount only — avoids SSR/hydration mismatch since
   // loadSettings() touches localStorage.
   const [settings, setSettings] = useState(() => ({
@@ -208,8 +216,22 @@ function SendPage() {
     };
   }, []);
 
+  /** Consume one free document from the quota, but only once per session. */
+  function consumeQuotaOnce() {
+    if (isPremium) return;
+    if (consumedThisSessionRef.current) return;
+    usage.incrementSent();
+    consumedThisSessionRef.current = true;
+  }
+
   async function downloadPdf(): Promise<{ blob: Blob; filename: string } | null> {
     if (!pdfUrl) return null;
+    // Hard gate: out of free docs and not premium → refuse the download.
+    // (The button is also hidden by `blocked` rendering the Paywall, but
+    // this is defense in depth in case the gate is ever bypassed.)
+    if (!isPremium && remaining <= 0 && !consumedThisSessionRef.current) {
+      return null;
+    }
     const filename = `${(subject || "dokument").replace(/[^\w\-]+/g, "_")}.pdf`;
     const blob = dataUrlToBlob(pdfUrl);
 
@@ -223,6 +245,7 @@ function SendPage() {
       };
       if (nav.canShare?.({ files: [file] }) && nav.share) {
         await nav.share({ files: [file], title: filename });
+        consumeQuotaOnce();
         return { blob, filename };
       }
     } catch (err) {
@@ -247,6 +270,7 @@ function SendPage() {
       if (isIOS) {
         window.open(fileUrl, "_blank");
       }
+      consumeQuotaOnce();
     } finally {
       setTimeout(() => {
         console.info("[send] revokeObjectURL called", { reason: "download pdf temp url" });
@@ -319,8 +343,13 @@ function SendPage() {
       if (result.ok) {
         let postSendRemaining: number | null = null;
         if (!isPremium) {
-          const sentNow = usage.incrementSent();
-          postSendRemaining = Math.max(0, limit - sentNow);
+          // Dedupe: if this doc was already counted (e.g. user downloaded
+          // before sending), do NOT charge a second free document.
+          const alreadyConsumed = consumedThisSessionRef.current;
+          if (!alreadyConsumed) {
+            consumeQuotaOnce();
+          }
+          postSendRemaining = Math.max(0, limit - usage.getSentCount());
         }
         setDone(true);
         // Soft prompt only when exactly 1 free doc remains after this send.

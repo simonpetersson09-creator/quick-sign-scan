@@ -44,10 +44,20 @@ function writeCache(active: boolean) {
   } catch {}
 }
 
-function setStatus(next: PremiumStatus) {
+function setStatus(
+  next: PremiumStatus,
+  opts: { fromReceipt?: boolean } = {},
+) {
+  // CRITICAL: never downgrade from active → non-active unless we got an
+  // explicit verified/unverified signal from StoreKit. Plugin-load timeouts,
+  // `unsupported`, transient `store.owned() === false` before the receipt
+  // arrives, and Restore-in-progress must NOT wipe the active cache.
+  if (current.state === "active" && next.state !== "active" && !opts.fromReceipt) {
+    return;
+  }
   current = next;
   if (next.state === "active") writeCache(true);
-  else if (next.state === "inactive") writeCache(false);
+  else if (next.state === "inactive" && opts.fromReceipt) writeCache(false);
   listeners.forEach((l) => l(next));
 }
 
@@ -155,7 +165,12 @@ export async function initPremium(): Promise<void> {
         applyReceipt(r);
       })
       .unverified(() => {
-        // Treat unverified as inactive; user can try Restore.
+        // Explicit receipt-level signal that the user is NOT premium.
+        // Allowed to clear cache.
+        setStatus(
+          { state: "inactive", priceLabel: getPriceLabel() ?? undefined },
+          { fromReceipt: true },
+        );
       })
       .finished(() => {
         refreshFromStore();
@@ -186,11 +201,17 @@ function applyReceipt(r: CdvReceipt) {
   const entry = r.collection?.find((e) => e.productId === PRODUCT_ID);
   if (!entry) return;
   if (entry.isExpired) {
-    setStatus({ state: "inactive", priceLabel: getPriceLabel() ?? undefined });
+    setStatus(
+      { state: "inactive", priceLabel: getPriceLabel() ?? undefined },
+      { fromReceipt: true },
+    );
     return;
   }
   const expiry = entry.expiryDate ? new Date(entry.expiryDate) : null;
-  setStatus({ state: "active", expiryDate: expiry, willRenew: entry.willRenew });
+  setStatus(
+    { state: "active", expiryDate: expiry, willRenew: entry.willRenew },
+    { fromReceipt: true },
+  );
 }
 
 function refreshFromStore() {
@@ -204,7 +225,13 @@ function refreshFromStore() {
     false;
   if (owned) {
     if (current.state !== "active") setStatus({ state: "active" });
-  } else {
+    return;
+  }
+  // Do NOT downgrade an active subscription here. `owned` can be false
+  // transiently before StoreKit loads/verifies the receipt. The
+  // verified/unverified callbacks are the single source of truth for
+  // moving active → inactive (they pass fromReceipt:true).
+  if (current.state !== "active") {
     setStatus({ state: "inactive", priceLabel: getPriceLabel() ?? undefined });
   }
 }

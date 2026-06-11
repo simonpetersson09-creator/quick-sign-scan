@@ -7,6 +7,12 @@ import {
   type PremiumStatus,
 } from "@/lib/premium";
 
+// Apple's standard EULA — used when the app doesn't ship a custom EULA.
+// Replace with your own Terms of Use URL when you have one.
+const TERMS_URL = "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
+// TODO: replace with your own hosted Privacy Policy URL before App Store submission.
+const PRIVACY_URL = "https://quick-sign-scan.lovable.app/privacy";
+
 interface Props {
   status: PremiumStatus;
   freeRemaining: number;
@@ -115,6 +121,32 @@ export function Paywall({ status, freeRemaining, freeLimit, onClose }: Props) {
         {info && (
           <p className="text-[12px] text-destructive mt-1">{info}</p>
         )}
+      </div>
+
+      {/* Apple-required disclosures for auto-renewable subscriptions. */}
+      <div className="self-stretch flex flex-col gap-2 pt-2">
+        <p className="text-[11px] leading-snug text-muted-foreground text-left">
+          {t("premium_legal_renewal")}
+        </p>
+        <div className="flex items-center justify-center gap-3 text-[12px] font-medium">
+          <a
+            href={TERMS_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline"
+          >
+            {t("premium_legal_terms")}
+          </a>
+          <span className="text-muted-foreground/60">·</span>
+          <a
+            href={PRIVACY_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline"
+          >
+            {t("premium_legal_privacy")}
+          </a>
+        </div>
       </div>
     </div>
   );
