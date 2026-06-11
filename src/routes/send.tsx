@@ -208,22 +208,51 @@ function SendPage() {
     };
   }, []);
 
-  function downloadPdf(): { blob: Blob; filename: string } | null {
+  async function downloadPdf(): Promise<{ blob: Blob; filename: string } | null> {
     if (!pdfUrl) return null;
     const filename = `${(subject || "dokument").replace(/[^\w\-]+/g, "_")}.pdf`;
     const blob = dataUrlToBlob(pdfUrl);
+
+    // Mobile (iOS Safari especially): prefer the native share sheet which lets
+    // the user save to Files / Drive. <a download> is ignored for blob URLs on iOS.
+    try {
+      const file = new File([blob], filename, { type: "application/pdf" });
+      const nav = navigator as Navigator & {
+        canShare?: (data: { files: File[] }) => boolean;
+        share?: (data: { files: File[]; title?: string }) => Promise<void>;
+      };
+      if (nav.canShare?.({ files: [file] }) && nav.share) {
+        await nav.share({ files: [file], title: filename });
+        return { blob, filename };
+      }
+    } catch (err) {
+      console.warn("[send] navigator.share failed, falling back", err);
+    }
+
     const fileUrl = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = fileUrl;
-    a.download = filename;
-    a.rel = "noopener";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => {
-      console.info("[send] revokeObjectURL called", { reason: "download pdf temp url" });
-      URL.revokeObjectURL(fileUrl);
-    }, 10000);
+    try {
+      const a = document.createElement("a");
+      a.href = fileUrl;
+      a.download = filename;
+      a.rel = "noopener";
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      // iOS Safari ignores the download attribute on blob URLs and may not
+      // navigate either — open in a new tab as a last-ditch fallback so the
+      // user can save the PDF manually.
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !("MSStream" in window);
+      if (isIOS) {
+        window.open(fileUrl, "_blank");
+      }
+    } finally {
+      setTimeout(() => {
+        console.info("[send] revokeObjectURL called", { reason: "download pdf temp url" });
+        URL.revokeObjectURL(fileUrl);
+      }, 30000);
+    }
     return { blob, filename };
   }
 
@@ -475,7 +504,7 @@ function SendPage() {
         </PrimaryButton>
         <PrimaryButton
           variant="secondary"
-          onClick={() => downloadPdf()}
+          onClick={() => { void downloadPdf(); }}
           disabled={!pdfUrl}
           className="h-12 text-[15px]"
         >
