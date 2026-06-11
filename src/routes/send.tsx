@@ -504,7 +504,7 @@ function SendPage() {
         </PrimaryButton>
         <PrimaryButton
           variant="secondary"
-          onClick={() => downloadPdf()}
+          onClick={() => { void downloadPdf(); }}
           disabled={!pdfUrl}
           className="h-12 text-[15px]"
         >
