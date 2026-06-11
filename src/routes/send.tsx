@@ -216,8 +216,22 @@ function SendPage() {
     };
   }, []);
 
+  /** Consume one free document from the quota, but only once per session. */
+  function consumeQuotaOnce() {
+    if (isPremium) return;
+    if (consumedThisSessionRef.current) return;
+    usage.incrementSent();
+    consumedThisSessionRef.current = true;
+  }
+
   async function downloadPdf(): Promise<{ blob: Blob; filename: string } | null> {
     if (!pdfUrl) return null;
+    // Hard gate: out of free docs and not premium → refuse the download.
+    // (The button is also hidden by `blocked` rendering the Paywall, but
+    // this is defense in depth in case the gate is ever bypassed.)
+    if (!isPremium && remaining <= 0 && !consumedThisSessionRef.current) {
+      return null;
+    }
     const filename = `${(subject || "dokument").replace(/[^\w\-]+/g, "_")}.pdf`;
     const blob = dataUrlToBlob(pdfUrl);
 
