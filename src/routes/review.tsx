@@ -333,7 +333,10 @@ function ReviewPage() {
 
   return (
     <AppShell title={t("reviewTitle")} back={signed ? "/sign" : "/place"}>
-      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
+      <div
+        className="flex-1 min-h-0 overflow-hidden flex flex-col"
+        style={{ ["--doc-box-h" as string]: "min(calc(min(88vw, 400px) * 1.35), calc(100dvh - 28rem))" }}
+      >
       {/* Status row */}
       <div className="mt-1 mb-3 flex flex-wrap items-center justify-center gap-2">
         <StatusChip tone="success" label={t("documentReady")} />
