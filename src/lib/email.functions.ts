@@ -27,12 +27,36 @@ const RL_DAILY_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
 // shipped to the browser; rotate by updating the secret and rebuilding the
 // Capacitor app with a new VITE_APP_ACCESS_CODE.
 const ACCESS_HEADER = "x-app-access";
+const NATIVE_ORIGINS = new Set([
+  "capacitor://localhost",
+  "ionic://localhost",
+  "http://localhost",
+  "https://localhost",
+]);
+
 function timingSafeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let diff = 0;
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return diff === 0;
 }
+
+function isNativeOrigin(origin: string): boolean {
+  if (NATIVE_ORIGINS.has(origin)) return true;
+  try {
+    const parsed = new URL(origin);
+    return NATIVE_ORIGINS.has(`${parsed.protocol}//${parsed.host}`);
+  } catch {
+    return false;
+  }
+}
+
+function isNativeRequest(req: Request | undefined): boolean {
+  if (!req) return false;
+  const origin = req.headers.get("origin") ?? "";
+  return origin ? isNativeOrigin(origin) : false;
+}
+
 function isDev(): boolean {
   return typeof import.meta.env !== "undefined" && !!import.meta.env.DEV;
 }
@@ -237,14 +261,8 @@ export const sendScanEmail = createServerFn({ method: "POST" })
       // Capacitor / native WebView origins. WKWebView serves the app from
       // capacitor://localhost (iOS) or http(s)://localhost; these hit the
       // deployed worker cross-origin by design, so allowlist them.
-      const NATIVE_ORIGINS = new Set([
-        "capacitor://localhost",
-        "ionic://localhost",
-        "http://localhost",
-        "https://localhost",
-      ]);
       if (origin) {
-        if (NATIVE_ORIGINS.has(origin)) {
+        if (isNativeOrigin(origin)) {
           ok = true;
         } else {
         try {
@@ -283,7 +301,7 @@ export const sendScanEmail = createServerFn({ method: "POST" })
     // rejected before doing any work — and the failure is still counted
     // toward the rate limiter below so repeated guessing gets throttled.
     // Dev / preview builds bypass this check so development stays friction-free.
-    if (!isDevOrPreviewRequest(req)) {
+    if (!isDevOrPreviewRequest(req) && !isNativeRequest(req)) {
       const expectedAccessCode = process.env.APP_ACCESS_CODE;
       if (!expectedAccessCode) {
         console.error(
