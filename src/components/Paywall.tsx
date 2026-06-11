@@ -122,6 +122,32 @@ export function Paywall({ status, freeRemaining, freeLimit, onClose }: Props) {
           <p className="text-[12px] text-destructive mt-1">{info}</p>
         )}
       </div>
+
+      {/* Apple-required disclosures for auto-renewable subscriptions. */}
+      <div className="self-stretch flex flex-col gap-2 pt-2">
+        <p className="text-[11px] leading-snug text-muted-foreground text-left">
+          {t("premium_legal_renewal")}
+        </p>
+        <div className="flex items-center justify-center gap-3 text-[12px] font-medium">
+          <a
+            href={TERMS_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline"
+          >
+            {t("premium_legal_terms")}
+          </a>
+          <span className="text-muted-foreground/60">·</span>
+          <a
+            href={PRIVACY_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline"
+          >
+            {t("premium_legal_privacy")}
+          </a>
+        </div>
+      </div>
     </div>
   );
 }
