@@ -245,6 +245,10 @@ const sv: Dict = {
   premium_purchase_failed: "Köpet kunde inte slutföras. Försök igen.",
   premium_restore_failed: "Kunde inte återställa köpet. Försök igen.",
   premium_restore_none: "Inget aktivt abonnemang hittades på det här Apple-ID:t.",
+  premium_legal_renewal:
+    "Sign & Go Premium kostar 99 kr/år. Abonnemanget förnyas automatiskt varje år tills det sägs upp. Betalningen dras från ditt Apple-ID 24 timmar före varje förnyelse. Du kan när som helst hantera eller säga upp abonnemanget i App Store-inställningar på din enhet.",
+  premium_legal_terms: "Användarvillkor",
+  premium_legal_privacy: "Integritetspolicy",
 
   // soft prompt after sending (when only 1 free doc remains)
   soft_one_left_title: "Du har 1 gratis dokument kvar.",
