@@ -44,10 +44,20 @@ function writeCache(active: boolean) {
   } catch {}
 }
 
-function setStatus(next: PremiumStatus) {
+function setStatus(
+  next: PremiumStatus,
+  opts: { fromReceipt?: boolean } = {},
+) {
+  // CRITICAL: never downgrade from active → non-active unless we got an
+  // explicit verified/unverified signal from StoreKit. Plugin-load timeouts,
+  // `unsupported`, transient `store.owned() === false` before the receipt
+  // arrives, and Restore-in-progress must NOT wipe the active cache.
+  if (current.state === "active" && next.state !== "active" && !opts.fromReceipt) {
+    return;
+  }
   current = next;
   if (next.state === "active") writeCache(true);
-  else if (next.state === "inactive") writeCache(false);
+  else if (next.state === "inactive" && opts.fromReceipt) writeCache(false);
   listeners.forEach((l) => l(next));
 }
 
