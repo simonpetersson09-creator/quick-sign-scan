@@ -59,6 +59,11 @@ function isDevOrPreviewRequest(req: Request | undefined): boolean {
   // Lovable preview subdomains, e.g. id-preview--<uuid>.lovable.app
   if (/^id-preview--[a-z0-9-]+\.lovable\.app$/.test(host)) return true;
   if (/--[a-z0-9-]+-dev\.lovable\.app$/.test(host)) return true;
+  // Lovable in-IDE preview iframe, e.g. <uuid>.lovableproject.com or
+  // id-preview--<uuid>.lovableproject.com
+  if (host.endsWith(".lovableproject.com")) return true;
+  // Lovable sandbox preview, e.g. <uuid>.sandbox.lovable.dev
+  if (host.endsWith(".sandbox.lovable.dev")) return true;
   return false;
 }
 
