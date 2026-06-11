@@ -69,15 +69,17 @@ function isDev(): boolean {
 function isDevOrPreviewRequest(req: Request | undefined): boolean {
   if (isDev()) return true;
   if (!req) return false;
-  const hostHeader =
-    req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "";
+  // SECURITY: derive the host from req.url only — never from client-supplied
+  // headers like x-forwarded-host or host. Those are attacker-controlled on
+  // direct HTTP calls and previously allowed bypassing the access-code gate
+  // by spoofing a Lovable preview hostname.
   let urlHost = "";
   try {
     if (req.url) urlHost = new URL(req.url).host;
   } catch {
     urlHost = "";
   }
-  const host = (hostHeader || urlHost).toLowerCase();
+  const host = urlHost.toLowerCase();
   if (!host) return false;
   if (host.startsWith("localhost") || host.startsWith("127.0.0.1")) return true;
   // Lovable preview subdomains, e.g. id-preview--<uuid>.lovable.app
@@ -249,8 +251,9 @@ export const sendScanEmail = createServerFn({ method: "POST" })
     try {
       req = getRequest();
       const origin = req?.headers.get("origin") ?? req?.headers.get("referer") ?? "";
-      const hostHeader =
-        req?.headers.get("x-forwarded-host") ?? req?.headers.get("host") ?? "";
+      // SECURITY: authoritative host comes from req.url only. Headers like
+      // x-forwarded-host / host are client-controlled on direct HTTP calls
+      // and must not influence the same-origin decision.
       let requestHost = "";
       try {
         if (req?.url) requestHost = new URL(req.url).host;
@@ -272,9 +275,7 @@ export const sendScanEmail = createServerFn({ method: "POST" })
             ok = true;
           } else {
             const originHost = originUrl.host;
-            ok =
-              (!!hostHeader && originHost === hostHeader) ||
-              (!!requestHost && originHost === requestHost);
+            ok = !!requestHost && originHost === requestHost;
           }
         } catch {
           ok = false;
@@ -283,7 +284,7 @@ export const sendScanEmail = createServerFn({ method: "POST" })
       }
       if (!ok) {
         console.error(
-          `[sendScanEmail] ${ts} ${requestId} status=forbidden reason=cross_origin origin=${origin} host=${hostHeader} reqHost=${requestHost}`,
+          `[sendScanEmail] ${ts} ${requestId} status=forbidden reason=cross_origin origin=${origin} reqHost=${requestHost}`,
         );
         return fail("unauthorized");
       }
