@@ -43,7 +43,15 @@ function SendPage() {
   const premium = usePremium();
   const { remaining, limit } = useUsage();
   const isPremium = premium.state === "active";
-  const blocked = !isPremium && remaining <= 0;
+  // Tracks whether this document (this /send session) has already been
+  // counted against the free quota — either by sending OR by downloading.
+  // Prevents double-counting when the user does both for the same doc.
+  const consumedThisSessionRef = useRef(false);
+  // Block when out of free docs AND nothing has been consumed for this
+  // document yet. If the user has already consumed (e.g. downloaded),
+  // they're allowed to also send the same document without re-blocking.
+  const blocked =
+    !isPremium && remaining <= 0 && !consumedThisSessionRef.current;
   // Read settings on mount only — avoids SSR/hydration mismatch since
   // loadSettings() touches localStorage.
   const [settings, setSettings] = useState(() => ({
