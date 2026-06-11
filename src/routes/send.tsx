@@ -245,6 +245,7 @@ function SendPage() {
       };
       if (nav.canShare?.({ files: [file] }) && nav.share) {
         await nav.share({ files: [file], title: filename });
+        consumeQuotaOnce();
         return { blob, filename };
       }
     } catch (err) {
@@ -269,6 +270,7 @@ function SendPage() {
       if (isIOS) {
         window.open(fileUrl, "_blank");
       }
+      consumeQuotaOnce();
     } finally {
       setTimeout(() => {
         console.info("[send] revokeObjectURL called", { reason: "download pdf temp url" });
