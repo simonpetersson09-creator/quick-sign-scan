@@ -69,7 +69,15 @@ function SendPage() {
   // current text is still a default (and therefore safe to swap when the
   // user changes the app language) vs a user customization.
   const KNOWN_DEFAULT_SUBJECTS = useMemo(
-    () => new Set(["Dokument", "Document", "Skannat dokument", "Scanned document"]),
+    () =>
+      new Set([
+        "Dokument",
+        "Document",
+        "Skannat dokument",
+        "Scanned document",
+        "Sign & Go – Skannat dokument",
+        "Sign & Go – Scanned document",
+      ]),
     [],
   );
   const KNOWN_DEFAULT_MESSAGES = useMemo(
@@ -77,6 +85,8 @@ function SendPage() {
       new Set([
         "Hej,\n\nBifogar dokumentet.\n\nVänliga hälsningar",
         "Hello,\n\nPlease find the document attached.\n\nKind regards",
+        "Hej,\n\nBifogat finner du det skannade dokumentet.\n\nMed vänliga hälsningar",
+        "Hello,\n\nPlease find attached the scanned document.\n\nKind regards",
       ]),
     [],
   );
