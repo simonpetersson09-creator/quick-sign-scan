@@ -494,7 +494,7 @@ function ReviewPage() {
             className="h-12 text-[15px]"
           >
             <span className="inline-flex items-center justify-center gap-2">
-              <Camera className="h-4 w-4" /> {t("retake")}
+              <Camera className="h-4 w-4" /> {t("startOver")}
             </span>
           </PrimaryButton>
         </div>
