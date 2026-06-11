@@ -513,6 +513,10 @@ const en: Dict = {
   premium_purchase_failed: "The purchase couldn't be completed. Please try again.",
   premium_restore_failed: "Couldn't restore the purchase. Please try again.",
   premium_restore_none: "No active subscription was found on this Apple ID.",
+  premium_legal_renewal:
+    "Sign & Go Premium costs 99 SEK/year. The subscription auto-renews every year until cancelled. Payment is charged to your Apple ID 24 hours before each renewal. You can manage or cancel the subscription at any time in App Store settings on your device.",
+  premium_legal_terms: "Terms of Use",
+  premium_legal_privacy: "Privacy Policy",
 
   // soft prompt after sending
   soft_one_left_title: "You have 1 free document left.",
