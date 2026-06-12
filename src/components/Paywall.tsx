@@ -28,6 +28,13 @@ export function Paywall({ status, freeRemaining, freeLimit, onClose }: Props) {
 
   const unsupported = status.state === "unsupported";
   const usedAll = freeRemaining <= 0;
+  const priceLabel =
+    status.state === "inactive" ? status.priceLabel : undefined;
+  const productReady =
+    status.state === "active" ||
+    unsupported ||
+    isProductLoaded() ||
+    Boolean(priceLabel);
 
   async function buy() {
     setInfo(null);
@@ -35,9 +42,16 @@ export function Paywall({ status, freeRemaining, freeLimit, onClose }: Props) {
     const res = await purchasePremium();
     setBusy(null);
     if (!res.ok && res.reason !== "unsupported") {
-      setInfo(t("premium_purchase_failed"));
+      // Surface the real reason so reviewers (and us) can diagnose.
+      const reason = res.reason ?? "";
+      if (reason === "product_not_loaded" || reason === "no_offer") {
+        setInfo(t("premium_loading_product"));
+      } else {
+        setInfo(`${t("premium_purchase_failed")}${reason ? ` (${reason})` : ""}`);
+      }
     }
   }
+
 
   async function restore() {
     setInfo(null);
