@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Crown, Loader2, Check } from "lucide-react";
+import { Crown, Loader2, Check, ExternalLink } from "lucide-react";
 import { useT } from "@/lib/i18n";
+import { Button } from "@/components/ui/button";
 import {
   purchasePremium,
   restorePremium,
@@ -8,11 +9,9 @@ import {
   type PremiumStatus,
 } from "@/lib/premium";
 
-
-// Apple's standard EULA — used when the app doesn't ship a custom EULA.
-// Replace with your own Terms of Use URL when you have one.
-const TERMS_URL = "https://signandgo-support.lovable.app/#terms";
-const PRIVACY_URL = "https://signandgo-support.lovable.app/#privacy";
+// Apple-required links for auto-renewable subscriptions.
+const TERMS_URL = "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
+const PRIVACY_URL = "https://signandgo-support.lovable.app";
 
 interface Props {
   status: PremiumStatus;
@@ -142,28 +141,23 @@ export function Paywall({ status, freeRemaining, freeLimit, onClose }: Props) {
       </div>
 
       {/* Apple-required disclosures for auto-renewable subscriptions. */}
-      <div className="self-stretch flex flex-col gap-2 pt-2">
+      <div className="self-stretch flex flex-col gap-3 pt-2">
         <p className="text-[11px] leading-snug text-muted-foreground text-left">
           {t("premium_legal_renewal")}
         </p>
-        <div className="flex items-center justify-center gap-3 text-[12px] font-medium">
-          <a
-            href={TERMS_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary hover:underline"
-          >
-            {t("premium_legal_terms")}
-          </a>
-          <span className="text-muted-foreground/60">·</span>
-          <a
-            href={PRIVACY_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary hover:underline"
-          >
-            {t("premium_legal_privacy")}
-          </a>
+        <div className="flex flex-col gap-2">
+          <Button asChild variant="outline" className="w-full h-10 text-[13px]">
+            <a href={TERMS_URL} target="_blank" rel="noopener noreferrer">
+              <ExternalLink className="h-3.5 w-3.5" />
+              {t("premium_legal_terms")}
+            </a>
+          </Button>
+          <Button asChild variant="outline" className="w-full h-10 text-[13px]">
+            <a href={PRIVACY_URL} target="_blank" rel="noopener noreferrer">
+              <ExternalLink className="h-3.5 w-3.5" />
+              {t("premium_legal_privacy")}
+            </a>
+          </Button>
         </div>
       </div>
     </div>
