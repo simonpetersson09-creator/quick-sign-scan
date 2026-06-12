@@ -248,6 +248,9 @@ function refreshFromStore() {
   const cdv = getCdv();
   if (!cdv) return;
   const product = cdv.store.get(PRODUCT_ID);
+  if (product && (product.pricing?.price || product.offers?.length)) {
+    productLoaded = true;
+  }
   const owned =
     cdv.store.owned?.(PRODUCT_ID) ??
     cdv.store.owned?.(product as CdvProduct) ??
@@ -257,14 +260,15 @@ function refreshFromStore() {
     if (current.state !== "active") setStatus({ state: "active" });
     return;
   }
-  // Do NOT downgrade an active subscription here. `owned` can be false
-  // transiently before StoreKit loads/verifies the receipt. The
-  // verified/unverified callbacks are the single source of truth for
-  // moving active → inactive (they pass fromReceipt:true).
   if (current.state !== "active") {
-    setStatus({ state: "inactive", priceLabel: getPriceLabel() ?? undefined });
+    setStatus({
+      state: "inactive",
+      priceLabel: getPriceLabel() ?? undefined,
+      productLoaded,
+    });
   }
 }
+
 
 function getPriceLabel(): string | null {
   const cdv = getCdv();
