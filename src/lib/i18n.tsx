@@ -243,6 +243,8 @@ const sv: Dict = {
   premium_restore: "Återställ köp",
   premium_only_ios: "Köp är endast tillgängligt i iOS-appen.",
   premium_purchase_failed: "Köpet kunde inte slutföras. Försök igen.",
+  premium_loading_product: "Laddar abonnemang…",
+
   premium_restore_failed: "Kunde inte återställa köpet. Försök igen.",
   premium_restore_none: "Inget aktivt abonnemang hittades på det här Apple-ID:t.",
   premium_legal_renewal:
