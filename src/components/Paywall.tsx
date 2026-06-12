@@ -4,8 +4,10 @@ import { useT } from "@/lib/i18n";
 import {
   purchasePremium,
   restorePremium,
+  isProductLoaded,
   type PremiumStatus,
 } from "@/lib/premium";
+
 
 // Apple's standard EULA — used when the app doesn't ship a custom EULA.
 // Replace with your own Terms of Use URL when you have one.
@@ -26,6 +28,13 @@ export function Paywall({ status, freeRemaining, freeLimit, onClose }: Props) {
 
   const unsupported = status.state === "unsupported";
   const usedAll = freeRemaining <= 0;
+  const priceLabel =
+    status.state === "inactive" ? status.priceLabel : undefined;
+  const productReady =
+    status.state === "active" ||
+    unsupported ||
+    isProductLoaded() ||
+    Boolean(priceLabel);
 
   async function buy() {
     setInfo(null);
@@ -33,9 +42,16 @@ export function Paywall({ status, freeRemaining, freeLimit, onClose }: Props) {
     const res = await purchasePremium();
     setBusy(null);
     if (!res.ok && res.reason !== "unsupported") {
-      setInfo(t("premium_purchase_failed"));
+      // Surface the real reason so reviewers (and us) can diagnose.
+      const reason = res.reason ?? "";
+      if (reason === "product_not_loaded" || reason === "no_offer") {
+        setInfo(t("premium_loading_product"));
+      } else {
+        setInfo(`${t("premium_purchase_failed")}${reason ? ` (${reason})` : ""}`);
+      }
     }
   }
+
 
   async function restore() {
     setInfo(null);
@@ -81,25 +97,28 @@ export function Paywall({ status, freeRemaining, freeLimit, onClose }: Props) {
       </ul>
 
       <div className="text-[22px] font-semibold tracking-tight text-foreground">
-        {t("premium_price_yearly")}
+        {priceLabel ?? t("premium_price_yearly")}
       </div>
 
       <div className="flex flex-col gap-2 self-stretch">
         <button
           type="button"
           onClick={buy}
-          disabled={busy !== null || unsupported}
+          disabled={busy !== null || unsupported || !productReady}
           className="rounded-xl bg-primary text-primary-foreground h-12 px-6 shadow-[var(--shadow-card)] transition active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
         >
-          {busy === "buy" ? (
+          {busy === "buy" || !productReady ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <Crown className="h-4 w-4" />
           )}
           <span className="text-[15px] font-semibold">
-            {t("premium_start_cta")}
+            {!productReady && !unsupported
+              ? t("premium_loading_product")
+              : t("premium_start_cta")}
           </span>
         </button>
+
         <p className="text-[11px] text-muted-foreground mt-0.5">
           {t("premium_apple_secure")}
         </p>

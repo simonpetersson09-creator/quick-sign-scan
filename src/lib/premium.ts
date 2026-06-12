@@ -14,8 +14,9 @@ const CACHE_KEY = "signgo.premium.active.v1";
 export type PremiumStatus =
   | { state: "loading" }
   | { state: "unsupported" } // web / non-iOS — IAP not available
-  | { state: "inactive"; priceLabel?: string }
+  | { state: "inactive"; priceLabel?: string; productLoaded?: boolean }
   | { state: "active"; expiryDate?: Date | null; willRenew?: boolean };
+
 
 type Listener = (s: PremiumStatus) => void;
 const listeners = new Set<Listener>();
@@ -73,11 +74,13 @@ function isNativeIOS(): boolean {
 type CdvStore = {
   register: (products: unknown[]) => void;
   when: () => {
+    productUpdated: (cb: (p: CdvProduct) => void) => unknown;
     approved: (cb: (t: CdvTx) => void) => unknown;
     verified: (cb: (r: CdvReceipt) => void) => unknown;
     unverified: (cb: (r: CdvReceipt) => void) => unknown;
     finished: (cb: (t: CdvTx) => void) => unknown;
   };
+  error: (cb: (err: { code?: number; message?: string }) => void) => void;
   initialize: (platforms?: unknown[]) => Promise<unknown>;
   update: () => Promise<unknown>;
   restorePurchases: () => Promise<unknown>;
@@ -87,6 +90,7 @@ type CdvStore = {
 type CdvProduct = {
   id: string;
   owned?: boolean;
+  canPurchase?: boolean;
   pricing?: { price?: string };
   getOffer?: () => { order: () => Promise<unknown> } | undefined;
   offers?: Array<{ order: () => Promise<unknown> }>;
@@ -109,6 +113,7 @@ type CdvGlobal = {
   Platform: { APPLE_APPSTORE: string };
   store: CdvStore;
 };
+
 
 function getCdv(): CdvGlobal | null {
   if (typeof window === "undefined") return null;
@@ -142,6 +147,13 @@ export async function initPremium(): Promise<void> {
   try {
     const { store, ProductType, Platform } = cdv;
 
+    // Surface StoreKit errors. Without this, failures are silent and Apple
+    // reviewers just see a generic toast with no diagnostics in the logs.
+    store.error((err) => {
+      console.error("[premium] store error", err?.code, err?.message);
+      lastStoreError = err?.message ?? `code ${err?.code ?? "?"}`;
+    });
+
     store.register([
       {
         id: PRODUCT_ID,
@@ -151,6 +163,7 @@ export async function initPremium(): Promise<void> {
     ]);
 
     type Chain = {
+      productUpdated: (cb: (p: CdvProduct) => void) => Chain;
       approved: (cb: (t: CdvTx) => void) => Chain;
       verified: (cb: (r: CdvReceipt) => void) => Chain;
       unverified: (cb: (r: CdvReceipt) => void) => Chain;
@@ -158,17 +171,28 @@ export async function initPremium(): Promise<void> {
     };
     const chain = store.when() as unknown as Chain;
     chain
+      .productUpdated((p: CdvProduct) => {
+        if (p.id === PRODUCT_ID) {
+          productLoaded = true;
+          refreshFromStore();
+        }
+      })
       .approved((t: CdvTx) => {
-        void t.verify();
+        // No server-side receipt validator is configured for this app, so
+        // calling t.verify() would stall forever (the `verified` callback
+        // never fires without a validator). Finish the transaction directly
+        // and refresh ownership from StoreKit.
+        void t
+          .finish()
+          .catch((e) => console.error("[premium] finish failed", e))
+          .finally(() => refreshFromStore());
       })
       .verified((r: CdvReceipt) => {
         applyReceipt(r);
       })
       .unverified(() => {
-        // Explicit receipt-level signal that the user is NOT premium.
-        // Allowed to clear cache.
         setStatus(
-          { state: "inactive", priceLabel: getPriceLabel() ?? undefined },
+          { state: "inactive", priceLabel: getPriceLabel() ?? undefined, productLoaded },
           { fromReceipt: true },
         );
       })
@@ -177,12 +201,18 @@ export async function initPremium(): Promise<void> {
       });
 
     await store.initialize([Platform.APPLE_APPSTORE]);
+    // Kick a product refresh; productUpdated will fire once StoreKit responds.
+    await store.update().catch(() => {});
     refreshFromStore();
   } catch (e) {
     console.error("[premium] init failed", e);
     setStatus({ state: "unsupported" });
   }
 }
+
+let productLoaded = false;
+let lastStoreError: string | null = null;
+
 
 function waitForCdv(timeoutMs: number): Promise<CdvGlobal | null> {
   return new Promise((resolve) => {
@@ -218,6 +248,9 @@ function refreshFromStore() {
   const cdv = getCdv();
   if (!cdv) return;
   const product = cdv.store.get(PRODUCT_ID);
+  if (product && (product.pricing?.price || product.offers?.length)) {
+    productLoaded = true;
+  }
   const owned =
     cdv.store.owned?.(PRODUCT_ID) ??
     cdv.store.owned?.(product as CdvProduct) ??
@@ -227,14 +260,15 @@ function refreshFromStore() {
     if (current.state !== "active") setStatus({ state: "active" });
     return;
   }
-  // Do NOT downgrade an active subscription here. `owned` can be false
-  // transiently before StoreKit loads/verifies the receipt. The
-  // verified/unverified callbacks are the single source of truth for
-  // moving active → inactive (they pass fromReceipt:true).
   if (current.state !== "active") {
-    setStatus({ state: "inactive", priceLabel: getPriceLabel() ?? undefined });
+    setStatus({
+      state: "inactive",
+      priceLabel: getPriceLabel() ?? undefined,
+      productLoaded,
+    });
   }
 }
+
 
 function getPriceLabel(): string | null {
   const cdv = getCdv();
@@ -246,19 +280,50 @@ function getPriceLabel(): string | null {
 export async function purchasePremium(): Promise<{ ok: boolean; reason?: string }> {
   const cdv = getCdv();
   if (!cdv) return { ok: false, reason: "unsupported" };
-  const product = cdv.store.get(PRODUCT_ID);
-  if (!product) return { ok: false, reason: "product_not_loaded" };
+
+  // Wait briefly for the product to finish loading from the App Store.
+  // On a fresh sandbox account (Apple review) the product list can take a
+  // couple of seconds. Tapping before it arrives previously returned a
+  // generic "purchase_failed" toast.
+  const product = await waitForProduct(6000);
+  if (!product) {
+    return {
+      ok: false,
+      reason: lastStoreError ?? "product_not_loaded",
+    };
+  }
+
   try {
     const offer = product.getOffer?.() ?? product.offers?.[0];
     if (!offer) return { ok: false, reason: "no_offer" };
+    lastStoreError = null;
     await offer.order();
     return { ok: true };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[premium] purchase failed", msg);
-    return { ok: false, reason: msg };
+    return { ok: false, reason: lastStoreError ?? msg };
   }
 }
+
+function waitForProduct(timeoutMs: number): Promise<CdvProduct | null> {
+  return new Promise((resolve) => {
+    const start = Date.now();
+    const tick = () => {
+      const cdv = getCdv();
+      const p = cdv?.store.get(PRODUCT_ID);
+      if (p && (p.pricing?.price || p.offers?.length)) return resolve(p);
+      if (Date.now() - start > timeoutMs) return resolve(p ?? null);
+      setTimeout(tick, 200);
+    };
+    tick();
+  });
+}
+
+export function isProductLoaded(): boolean {
+  return productLoaded;
+}
+
 
 export async function restorePremium(): Promise<{ ok: boolean; active: boolean }> {
   const cdv = getCdv();
