@@ -147,6 +147,13 @@ export async function initPremium(): Promise<void> {
   try {
     const { store, ProductType, Platform } = cdv;
 
+    // Surface StoreKit errors. Without this, failures are silent and Apple
+    // reviewers just see a generic toast with no diagnostics in the logs.
+    store.error((err) => {
+      console.error("[premium] store error", err?.code, err?.message);
+      lastStoreError = err?.message ?? `code ${err?.code ?? "?"}`;
+    });
+
     store.register([
       {
         id: PRODUCT_ID,
@@ -156,6 +163,7 @@ export async function initPremium(): Promise<void> {
     ]);
 
     type Chain = {
+      productUpdated: (cb: (p: CdvProduct) => void) => Chain;
       approved: (cb: (t: CdvTx) => void) => Chain;
       verified: (cb: (r: CdvReceipt) => void) => Chain;
       unverified: (cb: (r: CdvReceipt) => void) => Chain;
@@ -163,17 +171,28 @@ export async function initPremium(): Promise<void> {
     };
     const chain = store.when() as unknown as Chain;
     chain
+      .productUpdated((p: CdvProduct) => {
+        if (p.id === PRODUCT_ID) {
+          productLoaded = true;
+          refreshFromStore();
+        }
+      })
       .approved((t: CdvTx) => {
-        void t.verify();
+        // No server-side receipt validator is configured for this app, so
+        // calling t.verify() would stall forever (the `verified` callback
+        // never fires without a validator). Finish the transaction directly
+        // and refresh ownership from StoreKit.
+        void t
+          .finish()
+          .catch((e) => console.error("[premium] finish failed", e))
+          .finally(() => refreshFromStore());
       })
       .verified((r: CdvReceipt) => {
         applyReceipt(r);
       })
       .unverified(() => {
-        // Explicit receipt-level signal that the user is NOT premium.
-        // Allowed to clear cache.
         setStatus(
-          { state: "inactive", priceLabel: getPriceLabel() ?? undefined },
+          { state: "inactive", priceLabel: getPriceLabel() ?? undefined, productLoaded },
           { fromReceipt: true },
         );
       })
@@ -182,12 +201,18 @@ export async function initPremium(): Promise<void> {
       });
 
     await store.initialize([Platform.APPLE_APPSTORE]);
+    // Kick a product refresh; productUpdated will fire once StoreKit responds.
+    await store.update().catch(() => {});
     refreshFromStore();
   } catch (e) {
     console.error("[premium] init failed", e);
     setStatus({ state: "unsupported" });
   }
 }
+
+let productLoaded = false;
+let lastStoreError: string | null = null;
+
 
 function waitForCdv(timeoutMs: number): Promise<CdvGlobal | null> {
   return new Promise((resolve) => {
