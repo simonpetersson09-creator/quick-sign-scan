@@ -4,8 +4,10 @@ import { useT } from "@/lib/i18n";
 import {
   purchasePremium,
   restorePremium,
+  isProductLoaded,
   type PremiumStatus,
 } from "@/lib/premium";
+
 
 // Apple's standard EULA — used when the app doesn't ship a custom EULA.
 // Replace with your own Terms of Use URL when you have one.
