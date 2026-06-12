@@ -513,6 +513,8 @@ const en: Dict = {
   premium_restore: "Restore purchase",
   premium_only_ios: "Purchases are only available in the iOS app.",
   premium_purchase_failed: "The purchase couldn't be completed. Please try again.",
+  premium_loading_product: "Loading subscription…",
+
   premium_restore_failed: "Couldn't restore the purchase. Please try again.",
   premium_restore_none: "No active subscription was found on this Apple ID.",
   premium_legal_renewal:
