@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Crown, Loader2, Check } from "lucide-react";
+import { Crown, Loader2, Check, ExternalLink } from "lucide-react";
 import { useT } from "@/lib/i18n";
+import { Button } from "@/components/ui/button";
 import {
   purchasePremium,
   restorePremium,
@@ -8,11 +9,9 @@ import {
   type PremiumStatus,
 } from "@/lib/premium";
 
-
-// Apple's standard EULA — used when the app doesn't ship a custom EULA.
-// Replace with your own Terms of Use URL when you have one.
-const TERMS_URL = "https://signandgo-support.lovable.app/#terms";
-const PRIVACY_URL = "https://signandgo-support.lovable.app/#privacy";
+// Apple-required links for auto-renewable subscriptions.
+const TERMS_URL = "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
+const PRIVACY_URL = "https://signandgo-support.lovable.app";
 
 interface Props {
   status: PremiumStatus;
