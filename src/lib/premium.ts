@@ -74,11 +74,13 @@ function isNativeIOS(): boolean {
 type CdvStore = {
   register: (products: unknown[]) => void;
   when: () => {
+    productUpdated: (cb: (p: CdvProduct) => void) => unknown;
     approved: (cb: (t: CdvTx) => void) => unknown;
     verified: (cb: (r: CdvReceipt) => void) => unknown;
     unverified: (cb: (r: CdvReceipt) => void) => unknown;
     finished: (cb: (t: CdvTx) => void) => unknown;
   };
+  error: (cb: (err: { code?: number; message?: string }) => void) => void;
   initialize: (platforms?: unknown[]) => Promise<unknown>;
   update: () => Promise<unknown>;
   restorePurchases: () => Promise<unknown>;
@@ -88,6 +90,7 @@ type CdvStore = {
 type CdvProduct = {
   id: string;
   owned?: boolean;
+  canPurchase?: boolean;
   pricing?: { price?: string };
   getOffer?: () => { order: () => Promise<unknown> } | undefined;
   offers?: Array<{ order: () => Promise<unknown> }>;
@@ -110,6 +113,7 @@ type CdvGlobal = {
   Platform: { APPLE_APPSTORE: string };
   store: CdvStore;
 };
+
 
 function getCdv(): CdvGlobal | null {
   if (typeof window === "undefined") return null;
