@@ -14,8 +14,9 @@ const CACHE_KEY = "signgo.premium.active.v1";
 export type PremiumStatus =
   | { state: "loading" }
   | { state: "unsupported" } // web / non-iOS — IAP not available
-  | { state: "inactive"; priceLabel?: string }
+  | { state: "inactive"; priceLabel?: string; productLoaded?: boolean }
   | { state: "active"; expiryDate?: Date | null; willRenew?: boolean };
+
 
 type Listener = (s: PremiumStatus) => void;
 const listeners = new Set<Listener>();
