@@ -280,19 +280,50 @@ function getPriceLabel(): string | null {
 export async function purchasePremium(): Promise<{ ok: boolean; reason?: string }> {
   const cdv = getCdv();
   if (!cdv) return { ok: false, reason: "unsupported" };
-  const product = cdv.store.get(PRODUCT_ID);
-  if (!product) return { ok: false, reason: "product_not_loaded" };
+
+  // Wait briefly for the product to finish loading from the App Store.
+  // On a fresh sandbox account (Apple review) the product list can take a
+  // couple of seconds. Tapping before it arrives previously returned a
+  // generic "purchase_failed" toast.
+  const product = await waitForProduct(6000);
+  if (!product) {
+    return {
+      ok: false,
+      reason: lastStoreError ?? "product_not_loaded",
+    };
+  }
+
   try {
     const offer = product.getOffer?.() ?? product.offers?.[0];
     if (!offer) return { ok: false, reason: "no_offer" };
+    lastStoreError = null;
     await offer.order();
     return { ok: true };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[premium] purchase failed", msg);
-    return { ok: false, reason: msg };
+    return { ok: false, reason: lastStoreError ?? msg };
   }
 }
+
+function waitForProduct(timeoutMs: number): Promise<CdvProduct | null> {
+  return new Promise((resolve) => {
+    const start = Date.now();
+    const tick = () => {
+      const cdv = getCdv();
+      const p = cdv?.store.get(PRODUCT_ID);
+      if (p && (p.pricing?.price || p.offers?.length)) return resolve(p);
+      if (Date.now() - start > timeoutMs) return resolve(p ?? null);
+      setTimeout(tick, 200);
+    };
+    tick();
+  });
+}
+
+export function isProductLoaded(): boolean {
+  return productLoaded;
+}
+
 
 export async function restorePremium(): Promise<{ ok: boolean; active: boolean }> {
   const cdv = getCdv();
