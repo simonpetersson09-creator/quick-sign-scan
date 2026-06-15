@@ -151,7 +151,12 @@ export async function initPremium(): Promise<void> {
     // reviewers just see a generic toast with no diagnostics in the logs.
     store.error((err) => {
       console.error("[premium] store error", err?.code, err?.message);
-      lastStoreError = err?.message ?? `code ${err?.code ?? "?"}`;
+      // 6500 = PAYMENT_CANCELLED (user tapped Cancel). Don't treat as error.
+      if (err?.code === 6500) {
+        lastStoreError = "cancelled";
+        return;
+      }
+      lastStoreError = `${err?.message ?? "store_error"} [${err?.code ?? "?"}]`;
     });
 
     store.register([
