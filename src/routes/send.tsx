@@ -437,9 +437,7 @@ function SendPage() {
                   disabled={premium.state === "unsupported" || !premiumProductReady}
                   className="rounded-xl bg-primary text-primary-foreground h-11 px-6 shadow-[var(--shadow-card)] transition active:scale-[0.98] disabled:opacity-60 text-[15px] font-semibold"
                 >
-                  {!premiumProductReady && premium.state !== "unsupported"
-                    ? t("premium_loading_product")
-                    : t("premium_start_cta")}
+                  {!premiumProductReady ? t("premium_loading_product") : t("premium_start_cta")}
                 </button>
                 <button
                   type="button"
