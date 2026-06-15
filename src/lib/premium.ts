@@ -326,8 +326,15 @@ export async function purchasePremium(): Promise<{ ok: boolean; reason?: string 
   try {
     const offer = product.getOffer?.() ?? product.offers?.[0];
     if (!offer) return { ok: false, reason: "no_offer" };
+    if (offer.canPurchase === false || product.canPurchase === false) {
+      return { ok: false, reason: "not_allowed" };
+    }
     lastStoreError = null;
-    await offer.order();
+    const orderError = await offer.order();
+    if (orderError?.isError || orderError?.code) {
+      const reason = storeErrorReason(orderError);
+      return { ok: false, reason };
+    }
     // If StoreKit reported an async error (e.g. cancel) during order(),
     // surface that instead of pretending success.
     if (lastStoreError === "cancelled") return { ok: false, reason: "cancelled" };
