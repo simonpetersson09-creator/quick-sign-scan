@@ -92,11 +92,23 @@ type CdvProduct = {
   owned?: boolean;
   canPurchase?: boolean;
   pricing?: { price?: string };
-  getOffer?: () => { order: () => Promise<unknown> } | undefined;
-  offers?: Array<{ order: () => Promise<unknown> }>;
+  getOffer?: () => CdvOffer | undefined;
+  offers?: CdvOffer[];
+};
+type CdvOffer = {
+  id?: string;
+  canPurchase?: boolean;
+  order: () => Promise<CdvStoreError | undefined>;
+};
+type CdvStoreError = {
+  isError?: boolean;
+  code?: number;
+  message?: string;
+  productId?: string | null;
 };
 type CdvTx = {
   productId?: string;
+  products?: Array<{ id: string }>;
   verify: () => Promise<unknown>;
   finish: () => Promise<unknown>;
 };
@@ -217,6 +229,18 @@ export async function initPremium(): Promise<void> {
 
 let productLoaded = false;
 let lastStoreError: string | null = null;
+
+function isCancelledCode(code?: number): boolean {
+  // cordova-plugin-purchase v13 uses 6777006; older/native paths may surface
+  // platform cancellation codes instead.
+  return code === 6777006 || code === 6500 || code === 2;
+}
+
+function storeErrorReason(err: CdvStoreError | undefined, fallback = "purchase_failed"): string {
+  if (!err) return fallback;
+  if (isCancelledCode(err.code)) return "cancelled";
+  return `${err.message ?? fallback} [${err.code ?? "?"}]`;
+}
 
 
 function waitForCdv(timeoutMs: number): Promise<CdvGlobal | null> {
