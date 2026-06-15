@@ -92,11 +92,23 @@ type CdvProduct = {
   owned?: boolean;
   canPurchase?: boolean;
   pricing?: { price?: string };
-  getOffer?: () => { order: () => Promise<unknown> } | undefined;
-  offers?: Array<{ order: () => Promise<unknown> }>;
+  getOffer?: () => CdvOffer | undefined;
+  offers?: CdvOffer[];
+};
+type CdvOffer = {
+  id?: string;
+  canPurchase?: boolean;
+  order: () => Promise<CdvStoreError | undefined>;
+};
+type CdvStoreError = {
+  isError?: boolean;
+  code?: number;
+  message?: string;
+  productId?: string | null;
 };
 type CdvTx = {
   productId?: string;
+  products?: Array<{ id: string }>;
   verify: () => Promise<unknown>;
   finish: () => Promise<unknown>;
 };
@@ -151,12 +163,11 @@ export async function initPremium(): Promise<void> {
     // reviewers just see a generic toast with no diagnostics in the logs.
     store.error((err) => {
       console.error("[premium] store error", err?.code, err?.message);
-      // 6500 = PAYMENT_CANCELLED (user tapped Cancel). Don't treat as error.
-      if (err?.code === 6500) {
+      if (isCancelledCode(err?.code)) {
         lastStoreError = "cancelled";
         return;
       }
-      lastStoreError = `${err?.message ?? "store_error"} [${err?.code ?? "?"}]`;
+      lastStoreError = storeErrorReason(err, "store_error");
     });
 
     store.register([
@@ -183,6 +194,8 @@ export async function initPremium(): Promise<void> {
         }
       })
       .approved((t: CdvTx) => {
+        const txProductId = t.productId ?? t.products?.[0]?.id;
+        if (txProductId && txProductId !== PRODUCT_ID) return;
         // No server-side receipt validator is configured for this app, so
         // calling t.verify() would stall forever (the `verified` callback
         // never fires without a validator). Finish the transaction directly
@@ -217,6 +230,18 @@ export async function initPremium(): Promise<void> {
 
 let productLoaded = false;
 let lastStoreError: string | null = null;
+
+function isCancelledCode(code?: number): boolean {
+  // cordova-plugin-purchase v13 uses 6777006; older/native paths may surface
+  // platform cancellation codes instead.
+  return code === 6777006 || code === 6500 || code === 2;
+}
+
+function storeErrorReason(err: CdvStoreError | undefined, fallback = "purchase_failed"): string {
+  if (!err) return fallback;
+  if (isCancelledCode(err.code)) return "cancelled";
+  return `${err.message ?? fallback} [${err.code ?? "?"}]`;
+}
 
 
 function waitForCdv(timeoutMs: number): Promise<CdvGlobal | null> {
@@ -301,8 +326,15 @@ export async function purchasePremium(): Promise<{ ok: boolean; reason?: string 
   try {
     const offer = product.getOffer?.() ?? product.offers?.[0];
     if (!offer) return { ok: false, reason: "no_offer" };
+    if (offer.canPurchase === false || product.canPurchase === false) {
+      return { ok: false, reason: "not_allowed" };
+    }
     lastStoreError = null;
-    await offer.order();
+    const orderError = await offer.order();
+    if (orderError?.isError || orderError?.code) {
+      const reason = storeErrorReason(orderError);
+      return { ok: false, reason };
+    }
     // If StoreKit reported an async error (e.g. cancel) during order(),
     // surface that instead of pretending success.
     if (lastStoreError === "cancelled") return { ok: false, reason: "cancelled" };
