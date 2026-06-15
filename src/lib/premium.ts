@@ -163,12 +163,11 @@ export async function initPremium(): Promise<void> {
     // reviewers just see a generic toast with no diagnostics in the logs.
     store.error((err) => {
       console.error("[premium] store error", err?.code, err?.message);
-      // 6500 = PAYMENT_CANCELLED (user tapped Cancel). Don't treat as error.
-      if (err?.code === 6500) {
+      if (isCancelledCode(err?.code)) {
         lastStoreError = "cancelled";
         return;
       }
-      lastStoreError = `${err?.message ?? "store_error"} [${err?.code ?? "?"}]`;
+      lastStoreError = storeErrorReason(err, "store_error");
     });
 
     store.register([
@@ -195,6 +194,8 @@ export async function initPremium(): Promise<void> {
         }
       })
       .approved((t: CdvTx) => {
+        const txProductId = t.productId ?? t.products?.[0]?.id;
+        if (txProductId && txProductId !== PRODUCT_ID) return;
         // No server-side receipt validator is configured for this app, so
         // calling t.verify() would stall forever (the `verified` callback
         // never fires without a validator). Finish the transaction directly
