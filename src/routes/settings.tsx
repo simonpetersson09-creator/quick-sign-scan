@@ -6,7 +6,7 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { loadSettings, saveSettings, type AppSettings } from "@/lib/settings";
 import { useT, useLang } from "@/lib/i18n";
 import { usePremium, useUsage } from "@/hooks/usePremium";
-import { purchasePremium, restorePremium } from "@/lib/premium";
+import { isProductLoaded, purchasePremium, restorePremium } from "@/lib/premium";
 
 
 export const Route = createFileRoute("/settings")({
@@ -170,6 +170,11 @@ function PremiumSection() {
   const isActive = status.state === "active";
   const unsupported = status.state === "unsupported";
   const loading = status.state === "loading";
+  const productReady =
+    isActive ||
+    unsupported ||
+    isProductLoaded() ||
+    (status.state === "inactive" && Boolean(status.priceLabel));
 
   function formatDate(d?: Date | null) {
     if (!d) return "";
@@ -189,7 +194,13 @@ function PremiumSection() {
     setBusy("buy");
     const r = await purchasePremium();
     setBusy(null);
-    if (!r.ok && r.reason !== "unsupported") setInfo(t("premium_purchase_failed"));
+    if (!r.ok && r.reason !== "unsupported" && r.reason !== "cancelled") {
+      if (r.reason === "product_not_loaded" || r.reason === "no_offer") {
+        setInfo(t("premium_loading_product"));
+      } else {
+        setInfo(`${t("premium_purchase_failed")}${r.reason ? ` (${r.reason})` : ""}`);
+      }
+    }
   }
 
   async function restore() {
@@ -252,15 +263,19 @@ function PremiumSection() {
           <button
             type="button"
             onClick={buy}
-            disabled={busy !== null || unsupported}
+            disabled={busy !== null || unsupported || !productReady}
             className="rounded-xl bg-primary text-primary-foreground h-11 px-4 transition active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
           >
-            {busy === "buy" ? (
+            {busy === "buy" || !productReady ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Crown className="h-4 w-4" />
             )}
-            <span className="text-[14px] font-semibold">{t("premium_start_cta")}</span>
+            <span className="text-[14px] font-semibold">
+              {!productReady && !unsupported
+                ? t("premium_loading_product")
+                : t("premium_start_cta")}
+            </span>
           </button>
           <button
             type="button"
