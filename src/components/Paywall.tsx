@@ -40,7 +40,7 @@ export function Paywall({ status, freeRemaining, freeLimit, onClose }: Props) {
     setBusy("buy");
     const res = await purchasePremium();
     setBusy(null);
-    if (!res.ok && res.reason !== "unsupported") {
+    if (!res.ok && res.reason !== "unsupported" && res.reason !== "cancelled") {
       // Surface the real reason so reviewers (and us) can diagnose.
       const reason = res.reason ?? "";
       if (reason === "product_not_loaded" || reason === "no_offer") {

@@ -151,7 +151,12 @@ export async function initPremium(): Promise<void> {
     // reviewers just see a generic toast with no diagnostics in the logs.
     store.error((err) => {
       console.error("[premium] store error", err?.code, err?.message);
-      lastStoreError = err?.message ?? `code ${err?.code ?? "?"}`;
+      // 6500 = PAYMENT_CANCELLED (user tapped Cancel). Don't treat as error.
+      if (err?.code === 6500) {
+        lastStoreError = "cancelled";
+        return;
+      }
+      lastStoreError = `${err?.message ?? "store_error"} [${err?.code ?? "?"}]`;
     });
 
     store.register([
@@ -298,10 +303,15 @@ export async function purchasePremium(): Promise<{ ok: boolean; reason?: string 
     if (!offer) return { ok: false, reason: "no_offer" };
     lastStoreError = null;
     await offer.order();
+    // If StoreKit reported an async error (e.g. cancel) during order(),
+    // surface that instead of pretending success.
+    if (lastStoreError === "cancelled") return { ok: false, reason: "cancelled" };
+    if (lastStoreError) return { ok: false, reason: lastStoreError };
     return { ok: true };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[premium] purchase failed", msg);
+    if (lastStoreError === "cancelled") return { ok: false, reason: "cancelled" };
     return { ok: false, reason: lastStoreError ?? msg };
   }
 }
