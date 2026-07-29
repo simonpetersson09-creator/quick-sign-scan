@@ -34,7 +34,7 @@ export function AppShell({ title, back, children, rightSlot, className, mainClas
           {rightSlot && <div className="absolute right-5">{rightSlot}</div>}
         </header>
       )}
-      <main className="min-h-0 flex-1 flex flex-col overflow-hidden px-5 pb-safe">{children}</main>
+      <main className={cn("min-h-0 flex-1 flex flex-col overflow-hidden px-5 pb-safe", mainClassName)}>{children}</main>
     </div>
   );
 }
