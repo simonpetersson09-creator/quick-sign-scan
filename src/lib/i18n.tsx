@@ -578,7 +578,7 @@ const en: Dict = {
   home_premium_badge: "Premium",
 };
 
-const dicts: Partial<Record<Lang, Dict>> = { sv, en };
+const dicts: Partial<Record<Lang, Dict>> = { sv, en, de, fr, es, it, pt, nl, pl, da, no, fi };
 
 interface Ctx {
   lang: Lang;
