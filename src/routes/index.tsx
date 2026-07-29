@@ -53,8 +53,13 @@ function Home() {
           </span>
           <Link
             to="/settings"
-            className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-card border border-border text-[11px] font-medium text-foreground/75 shadow-[var(--shadow-soft)]"
+            className={`mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-card border text-[11px] font-medium text-foreground/75 shadow-[var(--shadow-soft)] ${
+              isPremium
+                ? "border-[hsl(43_74%_52%)] shadow-[0_0_0_1px_hsl(43_74%_52%/0.25),var(--shadow-soft)]"
+                : "border-border"
+            }`}
           >
+
             {isPremium ? (
               <>
                 <Crown className="h-3 w-3 text-primary" />
