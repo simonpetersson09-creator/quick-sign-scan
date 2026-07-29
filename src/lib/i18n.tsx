@@ -572,7 +572,7 @@ const en: Dict = {
   home_premium_badge: "Premium",
 };
 
-const dicts: Record<Lang, Dict> = { sv, en };
+const dicts: Partial<Record<Lang, Dict>> = { sv, en };
 
 interface Ctx {
   lang: Lang;
@@ -591,7 +591,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored === "sv" || stored === "en") setLangState(stored);
+      if (stored && LANGUAGES.some((l) => l.code === stored)) setLangState(stored as Lang);
     } catch {}
   }, []);
 
@@ -616,7 +616,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   }
 
   function t(key: string, vars?: Record<string, string | number>) {
-    let s = dicts[lang][key] ?? dicts.sv[key] ?? key;
+    let s = dicts[lang]?.[key] ?? en[key] ?? sv[key] ?? key;
     if (vars) {
       for (const [k, v] of Object.entries(vars)) {
         s = s.replaceAll(`{${k}}`, String(v));
