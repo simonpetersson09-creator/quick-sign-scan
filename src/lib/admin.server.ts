@@ -20,7 +20,7 @@ function timingSafeEqual(a: string, b: string): boolean {
 }
 
 export function checkAdminPassword(input: string): boolean {
-  const expected = process.env.ADMIN_PASSWORD;
+  const expected = process.env.ADMIN_PASSWORD?.trim();
   if (!expected) return false;
   return timingSafeEqual(input, expected);
 }

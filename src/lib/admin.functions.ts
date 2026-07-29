@@ -10,14 +10,14 @@ export const adminLogin = createServerFn({ method: "POST" })
     password: String(data?.password ?? "").trim().slice(0, 200),
   }))
   .handler(async ({ data }) => {
-    const { checkAdminPassword, getAdminSession } = await import("./admin.server");
+    const { checkAdminPassword, getAdminSession, loadMonthlyStats } = await import("./admin.server");
     if (!checkAdminPassword(data.password)) {
       await new Promise((r) => setTimeout(r, 600));
       return { ok: false as const };
     }
     const session = await getAdminSession();
     await session.update({ admin: true });
-    return { ok: true as const };
+    return loadMonthlyStats();
   });
 
 export const adminLogout = createServerFn({ method: "POST" }).handler(async () => {

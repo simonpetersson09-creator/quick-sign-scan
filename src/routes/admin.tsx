@@ -59,13 +59,17 @@ function AdminPage() {
   const [totalSent, setTotalSent] = useState(0);
   const [thisMonthSent, setThisMonthSent] = useState(0);
 
+  function applyStats(r: Extract<Awaited<ReturnType<typeof adminEmailStats>>, { ok: true }>) {
+    setMonths(r.months);
+    setTotalSent(r.totalSent);
+    setThisMonthSent(r.thisMonthSent);
+    setAuthed(true);
+  }
+
   async function refresh() {
     const r = await stats({});
     if (r.ok) {
-      setMonths(r.months);
-      setTotalSent(r.totalSent);
-      setThisMonthSent(r.thisMonthSent);
-      setAuthed(true);
+      applyStats(r);
     } else {
       setAuthed(false);
     }
@@ -87,7 +91,7 @@ function AdminPage() {
       if (!r.ok) setError("Fel lösenord");
       else {
         setPassword("");
-        await refresh();
+        applyStats(r);
       }
     } catch {
       setError("Något gick fel");
