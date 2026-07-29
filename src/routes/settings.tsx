@@ -299,15 +299,15 @@ function PremiumSection() {
         </div>
       )}
 
-      <a
-        href="https://apps.apple.com/account/subscriptions"
-        target="_blank"
-        rel="noopener noreferrer"
+      <button
+        type="button"
+        onClick={openManageSubscriptions}
         className="-mt-1 rounded-xl bg-background text-foreground border border-border h-10 px-4 transition active:scale-[0.98] flex items-center justify-center gap-2 shrink-0"
       >
         <ExternalLink className="h-4 w-4" />
         <span className="text-[13px] font-medium">{t("premium_manage_apple")}</span>
-      </a>
+      </button>
+
 
 
       {info && <p className="text-[12px] text-destructive">{info}</p>}
