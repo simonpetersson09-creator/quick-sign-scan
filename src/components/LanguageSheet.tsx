@@ -25,7 +25,7 @@ export function LanguageSheet() {
         <button
           type="button"
           aria-label={t("changeLanguage")}
-          className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-full bg-card text-foreground shadow-[var(--shadow-soft)] border border-border transition active:scale-[0.96]"
+          className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-card text-primary shadow-[var(--shadow-soft)] border border-border transition active:scale-[0.96]"
         >
           <Globe className="h-[18px] w-[18px]" strokeWidth={1.75} />
           <span className="mt-[1px] text-[9px] font-semibold tracking-wide uppercase">
