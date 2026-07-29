@@ -14,7 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      email_send_events: {
+        Row: {
+          created_at: string
+          error_code: string | null
+          id: string
+          recipient_hash: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          error_code?: string | null
+          id?: string
+          recipient_hash?: string | null
+          status: string
+        }
+        Update: {
+          created_at?: string
+          error_code?: string | null
+          id?: string
+          recipient_hash?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
