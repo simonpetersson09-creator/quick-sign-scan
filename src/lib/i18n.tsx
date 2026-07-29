@@ -52,6 +52,8 @@ const sv: Dict = {
   attachFile: "Bifoga fil",
   changeLanguage: "Byt språk",
   chooseLanguage: "Välj språk",
+  langTipTitle: "Välj språk",
+  langTipBody: "Tryck här för att byta språk när som helst.",
 
   // scan
   scanTitle: "Skanna dokument",
@@ -323,6 +325,8 @@ const en: Dict = {
   attachFile: "Attach file",
   changeLanguage: "Change language",
   chooseLanguage: "Choose language",
+  langTipTitle: "Choose your language",
+  langTipBody: "Tap here to switch languages anytime.",
 
   // scan
   scanTitle: "Scan document",
