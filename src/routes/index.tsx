@@ -53,17 +53,19 @@ function Home() {
           </span>
           <Link
             to="/settings"
-            className={`mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold ${
+            className={`mt-3 inline-flex items-center gap-1.5 rounded-full text-[11px] font-semibold ${
               isPremium
-                ? "badge-premium"
-                : "bg-card border border-border text-foreground/75 shadow-[var(--shadow-soft)] font-medium"
+                ? "badge-premium px-2.5 py-[5px]"
+                : "bg-card border border-border text-foreground/75 shadow-[var(--shadow-soft)] font-medium px-3 py-1"
             }`}
           >
 
             {isPremium ? (
               <>
-                <Crown className="h-3 w-3" />
-                <span>{t("premium_status_active")} – {t("premium_unlimited")}</span>
+                <Crown className="h-[13px] w-[13px] text-primary" strokeWidth={2.25} />
+                <span>
+                  {t("premium_status_title")} • {t("premium_badge_unlimited")}
+                </span>
               </>
             ) : (
               <span>{t("home_free_remaining", { remaining: String(remaining) })}</span>
