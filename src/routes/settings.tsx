@@ -259,7 +259,14 @@ function PremiumSection() {
             </span>
           </div>
         </div>
+        {isActive && (
+          <span className="badge-premium inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold shrink-0">
+            <Crown className="h-3 w-3" />
+            <span>{t("home_premium_badge")}</span>
+          </span>
+        )}
       </div>
+
 
       <div className="text-[12px] text-muted-foreground ml-0.5">
         {isActive ? (
