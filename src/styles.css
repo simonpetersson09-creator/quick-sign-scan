@@ -84,6 +84,20 @@
 
   --shadow-soft: 0 1px 2px rgba(20, 30, 50, 0.04), 0 2px 8px rgba(20, 30, 50, 0.04);
   --shadow-card: 0 2px 4px rgba(20, 30, 50, 0.04), 0 12px 32px -8px rgba(20, 30, 50, 0.08);
+
+  /* Premium (gold) accents */
+  --gold: oklch(0.78 0.13 85);
+  --gold-soft: oklch(0.88 0.08 92);
+  --gold-deep: oklch(0.6 0.12 68);
+  --gold-foreground: oklch(0.26 0.04 70);
+  --gradient-gold: linear-gradient(
+    135deg,
+    oklch(0.9 0.08 95) 0%,
+    oklch(0.82 0.13 88) 35%,
+    oklch(0.7 0.14 76) 70%,
+    oklch(0.6 0.12 68) 100%
+  );
+  --shadow-gold: 0 1px 0 oklch(1 0 0 / 0.45) inset, 0 8px 22px -8px oklch(0.6 0.12 68 / 0.6);
 }
 
 @layer base {
@@ -141,4 +155,52 @@
 @keyframes scan-trace {
   from { stroke-dashoffset: 0; }
   to { stroke-dashoffset: -100; }
+}
+
+/* Shared premium (gold) surfaces — used by every premium CTA/badge */
+.btn-premium {
+  position: relative;
+  background: var(--gradient-gold);
+  color: var(--gold-foreground);
+  border: 1px solid oklch(0.66 0.13 74 / 0.85);
+  box-shadow: var(--shadow-gold);
+  overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+.btn-premium::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 35%,
+    oklch(1 0 0 / 0.55) 50%,
+    transparent 65%
+  );
+  transform: translateX(-120%);
+  animation: premium-sheen 4.5s ease-in-out infinite;
+  pointer-events: none;
+}
+.btn-premium:active {
+  transform: scale(0.98);
+  filter: brightness(0.97);
+}
+.btn-premium:disabled {
+  filter: saturate(0.6);
+}
+
+.badge-premium {
+  background: var(--gradient-gold);
+  color: var(--gold-foreground);
+  border: 1px solid oklch(0.66 0.13 74 / 0.9);
+  box-shadow: var(--shadow-gold);
+}
+
+@keyframes premium-sheen {
+  0%, 65% { transform: translateX(-120%); }
+  85%, 100% { transform: translateX(140%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-premium::after { animation: none; opacity: 0; }
 }
