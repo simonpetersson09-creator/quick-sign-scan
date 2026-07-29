@@ -412,6 +412,10 @@ export const sendScanEmail = createServerFn({ method: "POST" })
       if (response.ok) {
         recordHit(shortBuckets, ipHash, now);
         recordHit(dailyBuckets, ipHash, now);
+        try {
+          const { logEmailEvent } = await import("./email-log.server");
+          await logEmailEvent({ status: "sent", recipient: data.to });
+        } catch { /* ignore */ }
         console.log(
           `[sendScanEmail] ${ts} ${requestId} ip=${ipHash} status=sent`,
         );
@@ -434,6 +438,17 @@ export const sendScanEmail = createServerFn({ method: "POST" })
     recordHit(shortBuckets, ipHash, now);
     recordHit(dailyBuckets, ipHash, now);
 
-    if (lastStatus === undefined) return fail("network_error");
-    return fail(classifyResendError(lastStatus, lastBody), lastStatus);
+    const failure =
+      lastStatus === undefined
+        ? fail("network_error")
+        : fail(classifyResendError(lastStatus, lastBody), lastStatus);
+    try {
+      const { logEmailEvent } = await import("./email-log.server");
+      await logEmailEvent({
+        status: "failed",
+        errorCode: failure.ok === false ? failure.code : null,
+        recipient: data.to,
+      });
+    } catch { /* ignore */ }
+    return failure;
   });
