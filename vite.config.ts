@@ -38,7 +38,7 @@ function nitroSsrShimPlugin(): Plugin {
     "let handlerPromise;",
     "function getHandler() {",
     "  if (!handlerPromise) {",
-    "    handlerPromise = import('../../.output/server/index.mjs').then((m) => m.default ?? m);",
+    "    handlerPromise = import('./index.mjs').then((m) => m.default ?? m);",
     "  }",
     "  return handlerPromise;",
     "}",
