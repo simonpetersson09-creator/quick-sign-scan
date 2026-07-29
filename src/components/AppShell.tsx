@@ -10,9 +10,10 @@ interface Props {
   children: ReactNode;
   rightSlot?: ReactNode;
   className?: string;
+  mainClassName?: string;
 }
 
-export function AppShell({ title, back, children, rightSlot, className }: Props) {
+export function AppShell({ title, back, children, rightSlot, className, mainClassName }: Props) {
   const t = useT();
   return (
     <div className={cn("h-dvh overflow-hidden flex flex-col bg-background", className)}>
