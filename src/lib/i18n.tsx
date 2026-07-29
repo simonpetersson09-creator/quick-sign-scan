@@ -1,4 +1,14 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { de } from "./i18n/de";
+import { fr } from "./i18n/fr";
+import { es } from "./i18n/es";
+import { it } from "./i18n/it";
+import { pt } from "./i18n/pt";
+import { nl } from "./i18n/nl";
+import { pl } from "./i18n/pl";
+import { da } from "./i18n/da";
+import { no } from "./i18n/no";
+import { fi } from "./i18n/fi";
 
 export type Lang =
   | "sv"
@@ -578,7 +588,7 @@ const en: Dict = {
   home_premium_badge: "Premium",
 };
 
-const dicts: Partial<Record<Lang, Dict>> = { sv, en };
+const dicts: Partial<Record<Lang, Dict>> = { sv, en, de, fr, es, it, pt, nl, pl, da, no, fi };
 
 interface Ctx {
   lang: Lang;
