@@ -268,5 +268,6 @@ export const no: Record<string, string> = {
 
   // home banner
   home_free_remaining: "{remaining} av 5 gratis dokumenter igjen",
+  premium_badge_unlimited: "Ubegrensede dokumenter",
   home_premium_badge: "Premium",
 };

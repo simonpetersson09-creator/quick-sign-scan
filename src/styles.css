@@ -98,6 +98,12 @@
     oklch(0.6 0.12 68) 100%
   );
   --shadow-gold: 0 1px 0 oklch(1 0 0 / 0.45) inset, 0 8px 22px -8px oklch(0.6 0.12 68 / 0.6);
+
+  /* Champagne (subscription status badge) */
+  --champagne-from: #f7e3a1;
+  --champagne-to: #d7a03b;
+  --gradient-champagne: linear-gradient(135deg, var(--champagne-from) 0%, var(--champagne-to) 100%);
+  --champagne-border: color-mix(in oklab, var(--champagne-to) 70%, transparent);
 }
 
 @layer base {
@@ -190,10 +196,27 @@
 }
 
 .badge-premium {
-  background: var(--gradient-gold);
-  color: var(--gold-foreground);
-  border: 1px solid oklch(0.66 0.13 74 / 0.9);
-  box-shadow: var(--shadow-gold);
+  position: relative;
+  overflow: hidden;
+  background: var(--gradient-champagne);
+  color: var(--primary);
+  border: 1px solid var(--champagne-border);
+  box-shadow: var(--shadow-soft);
+}
+
+.badge-premium-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.55) 50%,
+    transparent 65%
+  );
+  transform: translateX(-120%);
+  animation: premium-sheen 1.6s ease-out 1 both;
+  pointer-events: none;
 }
 
 @keyframes premium-sheen {
@@ -203,4 +226,5 @@
 
 @media (prefers-reduced-motion: reduce) {
   .btn-premium::after { animation: none; opacity: 0; }
+  .badge-premium-shimmer::after { animation: none; opacity: 0; }
 }

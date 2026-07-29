@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ScanLine, PenLine, Mail, CheckCircle2, Settings as SettingsIcon, ArrowDown, FileUp, Loader2, Crown } from "lucide-react";
 import { useLang } from "@/lib/i18n";
 import { LanguageSheet } from "@/components/LanguageSheet";
@@ -31,6 +31,21 @@ function Home() {
   const { remaining } = useUsage();
   const isPremium = premium.state === "active";
 
+  // Play the shimmer once, the first time the badge is shown after purchase.
+  const [shimmer, setShimmer] = useState(false);
+  useEffect(() => {
+    if (!isPremium) return;
+    try {
+      if (localStorage.getItem("signgo.premium.badge.shimmer.v1") === "1") return;
+      localStorage.setItem("signgo.premium.badge.shimmer.v1", "1");
+    } catch {
+      return;
+    }
+    setShimmer(true);
+    const id = window.setTimeout(() => setShimmer(false), 2000);
+    return () => window.clearTimeout(id);
+  }, [isPremium]);
+
   const steps = [
     { icon: ScanLine, label: t("step_scan") },
     { icon: PenLine, label: t("step_sign") },
@@ -53,17 +68,19 @@ function Home() {
           </span>
           <Link
             to="/settings"
-            className={`mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold ${
+            className={`mt-3 inline-flex items-center gap-1.5 rounded-full text-[11px] font-semibold ${
               isPremium
-                ? "badge-premium"
-                : "bg-card border border-border text-foreground/75 shadow-[var(--shadow-soft)] font-medium"
+                ? `badge-premium px-2.5 py-[5px] ${shimmer ? "badge-premium-shimmer" : ""}`
+                : "bg-card border border-border text-foreground/75 shadow-[var(--shadow-soft)] font-medium px-3 py-1"
             }`}
           >
 
             {isPremium ? (
               <>
-                <Crown className="h-3 w-3" />
-                <span>{t("premium_status_active")} – {t("premium_unlimited")}</span>
+                <Crown className="h-[13px] w-[13px] text-primary" strokeWidth={2.25} />
+                <span>
+                  {t("premium_status_title")} • {t("premium_badge_unlimited")}
+                </span>
               </>
             ) : (
               <span>{t("home_free_remaining", { remaining: String(remaining) })}</span>

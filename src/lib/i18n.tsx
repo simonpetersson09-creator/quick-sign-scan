@@ -312,6 +312,7 @@ const sv: Dict = {
 
   // home banner
   home_free_remaining: "{remaining} av 5 gratis dokument kvar",
+  premium_badge_unlimited: "Obegränsade dokument",
   home_premium_badge: "Premium",
 };
 
@@ -585,6 +586,7 @@ const en: Dict = {
 
   // home banner
   home_free_remaining: "{remaining} of 5 free documents left",
+  premium_badge_unlimited: "Unlimited documents",
   home_premium_badge: "Premium",
 };
 
