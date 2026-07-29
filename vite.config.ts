@@ -22,59 +22,71 @@ import type { Plugin } from "vite";
  * the prerender request.
  */
 function nitroSsrShimPlugin(): Plugin {
+  const shimSource = [
+    // Re-export Nitro's fetch handler, but:
+    //  1. Resolve `./index.mjs` lazily, so the shim can be written before
+    //     Nitro has finished emitting its entry (ordering differs between
+    //     machines/CI; a static import would crash at load time).
+    //  2. Stub `env`/`ctx` so accesses like `env.ASSETS` don't throw under
+    //     Node — the prerender preview server invokes `fetch(req)` with no
+    //     Cloudflare bindings.
+    //  3. Re-wrap the incoming Request as a plain WHATWG Request so Nitro's
+    //     `augmentReq` can attach `.ip` and friends. srvx's NodeRequest
+    //     exposes `ip` as a read-only getter, which otherwise throws
+    //     "Cannot set property ip of #<Request>".
+    "const stubCtx = { waitUntil() {}, passThroughOnException() {} };",
+    "let handlerPromise;",
+    "function getHandler() {",
+    "  if (!handlerPromise) {",
+    "    handlerPromise = import('./index.mjs').then((m) => m.default ?? m);",
+    "  }",
+    "  return handlerPromise;",
+    "}",
+    "function toPlainRequest(request) {",
+    "  const init = {",
+    "    method: request.method,",
+    "    headers: request.headers,",
+    "    redirect: request.redirect,",
+    "  };",
+    "  if (request.method !== 'GET' && request.method !== 'HEAD') {",
+    "    init.body = request.body;",
+    "    init.duplex = 'half';",
+    "  }",
+    "  return new Request(request.url, init);",
+    "}",
+    "export default {",
+    "  async fetch(request, env, ctx) {",
+    "    const handler = await getHandler();",
+    "    return handler.fetch(toPlainRequest(request), env ?? {}, ctx ?? stubCtx);",
+    "  },",
+    "};",
+    "",
+  ].join("\n");
+
+  const writeShim = () => {
+    try {
+      const serverDir = join(process.cwd(), "dist", "server");
+      mkdirSync(serverDir, { recursive: true });
+      writeFileSync(join(serverDir, "server.js"), shimSource, "utf8");
+      // Guarantee the shim is treated as ESM regardless of what dist/package.json
+      // ends up containing (Nitro writes it without "type": "module").
+      const pkgPath = join(serverDir, "package.json");
+      if (!existsSync(pkgPath)) {
+        writeFileSync(pkgPath, JSON.stringify({ type: "module" }, null, 2), "utf8");
+      }
+    } catch {
+      /* ignore — the prerender will surface a clearer error if needed */
+    }
+  };
+
   return {
     name: "lovable:nitro-ssr-shim",
     apply: "build",
-    closeBundle: {
-      order: "post",
-      handler() {
-        try {
-          const serverDir = join(process.cwd(), "dist", "server");
-          const nitroEntry = join(serverDir, "index.mjs");
-          if (!existsSync(nitroEntry)) return;
-          const shimPath = join(serverDir, "server.js");
-          writeFileSync(
-            shimPath,
-            // Re-export Nitro's fetch handler, but:
-            //  1. Stub `env`/`ctx` so accesses like `env.ASSETS` don't throw
-            //     under Node — the prerender preview server invokes
-            //     `fetch(req)` with no Cloudflare bindings.
-            //  2. Re-wrap the incoming Request as a plain WHATWG Request so
-            //     Nitro's `augmentReq` can attach `.ip` and friends. srvx's
-            //     NodeRequest exposes `ip` as a read-only getter, which
-            //     otherwise throws "Cannot set property ip of #<Request>".
-            [
-              "import handler from './index.mjs';",
-              "const stubCtx = { waitUntil() {}, passThroughOnException() {} };",
-              "function toPlainRequest(request) {",
-              "  const init = {",
-              "    method: request.method,",
-              "    headers: request.headers,",
-              "    redirect: request.redirect,",
-              "  };",
-              "  if (request.method !== 'GET' && request.method !== 'HEAD') {",
-              "    init.body = request.body;",
-              "    init.duplex = 'half';",
-              "  }",
-              "  return new Request(request.url, init);",
-              "}",
-              "export default {",
-              "  fetch: (request, env, ctx) =>",
-              "    handler.fetch(toPlainRequest(request), env ?? {}, ctx ?? stubCtx),",
-              "};",
-              "",
-            ].join("\n"),
-            "utf8",
-          );
-
-
-        } catch {
-          /* ignore — the prerender will surface a clearer error if needed */
-        }
-      },
-    },
+    writeBundle: { order: "post", handler: writeShim },
+    closeBundle: { order: "post", handler: writeShim },
   };
 }
+
 
 function stableServerFunctionId({ filename, functionName }: { filename: string; functionName: string }) {
   const normalized = filename.replace(/\\/g, "/");
