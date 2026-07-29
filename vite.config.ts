@@ -151,7 +151,8 @@ export default defineConfig({
     },
 
     // SPA mode → vid build prerendas en lättviktig shell-HTML (utan route-content)
-    // som skrivs till dist/client/index.html. Capacitor (WKWebView) laddar den
+    // som skrivs som index.html i Nitros klient-output (.output/public eller
+    // dist/client beroende på preset). Capacitor (WKWebView) laddar den
     // lokalt; klient-routern hydratiserar och tar därefter över helt på enheten.
     // Web-deployen använder fortfarande SSR via Nitro/Cloudflare.
     spa: {
