@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { X, Crown, RotateCcw, Loader2 } from "lucide-react";
+import { X, Crown, RotateCcw, Loader2, ExternalLink } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { loadSettings, saveSettings, type AppSettings } from "@/lib/settings";
@@ -303,10 +303,12 @@ function PremiumSection() {
         href="https://apps.apple.com/account/subscriptions"
         target="_blank"
         rel="noopener noreferrer"
-        className="self-start text-[12px] font-medium text-primary hover:underline mt-1"
+        className="rounded-xl bg-background text-foreground border border-border h-10 px-4 transition active:scale-[0.98] flex items-center justify-center gap-2"
       >
-        {t("premium_manage_apple")}
+        <ExternalLink className="h-4 w-4" />
+        <span className="text-[13px] font-medium">{t("premium_manage_apple")}</span>
       </a>
+
 
       {info && <p className="text-[12px] text-destructive">{info}</p>}
     </section>
