@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { X, Crown, RotateCcw, Loader2 } from "lucide-react";
+import { X, Crown, RotateCcw, Loader2, ExternalLink } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { loadSettings, saveSettings, type AppSettings } from "@/lib/settings";
