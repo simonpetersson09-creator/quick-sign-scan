@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Drawer as DrawerPrimitive } from "vaul";
+import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { Globe, Check } from "lucide-react";
 import { useLang, LANGUAGES, type Lang } from "@/lib/i18n";
 
 /**
- * iOS-style language picker: circular button + bottom sheet.
- * Purely presentational — language state stays in the i18n provider.
+ * iOS-style language picker: circular button + compact floating popover
+ * anchored above the button. Purely presentational — language state stays
+ * in the i18n provider.
  */
 export function LanguageSheet() {
   const { lang, setLang, t } = useLang();
@@ -17,8 +18,8 @@ export function LanguageSheet() {
   }
 
   return (
-    <DrawerPrimitive.Root open={open} onOpenChange={setOpen} shouldScaleBackground={false}>
-      <DrawerPrimitive.Trigger asChild>
+    <PopoverPrimitive.Root open={open} onOpenChange={setOpen}>
+      <PopoverPrimitive.Trigger asChild>
         <button
           type="button"
           aria-label={t("changeLanguage")}
@@ -29,20 +30,20 @@ export function LanguageSheet() {
             {lang}
           </span>
         </button>
-      </DrawerPrimitive.Trigger>
+      </PopoverPrimitive.Trigger>
 
-      <DrawerPrimitive.Portal>
-        <DrawerPrimitive.Overlay className="fixed inset-0 z-50 bg-foreground/30 backdrop-blur-[2px]" />
-        <DrawerPrimitive.Content className="fixed inset-x-0 bottom-0 z-50 flex h-[60dvh] flex-col rounded-t-[24px] bg-card outline-none">
-          {/* Drag handle */}
-          <div className="mx-auto mt-2.5 h-1.5 w-10 shrink-0 rounded-full bg-muted-foreground/25" />
-
-          <DrawerPrimitive.Title className="px-6 pt-4 pb-3 text-[17px] font-semibold tracking-tight text-foreground text-center">
-            {t("chooseLanguage")}
-          </DrawerPrimitive.Title>
-
-          <div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-safe">
-            <ul className="pb-6">
+      <PopoverPrimitive.Portal>
+        <PopoverPrimitive.Content
+          side="top"
+          align="end"
+          sideOffset={10}
+          collisionPadding={12}
+          className="z-50 w-[280px] max-w-[calc(100vw-24px)] overflow-hidden rounded-[20px] border border-border bg-card p-1.5 shadow-[var(--shadow-card)] outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=top]:slide-in-from-bottom-2"
+        >
+          <div
+            className="max-h-[50dvh] overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            <ul>
               {LANGUAGES.map((l) => {
                 const active = l.code === lang;
                 return (
@@ -51,26 +52,26 @@ export function LanguageSheet() {
                       type="button"
                       onClick={() => pick(l.code)}
                       aria-current={active ? "true" : undefined}
-                      className="flex min-h-[52px] w-full items-center justify-between gap-3 rounded-xl px-4 text-left transition active:bg-muted/60"
+                      className="flex min-h-[46px] w-full items-center justify-between gap-3 rounded-[14px] px-3.5 text-left transition active:bg-muted/60"
                     >
                       <span
                         className={
                           active
-                            ? "text-[17px] font-semibold tracking-tight text-foreground"
-                            : "text-[17px] font-normal tracking-tight text-foreground/80"
+                            ? "text-[16px] font-semibold tracking-tight text-foreground"
+                            : "text-[16px] font-normal tracking-tight text-foreground/80"
                         }
                       >
                         {l.nativeName}
                       </span>
-                      {active && <Check className="h-5 w-5 shrink-0 text-primary" strokeWidth={2.5} />}
+                      {active && <Check className="h-[18px] w-[18px] shrink-0 text-primary" strokeWidth={2.5} />}
                     </button>
                   </li>
                 );
               })}
             </ul>
           </div>
-        </DrawerPrimitive.Content>
-      </DrawerPrimitive.Portal>
-    </DrawerPrimitive.Root>
+        </PopoverPrimitive.Content>
+      </PopoverPrimitive.Portal>
+    </PopoverPrimitive.Root>
   );
 }
