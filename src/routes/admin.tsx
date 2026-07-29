@@ -120,6 +120,9 @@ function AdminPage() {
             type="password"
             value={password}
             autoComplete="current-password"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             onChange={(e) => setPassword(e.target.value)}
             className="h-12 rounded-xl bg-card border border-border px-4 text-[15px] outline-none focus:border-primary"
             placeholder="Lösenord"

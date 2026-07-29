@@ -7,7 +7,7 @@ export type AdminStats =
 
 export const adminLogin = createServerFn({ method: "POST" })
   .inputValidator((data: { password: string }) => ({
-    password: String(data?.password ?? "").slice(0, 200),
+    password: String(data?.password ?? "").trim().slice(0, 200),
   }))
   .handler(async ({ data }) => {
     const { checkAdminPassword, getAdminSession } = await import("./admin.server");
