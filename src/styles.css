@@ -156,3 +156,51 @@
   from { stroke-dashoffset: 0; }
   to { stroke-dashoffset: -100; }
 }
+
+/* Shared premium (gold) surfaces — used by every premium CTA/badge */
+.btn-premium {
+  position: relative;
+  background: var(--gradient-gold);
+  color: var(--gold-foreground);
+  border: 1px solid oklch(0.66 0.13 74 / 0.85);
+  box-shadow: var(--shadow-gold);
+  overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+.btn-premium::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 35%,
+    oklch(1 0 0 / 0.55) 50%,
+    transparent 65%
+  );
+  transform: translateX(-120%);
+  animation: premium-sheen 4.5s ease-in-out infinite;
+  pointer-events: none;
+}
+.btn-premium:active {
+  transform: scale(0.98);
+  filter: brightness(0.97);
+}
+.btn-premium:disabled {
+  filter: saturate(0.6);
+}
+
+.badge-premium {
+  background: var(--gradient-gold);
+  color: var(--gold-foreground);
+  border: 1px solid oklch(0.66 0.13 74 / 0.9);
+  box-shadow: var(--shadow-gold);
+}
+
+@keyframes premium-sheen {
+  0%, 65% { transform: translateX(-120%); }
+  85%, 100% { transform: translateX(140%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-premium::after { animation: none; opacity: 0; }
+}
