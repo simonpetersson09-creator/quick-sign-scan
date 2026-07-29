@@ -84,6 +84,20 @@
 
   --shadow-soft: 0 1px 2px rgba(20, 30, 50, 0.04), 0 2px 8px rgba(20, 30, 50, 0.04);
   --shadow-card: 0 2px 4px rgba(20, 30, 50, 0.04), 0 12px 32px -8px rgba(20, 30, 50, 0.08);
+
+  /* Premium (gold) accents */
+  --gold: oklch(0.78 0.13 85);
+  --gold-soft: oklch(0.88 0.08 92);
+  --gold-deep: oklch(0.6 0.12 68);
+  --gold-foreground: oklch(0.26 0.04 70);
+  --gradient-gold: linear-gradient(
+    135deg,
+    oklch(0.9 0.08 95) 0%,
+    oklch(0.82 0.13 88) 35%,
+    oklch(0.7 0.14 76) 70%,
+    oklch(0.6 0.12 68) 100%
+  );
+  --shadow-gold: 0 1px 0 oklch(1 0 0 / 0.45) inset, 0 8px 22px -8px oklch(0.6 0.12 68 / 0.6);
 }
 
 @layer base {
