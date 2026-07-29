@@ -58,7 +58,12 @@ function SettingsPage() {
   }
 
   return (
-    <AppShell title={t("settingsTitle")} back="/" className="h-dvh overflow-hidden">
+    <AppShell
+      title={t("settingsTitle")}
+      back="/"
+      className="h-dvh overflow-hidden"
+      mainClassName="overflow-y-auto overscroll-contain"
+    >
       <div className="flex flex-col gap-5 mt-2">
 
         <PremiumSection />

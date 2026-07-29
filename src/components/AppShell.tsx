@@ -10,9 +10,10 @@ interface Props {
   children: ReactNode;
   rightSlot?: ReactNode;
   className?: string;
+  mainClassName?: string;
 }
 
-export function AppShell({ title, back, children, rightSlot, className }: Props) {
+export function AppShell({ title, back, children, rightSlot, className, mainClassName }: Props) {
   const t = useT();
   return (
     <div className={cn("h-dvh overflow-hidden flex flex-col bg-background", className)}>
@@ -33,7 +34,7 @@ export function AppShell({ title, back, children, rightSlot, className }: Props)
           {rightSlot && <div className="absolute right-5">{rightSlot}</div>}
         </header>
       )}
-      <main className="min-h-0 flex-1 flex flex-col overflow-hidden px-5 pb-safe">{children}</main>
+      <main className={cn("min-h-0 flex-1 flex flex-col overflow-hidden px-5 pb-safe", mainClassName)}>{children}</main>
     </div>
   );
 }
