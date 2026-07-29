@@ -217,6 +217,26 @@ function PremiumSection() {
     else if (!r.active) setInfo(t("premium_restore_none"));
   }
 
+  function openManageSubscriptions() {
+    const webUrl = "https://apps.apple.com/account/subscriptions";
+    const isNative =
+      typeof window !== "undefined" &&
+      // Capacitor native shell
+      Boolean((window as any).Capacitor?.isNativePlatform?.());
+    if (isNative) {
+      // itms-apps opens the App Store subscriptions screen directly
+      window.location.href = "itms-apps://apps.apple.com/account/subscriptions";
+      setTimeout(() => {
+        window.location.href = webUrl;
+      }, 800);
+      return;
+    }
+    const w = window.open(webUrl, "_blank", "noopener,noreferrer");
+    if (!w) window.location.href = webUrl;
+  }
+
+
+
   return (
     <section className="rounded-2xl bg-card border border-border p-4 flex flex-col gap-3">
       <div className="flex items-start justify-between gap-3">
