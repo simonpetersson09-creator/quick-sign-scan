@@ -1,6 +1,34 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
-export type Lang = "sv" | "en";
+export type Lang =
+  | "sv"
+  | "en"
+  | "de"
+  | "fr"
+  | "es"
+  | "it"
+  | "pt"
+  | "nl"
+  | "pl"
+  | "da"
+  | "no"
+  | "fi";
+
+/** Language list — add new entries here, the UI scales automatically. */
+export const LANGUAGES: { code: Lang; nativeName: string; locale: string }[] = [
+  { code: "sv", nativeName: "Svenska", locale: "sv-SE" },
+  { code: "en", nativeName: "English", locale: "en-US" },
+  { code: "de", nativeName: "Deutsch", locale: "de-DE" },
+  { code: "fr", nativeName: "Français", locale: "fr-FR" },
+  { code: "es", nativeName: "Español", locale: "es-ES" },
+  { code: "it", nativeName: "Italiano", locale: "it-IT" },
+  { code: "pt", nativeName: "Português", locale: "pt-PT" },
+  { code: "nl", nativeName: "Nederlands", locale: "nl-NL" },
+  { code: "pl", nativeName: "Polski", locale: "pl-PL" },
+  { code: "da", nativeName: "Dansk", locale: "da-DK" },
+  { code: "no", nativeName: "Norsk", locale: "nb-NO" },
+  { code: "fi", nativeName: "Suomi", locale: "fi-FI" },
+];
 
 type Dict = Record<string, string>;
 
