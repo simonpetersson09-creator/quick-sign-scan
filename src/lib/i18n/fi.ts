@@ -268,5 +268,6 @@ export const fi: Record<string, string> = {
 
   // home banner
   home_free_remaining: "{remaining}/5 ilmaista asiakirjaa jäljellä",
+  premium_badge_unlimited: "Rajattomat dokumentit",
   home_premium_badge: "Premium",
 };

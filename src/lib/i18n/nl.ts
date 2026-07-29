@@ -268,5 +268,6 @@ export const nl: Record<string, string> = {
 
   // home banner
   home_free_remaining: "{remaining} van 5 gratis documenten over",
+  premium_badge_unlimited: "Onbeperkte documenten",
   home_premium_badge: "Premium",
 };

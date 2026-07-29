@@ -268,5 +268,6 @@ export const pt: Record<string, string> = {
 
   // home banner
   home_free_remaining: "{remaining} de 5 documentos gratuitos",
+  premium_badge_unlimited: "Documentos ilimitados",
   home_premium_badge: "Premium",
 };
