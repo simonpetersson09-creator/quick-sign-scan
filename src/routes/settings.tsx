@@ -269,18 +269,19 @@ function PremiumSection() {
             type="button"
             onClick={buy}
             disabled={busy !== null || unsupported || !productReady}
-            className="btn-premium rounded-xl h-12 px-4 disabled:opacity-60 flex items-center justify-center gap-2"
+            className="btn-premium rounded-xl h-10 px-4 disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {busy === "buy" || !productReady ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Crown className="h-4 w-4" />
             )}
-            <span className="text-[15px] font-semibold tracking-tight">
+            <span className="text-[13px] font-semibold tracking-tight">
               {!productReady && !unsupported
                 ? t("premium_loading_product")
                 : t("premium_start_cta")}
             </span>
+
           </button>
           <button
             type="button"
