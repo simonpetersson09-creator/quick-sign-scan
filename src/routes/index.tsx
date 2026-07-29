@@ -186,9 +186,12 @@ function Home() {
 
         <div className="flex items-center justify-center gap-2 w-full">
           {/* Settings — vänster */}
-          <Link to="/settings" className="block group">
-            <div className="rounded-xl bg-card text-muted-foreground h-11 w-12 flex items-center justify-center shadow-[var(--shadow-soft)] border border-border transition active:scale-[0.98]">
+          <Link to="/settings" className="block group" aria-label={t("settings")}>
+            <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-card text-primary shadow-[var(--shadow-soft)] border border-border transition active:scale-[0.96]">
               <SettingsIcon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
+              <span className="mt-[1px] text-[9px] font-semibold tracking-wide uppercase">
+                {t("settings")}
+              </span>
             </div>
           </Link>
 
