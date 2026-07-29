@@ -31,6 +31,21 @@ function Home() {
   const { remaining } = useUsage();
   const isPremium = premium.state === "active";
 
+  // Play the shimmer once, the first time the badge is shown after purchase.
+  const [shimmer, setShimmer] = useState(false);
+  useEffect(() => {
+    if (!isPremium) return;
+    try {
+      if (localStorage.getItem("signgo.premium.badge.shimmer.v1") === "1") return;
+      localStorage.setItem("signgo.premium.badge.shimmer.v1", "1");
+    } catch {
+      return;
+    }
+    setShimmer(true);
+    const id = window.setTimeout(() => setShimmer(false), 2000);
+    return () => window.clearTimeout(id);
+  }, [isPremium]);
+
   const steps = [
     { icon: ScanLine, label: t("step_scan") },
     { icon: PenLine, label: t("step_sign") },
