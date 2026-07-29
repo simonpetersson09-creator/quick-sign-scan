@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ScanLine, PenLine, Mail, CheckCircle2, Settings as SettingsIcon, ArrowDown, FileUp, Loader2, Crown } from "lucide-react";
 import { useLang } from "@/lib/i18n";
 import { LanguageSheet } from "@/components/LanguageSheet";
