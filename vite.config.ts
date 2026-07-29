@@ -98,9 +98,13 @@ function nitroSsrShimPlugin(): Plugin {
 
   const writeShim = () => {
     try {
-      // Write the shim for both possible Nitro output layouts.
+      // Write the shim for both possible Nitro output layouts. `.output` is
+      // only touched when Nitro actually emitted there, so we never leave a
+      // stray directory behind on the `dist/server` layout.
       writeShimTo("dist", "server");
-      writeShimTo(".output", "server");
+      if (existsSync(join(process.cwd(), ".output", "server"))) {
+        writeShimTo(".output", "server");
+      }
     } catch {
       /* ignore — the prerender will surface a clearer error if needed */
     }
