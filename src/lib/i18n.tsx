@@ -51,6 +51,7 @@ const sv: Dict = {
   scanDocument: "Skanna dokument",
   attachFile: "Bifoga fil",
   changeLanguage: "Byt språk",
+  chooseLanguage: "Välj språk",
 
   // scan
   scanTitle: "Skanna dokument",
@@ -321,6 +322,7 @@ const en: Dict = {
   scanDocument: "Scan document",
   attachFile: "Attach file",
   changeLanguage: "Change language",
+  chooseLanguage: "Choose language",
 
   // scan
   scanTitle: "Scan document",
