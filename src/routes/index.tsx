@@ -63,7 +63,7 @@ function Home() {
             {isPremium ? (
               <>
                 <Crown className="h-3 w-3" />
-                <span>{t("premium_unlimited")}</span>
+                <span>{t("premium_status_active")} – {t("premium_unlimited")}</span>
               </>
             ) : (
               <span>{t("home_free_remaining", { remaining: String(remaining) })}</span>
