@@ -1,6 +1,34 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
-export type Lang = "sv" | "en";
+export type Lang =
+  | "sv"
+  | "en"
+  | "de"
+  | "fr"
+  | "es"
+  | "it"
+  | "pt"
+  | "nl"
+  | "pl"
+  | "da"
+  | "no"
+  | "fi";
+
+/** Language list — add new entries here, the UI scales automatically. */
+export const LANGUAGES: { code: Lang; nativeName: string; locale: string }[] = [
+  { code: "sv", nativeName: "Svenska", locale: "sv-SE" },
+  { code: "en", nativeName: "English", locale: "en-US" },
+  { code: "de", nativeName: "Deutsch", locale: "de-DE" },
+  { code: "fr", nativeName: "Français", locale: "fr-FR" },
+  { code: "es", nativeName: "Español", locale: "es-ES" },
+  { code: "it", nativeName: "Italiano", locale: "it-IT" },
+  { code: "pt", nativeName: "Português", locale: "pt-PT" },
+  { code: "nl", nativeName: "Nederlands", locale: "nl-NL" },
+  { code: "pl", nativeName: "Polski", locale: "pl-PL" },
+  { code: "da", nativeName: "Dansk", locale: "da-DK" },
+  { code: "no", nativeName: "Norsk", locale: "nb-NO" },
+  { code: "fi", nativeName: "Suomi", locale: "fi-FI" },
+];
 
 type Dict = Record<string, string>;
 
@@ -23,6 +51,7 @@ const sv: Dict = {
   scanDocument: "Skanna dokument",
   attachFile: "Bifoga fil",
   changeLanguage: "Byt språk",
+  chooseLanguage: "Välj språk",
 
   // scan
   scanTitle: "Skanna dokument",
@@ -293,6 +322,7 @@ const en: Dict = {
   scanDocument: "Scan document",
   attachFile: "Attach file",
   changeLanguage: "Change language",
+  chooseLanguage: "Choose language",
 
   // scan
   scanTitle: "Scan document",
@@ -544,7 +574,7 @@ const en: Dict = {
   home_premium_badge: "Premium",
 };
 
-const dicts: Record<Lang, Dict> = { sv, en };
+const dicts: Partial<Record<Lang, Dict>> = { sv, en };
 
 interface Ctx {
   lang: Lang;
@@ -563,7 +593,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored === "sv" || stored === "en") setLangState(stored);
+      if (stored && LANGUAGES.some((l) => l.code === stored)) setLangState(stored as Lang);
     } catch {}
   }, []);
 
@@ -588,7 +618,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   }
 
   function t(key: string, vars?: Record<string, string | number>) {
-    let s = dicts[lang][key] ?? dicts.sv[key] ?? key;
+    let s = dicts[lang]?.[key] ?? en[key] ?? sv[key] ?? key;
     if (vars) {
       for (const [k, v] of Object.entries(vars)) {
         s = s.replaceAll(`{${k}}`, String(v));

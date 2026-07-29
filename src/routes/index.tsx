@@ -1,7 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
-import { ScanLine, PenLine, Mail, CheckCircle2, Settings as SettingsIcon, ArrowDown, Globe, FileUp, Loader2, Crown } from "lucide-react";
+import { ScanLine, PenLine, Mail, CheckCircle2, Settings as SettingsIcon, ArrowDown, FileUp, Loader2, Crown } from "lucide-react";
 import { useLang } from "@/lib/i18n";
+import { LanguageSheet } from "@/components/LanguageSheet";
 import { scanStore } from "@/lib/scanStore";
 import { pdfFileToImages } from "@/lib/pdfToImages";
 import { usePremium, useUsage } from "@/hooks/usePremium";
@@ -21,7 +22,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Home() {
-  const { lang, toggle, t } = useLang();
+  const { t } = useLang();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -199,29 +200,7 @@ function Home() {
           </Link>
 
           {/* Språkväxlare */}
-          <button
-            type="button"
-            onClick={toggle}
-            aria-label={t("changeLanguage")}
-            className="flex flex-col items-center justify-center rounded-xl bg-card text-muted-foreground h-11 w-12 shadow-[var(--shadow-soft)] border border-border transition active:scale-[0.98]"
-          >
-            <Globe className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
-            <span className="text-[7px] font-semibold tracking-wide mt-0.5">
-              {lang === "sv" ? (
-                <>
-                  <span className="text-foreground">SV</span>
-                  <span> | </span>
-                  <span className="opacity-50">EN</span>
-                </>
-              ) : (
-                <>
-                  <span className="opacity-50">SV</span>
-                  <span> | </span>
-                  <span className="text-foreground">EN</span>
-                </>
-              )}
-            </span>
-          </button>
+          <LanguageSheet />
         </div>
       </div>
     </div>

@@ -50,7 +50,7 @@ export function AccessCodeGate({ children }: { children: React.ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { lang } = useLang();
-  const t = STRINGS[lang];
+  const t = STRINGS[lang === "sv" ? "sv" : "en"];
 
   const verifyFn = useServerFn(verifyAccessCode);
 
