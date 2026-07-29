@@ -2,6 +2,7 @@ import { useState } from "react";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { Globe, Check } from "lucide-react";
 import { useLang, LANGUAGES, type Lang } from "@/lib/i18n";
+import { LanguageTip } from "@/components/LanguageTip";
 
 /**
  * iOS-style language picker: circular button + compact floating popover
@@ -18,6 +19,7 @@ export function LanguageSheet() {
   }
 
   return (
+    <div className="relative">
     <PopoverPrimitive.Root open={open} onOpenChange={setOpen}>
       <PopoverPrimitive.Trigger asChild>
         <button
@@ -73,5 +75,7 @@ export function LanguageSheet() {
         </PopoverPrimitive.Content>
       </PopoverPrimitive.Portal>
     </PopoverPrimitive.Root>
+    <LanguageTip dismissed={open} />
+    </div>
   );
 }
