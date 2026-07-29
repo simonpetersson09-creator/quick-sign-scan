@@ -11,22 +11,30 @@ import type { Plugin } from "vite";
 
 /**
  * TanStack Start's prerender step spins up a Vite preview server whose
- * preview-server-plugin tries to import `dist/server/server.js`. Lovable's
- * Nitro integration instead emits `dist/server/index.mjs`. The filename
- * mismatch makes the prerender request return 500 ("Cannot find module
- * .../dist/server/server.js"), which fails the entire publish build.
+ * preview-server-plugin tries to import `dist/server/server.js`. Nitro instead
+ * emits its worker entry as `index.mjs` — depending on the Nitro version /
+ * preset that lands either in `.output/server/index.mjs` (Nitro's default
+ * output dir) or in `dist/server/index.mjs` (Lovable's build config). The
+ * filename mismatch makes the prerender request return 500 ("Cannot find
+ * module .../dist/server/server.js"), which fails the entire publish build.
  *
  * This shim plugin runs at the end of the SSR build and writes a tiny
- * `dist/server/server.js` that just re-exports Nitro's `index.mjs`. That's
- * enough for the preview-server-plugin to load the worker handler and serve
- * the prerender request.
+ * `server.js` next to both possible Nitro entries that just re-exports it.
+ * That's enough for the preview-server-plugin to load the worker handler and
+ * serve the prerender request, on either output layout.
  */
 function nitroSsrShimPlugin(): Plugin {
+  // Candidate locations for Nitro's real entry, relative to the shim file.
+  // `.output/server/index.mjs` is Nitro's default; `./index.mjs` covers the
+  // case where the build writes the server bundle into `dist/server`.
+  const entryCandidates = ["./index.mjs", "../../.output/server/index.mjs"];
+
   const shimSource = [
     // Re-export Nitro's fetch handler, but:
-    //  1. Resolve `./index.mjs` lazily, so the shim can be written before
-    //     Nitro has finished emitting its entry (ordering differs between
-    //     machines/CI; a static import would crash at load time).
+    //  1. Resolve the entry lazily and try every known output location, so the
+    //     shim can be written before Nitro has finished emitting its entry
+    //     (ordering differs between machines/CI; a static import would crash
+    //     at load time) and works for both `.output/server` and `dist/server`.
     //  2. Stub `env`/`ctx` so accesses like `env.ASSETS` don't throw under
     //     Node — the prerender preview server invokes `fetch(req)` with no
     //     Cloudflare bindings.
@@ -35,10 +43,23 @@ function nitroSsrShimPlugin(): Plugin {
     //     exposes `ip` as a read-only getter, which otherwise throws
     //     "Cannot set property ip of #<Request>".
     "const stubCtx = { waitUntil() {}, passThroughOnException() {} };",
+    `const entryCandidates = ${JSON.stringify(entryCandidates)};`,
     "let handlerPromise;",
+    "async function loadHandler() {",
+    "  let lastError;",
+    "  for (const candidate of entryCandidates) {",
+    "    try {",
+    "      const mod = await import(candidate);",
+    "      return mod.default ?? mod;",
+    "    } catch (error) {",
+    "      lastError = error;",
+    "    }",
+    "  }",
+    "  throw lastError ?? new Error('Nitro server entry not found');",
+    "}",
     "function getHandler() {",
     "  if (!handlerPromise) {",
-    "    handlerPromise = import('./index.mjs').then((m) => m.default ?? m);",
+    "    handlerPromise = loadHandler();",
     "  }",
     "  return handlerPromise;",
     "}",
@@ -63,16 +84,26 @@ function nitroSsrShimPlugin(): Plugin {
     "",
   ].join("\n");
 
+  const writeShimTo = (...segments: string[]) => {
+    const serverDir = join(process.cwd(), ...segments);
+    mkdirSync(serverDir, { recursive: true });
+    writeFileSync(join(serverDir, "server.js"), shimSource, "utf8");
+    // Guarantee the shim is treated as ESM regardless of what the sibling
+    // package.json ends up containing (Nitro writes it without "type": "module").
+    const pkgPath = join(serverDir, "package.json");
+    if (!existsSync(pkgPath)) {
+      writeFileSync(pkgPath, JSON.stringify({ type: "module" }, null, 2), "utf8");
+    }
+  };
+
   const writeShim = () => {
     try {
-      const serverDir = join(process.cwd(), "dist", "server");
-      mkdirSync(serverDir, { recursive: true });
-      writeFileSync(join(serverDir, "server.js"), shimSource, "utf8");
-      // Guarantee the shim is treated as ESM regardless of what dist/package.json
-      // ends up containing (Nitro writes it without "type": "module").
-      const pkgPath = join(serverDir, "package.json");
-      if (!existsSync(pkgPath)) {
-        writeFileSync(pkgPath, JSON.stringify({ type: "module" }, null, 2), "utf8");
+      // Write the shim for both possible Nitro output layouts. `.output` is
+      // only touched when Nitro actually emitted there, so we never leave a
+      // stray directory behind on the `dist/server` layout.
+      writeShimTo("dist", "server");
+      if (existsSync(join(process.cwd(), ".output", "server"))) {
+        writeShimTo(".output", "server");
       }
     } catch {
       /* ignore — the prerender will surface a clearer error if needed */
@@ -120,7 +151,8 @@ export default defineConfig({
     },
 
     // SPA mode → vid build prerendas en lättviktig shell-HTML (utan route-content)
-    // som skrivs till dist/client/index.html. Capacitor (WKWebView) laddar den
+    // som skrivs som index.html i Nitros klient-output (.output/public eller
+    // dist/client beroende på preset). Capacitor (WKWebView) laddar den
     // lokalt; klient-routern hydratiserar och tar därefter över helt på enheten.
     // Web-deployen använder fortfarande SSR via Nitro/Cloudflare.
     spa: {
