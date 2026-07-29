@@ -303,30 +303,35 @@ function PremiumSection() {
             </span>
 
           </button>
+        </div>
+      )}
+
+      <div className={`flex items-stretch gap-2 ${isActive ? "pt-1" : "-mt-1"}`}>
+        {!isActive && (
           <button
             type="button"
             onClick={restore}
             disabled={busy !== null || unsupported}
-            className="rounded-xl bg-background text-foreground border border-border h-10 px-4 transition active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
+            className="flex-1 rounded-xl bg-background text-foreground border border-border h-10 px-3 transition active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {busy === "restore" ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <RotateCcw className="h-4 w-4" />
             )}
-            <span className="text-[13px] font-medium">{t("premium_restore")}</span>
+            <span className="text-[13px] font-medium truncate">{t("premium_restore")}</span>
           </button>
-        </div>
-      )}
+        )}
+        <button
+          type="button"
+          onClick={openManageSubscriptions}
+          className="flex-1 rounded-xl bg-background text-foreground border border-border h-10 px-3 transition active:scale-[0.98] flex items-center justify-center gap-2"
+        >
+          <ExternalLink className="h-4 w-4" />
+          <span className="text-[13px] font-medium truncate">{t("premium_manage_apple")}</span>
+        </button>
+      </div>
 
-      <button
-        type="button"
-        onClick={openManageSubscriptions}
-        className="-mt-1 rounded-xl bg-background text-foreground border border-border h-10 px-4 transition active:scale-[0.98] flex items-center justify-center gap-2 shrink-0"
-      >
-        <ExternalLink className="h-4 w-4" />
-        <span className="text-[13px] font-medium">{t("premium_manage_apple")}</span>
-      </button>
 
 
 
