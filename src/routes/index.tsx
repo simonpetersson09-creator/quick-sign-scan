@@ -1,7 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
-import { ScanLine, PenLine, Mail, CheckCircle2, Settings as SettingsIcon, ArrowDown, Globe, FileUp, Loader2, Crown } from "lucide-react";
+import { ScanLine, PenLine, Mail, CheckCircle2, Settings as SettingsIcon, ArrowDown, FileUp, Loader2, Crown } from "lucide-react";
 import { useLang } from "@/lib/i18n";
+import { LanguageSheet } from "@/components/LanguageSheet";
 import { scanStore } from "@/lib/scanStore";
 import { pdfFileToImages } from "@/lib/pdfToImages";
 import { usePremium, useUsage } from "@/hooks/usePremium";
@@ -21,7 +22,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Home() {
-  const { lang, toggle, t } = useLang();
+  const { t } = useLang();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
