@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Loader2, Lock, LogOut, Mail } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
-import { adminEmailStats, adminLogin, adminLogout, type MonthlyStat } from "@/lib/admin.functions";
+import { adminEmailStats, adminLogin, adminLogout, type AdminStats, type MonthlyStat } from "@/lib/admin.functions";
 
 // The admin view is web-only: it must never be reachable inside the native
 // (Capacitor/iOS) app shell, so it redirects home there.
@@ -59,7 +59,7 @@ function AdminPage() {
   const [totalSent, setTotalSent] = useState(0);
   const [thisMonthSent, setThisMonthSent] = useState(0);
 
-  function applyStats(r: Extract<Awaited<ReturnType<typeof adminEmailStats>>, { ok: true }>) {
+  function applyStats(r: Extract<AdminStats, { ok: true }>) {
     setMonths(r.months);
     setTotalSent(r.totalSent);
     setThisMonthSent(r.thisMonthSent);
