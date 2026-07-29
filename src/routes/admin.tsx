@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2, Lock, LogOut, Mail } from "lucide-react";
@@ -6,8 +6,21 @@ import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { adminEmailStats, adminLogin, adminLogout, type MonthlyStat } from "@/lib/admin.functions";
 
+// The admin view is web-only: it must never be reachable inside the native
+// (Capacitor/iOS) app shell, so it redirects home there.
+function isNativeApp(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    window.location.protocol === "capacitor:" ||
+    Boolean((window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.())
+  );
+}
+
 export const Route = createFileRoute("/admin")({
   ssr: false,
+  beforeLoad: () => {
+    if (isNativeApp()) throw redirect({ to: "/" });
+  },
   head: () => ({
     meta: [
       { title: "Admin – e-poststatistik | Sign & Go" },
