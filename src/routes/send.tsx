@@ -8,6 +8,7 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
 import { loadSettings, saveSettings } from "@/lib/settings";
 import { buildPdf, dataUrlToBlob } from "@/lib/pdf";
+import { getDeviceId } from "@/lib/device-id";
 import {
   sendScanEmail,
   type SendErrorCode,
