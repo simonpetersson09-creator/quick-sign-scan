@@ -56,8 +56,11 @@ function SendPage() {
   // Block when out of free docs AND nothing has been consumed for this
   // document yet. If the user has already consumed (e.g. downloaded),
   // they're allowed to also send the same document without re-blocking.
+  // Set when the server's authoritative paywall rejects the send.
+  const [blockedByServer, setBlockedByServer] = useState(false);
   const blocked =
-    !isPremium && remaining <= 0 && !consumedThisSessionRef.current;
+    blockedByServer ||
+    (!isPremium && remaining <= 0 && !consumedThisSessionRef.current);
   // Read settings on mount only — avoids SSR/hydration mismatch since
   // loadSettings() touches localStorage.
   const [settings, setSettings] = useState(() => ({
