@@ -338,7 +338,7 @@ function SendPage() {
             message: message || "",
             filename,
             pdfBase64,
-            
+            deviceId: await getDeviceId(),
           },
         })) as SendScanEmailResult;
       } catch (e) {
