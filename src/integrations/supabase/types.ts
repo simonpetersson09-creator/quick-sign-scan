@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      device_send_usage: {
+        Row: {
+          created_at: string
+          device_id: string
+          sent_count: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          device_id: string
+          sent_count?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          device_id?: string
+          sent_count?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       email_send_events: {
         Row: {
           created_at: string
@@ -35,6 +56,42 @@ export type Database = {
           id?: string
           recipient_hash?: string | null
           status?: string
+        }
+        Relationships: []
+      }
+      premium_entitlements: {
+        Row: {
+          created_at: string
+          device_id: string
+          environment: string | null
+          expires_at: string | null
+          original_transaction_id: string
+          product_id: string
+          revoked_at: string | null
+          updated_at: string
+          verified_at: string
+        }
+        Insert: {
+          created_at?: string
+          device_id: string
+          environment?: string | null
+          expires_at?: string | null
+          original_transaction_id: string
+          product_id: string
+          revoked_at?: string | null
+          updated_at?: string
+          verified_at?: string
+        }
+        Update: {
+          created_at?: string
+          device_id?: string
+          environment?: string | null
+          expires_at?: string | null
+          original_transaction_id?: string
+          product_id?: string
+          revoked_at?: string | null
+          updated_at?: string
+          verified_at?: string
         }
         Relationships: []
       }
