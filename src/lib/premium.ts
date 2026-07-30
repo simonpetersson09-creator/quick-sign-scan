@@ -109,6 +109,12 @@ type CdvStoreError = {
 type CdvTx = {
   productId?: string;
   products?: Array<{ id: string }>;
+  // Apple StoreKit 2 signed transaction (JWS). Exposed under different names
+  // depending on the plugin/StoreKit version — we try all of them.
+  jwsRepresentation?: string;
+  signedTransaction?: string;
+  transactionReceipt?: string;
+  nativePurchase?: { jwsRepresentation?: string; signedTransaction?: string };
   verify: () => Promise<unknown>;
   finish: () => Promise<unknown>;
 };
@@ -126,6 +132,46 @@ type CdvGlobal = {
   store: CdvStore;
 };
 
+
+/** Pull the Apple-signed JWS out of a transaction, if the plugin exposes it. */
+function extractSignedTransaction(t: CdvTx): string | null {
+  const candidates = [
+    t.jwsRepresentation,
+    t.signedTransaction,
+    t.nativePurchase?.jwsRepresentation,
+    t.nativePurchase?.signedTransaction,
+    t.transactionReceipt,
+  ];
+  for (const c of candidates) {
+    if (typeof c === "string" && c.split(".").length === 3) return c;
+  }
+  return null;
+}
+
+/**
+ * Send the Apple-signed transaction to the backend, which verifies it against
+ * Apple's certificate chain and stores the authoritative entitlement. Without
+ * this, the server treats the device as free-tier no matter what the client
+ * claims locally.
+ */
+async function syncEntitlementToServer(t: CdvTx): Promise<void> {
+  const jws = extractSignedTransaction(t);
+  if (!jws) {
+    console.warn("[premium] no signed transaction available to verify server-side");
+    return;
+  }
+  try {
+    const [{ verifyPremiumPurchase }, { getDeviceId }] = await Promise.all([
+      import("./premium.functions"),
+      import("./device-id"),
+    ]);
+    const deviceId = await getDeviceId();
+    const res = await verifyPremiumPurchase({ data: { deviceId, signedTransaction: jws } });
+    if (!res.ok) console.warn("[premium] server verification rejected", res.reason);
+  } catch (e) {
+    console.error("[premium] server verification failed", e instanceof Error ? e.name : "unknown");
+  }
+}
 
 function getCdv(): CdvGlobal | null {
   if (typeof window === "undefined") return null;
@@ -200,6 +246,7 @@ export async function initPremium(): Promise<void> {
         // calling t.verify() would stall forever (the `verified` callback
         // never fires without a validator). Finish the transaction directly
         // and refresh ownership from StoreKit.
+        void syncEntitlementToServer(t);
         void t
           .finish()
           .catch((e) => console.error("[premium] finish failed", e))

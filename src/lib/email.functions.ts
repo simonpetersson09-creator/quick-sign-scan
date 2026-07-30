@@ -99,6 +99,7 @@ export const SendErrorCodes = [
   "rate_limited",
   "network_error",
   "unauthorized",
+  "quota_exceeded",
   "invalid_input",
   "unknown",
 ] as const;
@@ -116,6 +117,7 @@ const GENERIC_DETAIL: Record<SendErrorCode, string> = {
   rate_limited: "Too many requests",
   network_error: "Email service unavailable",
   unauthorized: "Forbidden",
+  quota_exceeded: "Free document limit reached",
   invalid_input: "Invalid request",
   unknown: "Request failed",
 };
@@ -139,6 +141,16 @@ const inputSchema = z.object({
     .max(MAX_PDF_BASE64_LEN, { message: "attachment_too_large" })
     .regex(/^[A-Za-z0-9+/=\s]+$/, { message: "invalid_pdf" }),
   replyTo: z.string().trim().toLowerCase().email().max(MAX_EMAIL_LEN).optional(),
+  // Stable per-install id used to look up the server-side premium
+  // entitlement and free-document quota. Never trusted as proof of premium —
+  // it is only a key into records the server itself wrote.
+  deviceId: z
+    .string()
+    .trim()
+    .min(8)
+    .max(128)
+    .regex(/^[A-Za-z0-9_-]+$/)
+    .optional(),
 });
 
 function sleep(ms: number) {
@@ -333,6 +345,28 @@ export const sendScanEmail = createServerFn({ method: "POST" })
       return fail("rate_limited", 429);
     }
 
+    // PAYWALL (authoritative). Premium is only granted when the server has
+    // previously verified an Apple-signed StoreKit transaction for this
+    // device; a tampered client or edited localStorage cannot unlock it.
+    let quotaDeviceId: string | null = null;
+    if (data.deviceId) {
+      try {
+        const { canSend } = await import("./entitlement.server");
+        const decision = await canSend(data.deviceId);
+        if (!decision.allowed) {
+          console.warn(
+            `[sendScanEmail] ${ts} ${requestId} ip=${ipHash} status=quota_exceeded`,
+          );
+          return fail("quota_exceeded", 402);
+        }
+        if (!decision.premium) quotaDeviceId = data.deviceId;
+      } catch (e) {
+        console.error(
+          `[sendScanEmail] ${ts} ${requestId} status=quota_check_failed err=${e instanceof Error ? e.name : "unknown"}`,
+        );
+      }
+    }
+
     // Credentials.
     const LOVABLE_API_KEY = process.env.LOVABLE_API_KEY;
     const RESEND_API_KEY = process.env.RESEND_API_KEY;
@@ -412,6 +446,12 @@ export const sendScanEmail = createServerFn({ method: "POST" })
       if (response.ok) {
         recordHit(shortBuckets, ipHash, now);
         recordHit(dailyBuckets, ipHash, now);
+        if (quotaDeviceId) {
+          try {
+            const { incrementServerSentCount } = await import("./entitlement.server");
+            await incrementServerSentCount(quotaDeviceId);
+          } catch { /* best effort */ }
+        }
         try {
           const { logEmailEvent } = await import("./email-log.server");
           await logEmailEvent({ status: "sent", recipient: data.to });

@@ -8,6 +8,7 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
 import { loadSettings, saveSettings } from "@/lib/settings";
 import { buildPdf, dataUrlToBlob } from "@/lib/pdf";
+import { getDeviceId } from "@/lib/device-id";
 import {
   sendScanEmail,
   type SendErrorCode,
@@ -55,8 +56,11 @@ function SendPage() {
   // Block when out of free docs AND nothing has been consumed for this
   // document yet. If the user has already consumed (e.g. downloaded),
   // they're allowed to also send the same document without re-blocking.
+  // Set when the server's authoritative paywall rejects the send.
+  const [blockedByServer, setBlockedByServer] = useState(false);
   const blocked =
-    !isPremium && remaining <= 0 && !consumedThisSessionRef.current;
+    blockedByServer ||
+    (!isPremium && remaining <= 0 && !consumedThisSessionRef.current);
   // Read settings on mount only — avoids SSR/hydration mismatch since
   // loadSettings() touches localStorage.
   const [settings, setSettings] = useState(() => ({
@@ -338,7 +342,7 @@ function SendPage() {
             message: message || "",
             filename,
             pdfBase64,
-            
+            deviceId: await getDeviceId(),
           },
         })) as SendScanEmailResult;
       } catch (e) {
@@ -378,6 +382,11 @@ function SendPage() {
             navigate({ to: "/" });
           }, 2200);
         }
+      } else if (result.code === "quota_exceeded") {
+        // Server-side paywall said no (no verified subscription + free quota
+        // used up). Show the paywall instead of a generic error.
+        setInfo(t("premium_paywall_used_all", { limit: String(limit) }));
+        setBlockedByServer(true);
       } else {
         console.error(`[send] failed code=${result.code} status=${result.status ?? "n/a"} detail=${result.detail ?? ""}`);
         const baseMsg = t(`err_${result.code}`) ?? t("err_unknown");
