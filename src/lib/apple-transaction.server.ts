@@ -9,6 +9,8 @@
 //
 // No Apple API credentials are required for this — the JWS is self-contained.
 
+// @peculiar/x509 depends on tsyringe, which needs the Reflect metadata polyfill.
+import "reflect-metadata";
 import * as x509 from "@peculiar/x509";
 
 // SHA-256 fingerprint of "Apple Root CA - G3" (DER).
