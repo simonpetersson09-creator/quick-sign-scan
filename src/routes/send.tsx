@@ -379,6 +379,11 @@ function SendPage() {
             navigate({ to: "/" });
           }, 2200);
         }
+      } else if (result.code === "quota_exceeded") {
+        // Server-side paywall said no (no verified subscription + free quota
+        // used up). Show the paywall instead of a generic error.
+        setInfo(t("premium_paywall_used_all", { limit: String(limit) }));
+        setBlockedByServer(true);
       } else {
         console.error(`[send] failed code=${result.code} status=${result.status ?? "n/a"} detail=${result.detail ?? ""}`);
         const baseMsg = t(`err_${result.code}`) ?? t("err_unknown");
