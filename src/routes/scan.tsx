@@ -332,6 +332,9 @@ function ScanPage() {
   // bygga upp denna. Auto-capture triggas endast när
   // captureStableCount >= STABLE_FRAMES. Nollställs när readyForCapture=false.
   const captureStableCount = useRef(0);
+  // Antal frames i rad där capture-gaten missat. Används av
+  // ENABLE_SOFT_STABLE_DECAY för att tolerera enstaka missar.
+  const captureMissStreakRef = useRef(0);
   const detectCount = useRef(0);
   const missCount = useRef(0);
   const capturedRef = useRef(false);
