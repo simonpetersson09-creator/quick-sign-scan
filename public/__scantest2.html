@@ -1,0 +1,22 @@
+<!doctype html><html><body><script type="module">
+import * as P from '/src/lib/perspective.ts';
+window.run = async () => {
+  const img=new Image(); img.src='/__scantest.jpg'; await img.decode();
+  const res=[];
+  for (const DW of [220,280,360,480,640]) {
+    const DH=Math.round(DW*img.naturalHeight/img.naturalWidth);
+    const c=document.createElement('canvas'); c.width=DW;c.height=DH;
+    const cx=c.getContext('2d',{willReadFrequently:true}); cx.drawImage(img,0,0,DW,DH);
+    const d=cx.getImageData(0,0,DW,DH);
+    const t=performance.now();
+    const det=P.detectDocumentQuad(d,DW,DH,{});
+    const diag=P.getLastDetectDiagnostics();
+    res.push({DW,ms:+(performance.now()-t).toFixed(1),detected:!!det,
+      conf:det?.confidence, a4:det?.a4Ratio, dbg:det?.debug,
+      quad: det? P.orderQuad(det.corners.map(p=>({x:+(p.x/DW).toFixed(4),y:+(p.y/DH).toFixed(4)}))):null,
+      diag:{cands:diag.candidateCount, rejects:diag.rejects, best:diag.bestRejected, side:diag.sideSupport, overlay:!!diag.overlayBest}});
+  }
+  return res;
+};
+window.ready2=true;
+</script></body></html>
