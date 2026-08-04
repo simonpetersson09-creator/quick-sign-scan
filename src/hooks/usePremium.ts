@@ -20,14 +20,20 @@ export function usePremium() {
 }
 
 export function useUsage() {
-  const [count, setCount] = useState<number>(() => usage.getSentCount());
+  // Start at 0 — the same value the server renders with. Reading localStorage
+  // for the initial state causes a hydration mismatch for returning users
+  // ("5 of 5" from SSR vs "2 of 5" on the client). The real count is applied
+  // in the effect below, after hydration.
+  const [count, setCount] = useState<number>(0);
   useEffect(() => {
+    setCount(usage.getSentCount());
     void initUsage().then(() => setCount(usage.getSentCount()));
     const unsub = usage.subscribe(setCount);
     return () => {
       unsub();
     };
   }, []);
+
   return {
     sent: count,
     remaining: Math.max(0, FREE_DOC_LIMIT - count),
