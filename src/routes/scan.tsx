@@ -2533,6 +2533,10 @@ function ScanPage() {
     setPageCount(count);
     setLastThumbnail(dataUrl);
 
+    // Re-aim-paus efter en sparad sida: auto-capture är inte "armed" förrän
+    // REARM_DELAY_MS passerat, så samma dokument inte snappas igen direkt.
+    armedAtRef.current = performance.now() + REARM_DELAY_MS;
+
     // Reset detection state so auto-capture starts fresh for the next page.
     stableCount.current = 0;
     captureStableCount.current = 0;
