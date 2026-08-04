@@ -565,6 +565,20 @@ function ScanPage() {
   // för att låta temporal bias förfalla så detektorn kan hitta ut ur en
   // felaktig, för liten låsning.
   const outlierRejectFramesRef = useRef(0);
+  // Stagnation: signatur för senaste underkända quad + när den blev oförändrad.
+  const stagnationSigRef = useRef<{
+    cx: number;
+    cy: number;
+    area: number;
+    reason: string;
+  } | null>(null);
+  const stagnationSinceRef = useRef(0);
+  const lastStagnationAtRef = useRef(0);
+  // Antal återstående helt unbiased detect-pass (0 = normal tracking).
+  const freePassesLeftRef = useRef(0);
+  const freePassRunRef = useRef(0);
+  const freePassBaselineRef = useRef<{ area: number; conf: number } | null>(null);
+
   const brightnessRef = useRef(255);
   const lowLightFramesRef = useRef(0);
   const exposureLockedRef = useRef(false);
