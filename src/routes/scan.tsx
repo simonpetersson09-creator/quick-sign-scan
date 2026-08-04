@@ -1475,6 +1475,53 @@ function ScanPage() {
     // Normalize to 0..1
     const norm = corners.map((p) => ({ x: p.x / dw, y: p.y / dh })) as [Point, Point, Point, Point];
 
+    // ===== Stagnationsdetektor =====
+    // Om samma underkända quad (samma centroid/area/reasonNotReady) fortsätter
+    // vinna i ~1 s utan verklig förbättring, kör några helt unbiased pass.
+    // Rör inga scoring-, edge-, crop-, capture- eller hi-res-gates.
+    {
+      const areaNow = quadArea(norm);
+      const cxNow = (norm[0].x + norm[1].x + norm[2].x + norm[3].x) / 4;
+      const cyNow = (norm[0].y + norm[1].y + norm[2].y + norm[3].y) / 4;
+      const reasonNow = reasonNotReady ?? "unknown";
+      if (readyForCapture) {
+        stagnationSigRef.current = null;
+        stagnationSinceRef.current = 0;
+      } else {
+        const prevSig = stagnationSigRef.current;
+        const same =
+          prevSig !== null &&
+          prevSig.reason === reasonNow &&
+          Math.hypot(prevSig.cx - cxNow, prevSig.cy - cyNow) <= STAGNATION_CENTROID_EPS &&
+          Math.abs(areaNow - prevSig.area) <= STAGNATION_AREA_EPS * Math.max(prevSig.area, 1e-6);
+        if (!same) {
+          stagnationSigRef.current = { cx: cxNow, cy: cyNow, area: areaNow, reason: reasonNow };
+          stagnationSinceRef.current = now;
+        } else if (
+          freePassesLeftRef.current === 0 &&
+          !freePass &&
+          stagnationSinceRef.current > 0 &&
+          now - stagnationSinceRef.current >= STAGNATION_MS &&
+          now - lastStagnationAtRef.current >= STAGNATION_COOLDOWN_MS
+        ) {
+          lastStagnationAtRef.current = now;
+          stagnationSinceRef.current = now;
+          freePassesLeftRef.current = STAGNATION_FREE_PASSES;
+          freePassRunRef.current = 0;
+          freePassBaselineRef.current = { area: areaNow, conf: detection?.confidence ?? 0 };
+          // eslint-disable-next-line no-console
+          console.log("[scan] stagnation-detected", {
+            heldMs: Math.round(now - (stagnationSinceRef.current || now)) || STAGNATION_MS,
+            reason: reasonNow,
+            area: +areaNow.toFixed(4),
+            centroid: [+cxNow.toFixed(3), +cyNow.toFixed(3)],
+            freePassesQueued: STAGNATION_FREE_PASSES,
+          });
+        }
+      }
+    }
+
+
     // ===== visibleCandidate vs captureCandidate =====
     // visibleCandidate: detection passed structural gates → overlay får visas
     //                   och stabilitet får byggas upp.
