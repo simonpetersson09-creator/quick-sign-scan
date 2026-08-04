@@ -184,6 +184,43 @@ const EXPANSION_INWARD_SLACK = 0.004; // tillåt minimal inåtrörelse per hörn
 // Efter så här många raka förkastade frames släpper vi temporal bias helt så
 // detektorn kan söka fritt igen istället för att fastna i samma felaktiga quad.
 const OUTLIER_BIAS_DECAY_FRAMES = 6;
+
+/** Yta för en quad (shoelace, absolutbelopp). */
+function quadArea(q: readonly Point[]): number {
+  let a = 0;
+  for (let i = 0; i < q.length; i++) {
+    const p = q[i];
+    const n = q[(i + 1) % q.length];
+    a += p.x * n.y - n.x * p.y;
+  }
+  return Math.abs(a) / 2;
+}
+
+/**
+ * Sant när `next` är en trovärdig utåtgående korrektion av `prev`: större yta
+ * och inget hörn som rör sig nämnvärt inåt mot den gemensamma centroiden.
+ * Används för att släppa igenom expansioner som annars fastnar i det osignerade
+ * dödbandet i outlier-grinden.
+ */
+function isOutwardExpansion(
+  next: readonly Point[],
+  prev: readonly Point[],
+  confidence: number,
+): boolean {
+  if (confidence < EXPANSION_MIN_CONFIDENCE) return false;
+  const prevArea = quadArea(prev);
+  if (prevArea <= 0) return false;
+  if (quadArea(next) / prevArea < EXPANSION_MIN_AREA_GAIN) return false;
+  const cx = prev.reduce((s, p) => s + p.x, 0) / prev.length;
+  const cy = prev.reduce((s, p) => s + p.y, 0) / prev.length;
+  for (let i = 0; i < prev.length; i++) {
+    const rPrev = Math.hypot(prev[i].x - cx, prev[i].y - cy);
+    const rNext = Math.hypot(next[i].x - cx, next[i].y - cy);
+    // Varje hörn måste ligga minst lika långt ut som förut (med lite slack).
+    if (rNext < rPrev - EXPANSION_INWARD_SLACK) return false;
+  }
+  return true;
+}
 // Sharpness gates — Laplacian variance computed on a 280px detect frame
 // (in-camera) and the warped doc (post-capture). Tuned conservatively så
 // en suddig sida aldrig sparas, oavsett hur snabbt användaren rör mobilen.
