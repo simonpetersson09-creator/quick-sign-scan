@@ -1176,7 +1176,7 @@ function ScanPage() {
       return;
     }
 
-    detectCount.current++;
+    detectCount.current = Math.min(detectCount.current + 1, DETECT_COUNT_MAX);
     missCount.current = 0;
     detectionMeta.current = detection;
 
