@@ -2784,7 +2784,7 @@ function ScanPage() {
           <polygon
             ref={polyRef}
             points=""
-            strokeWidth={3}
+            strokeWidth={1.5}
             strokeLinejoin="round"
             strokeLinecap="round"
             style={{
