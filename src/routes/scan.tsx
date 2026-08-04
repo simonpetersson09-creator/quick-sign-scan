@@ -3236,34 +3236,42 @@ function ScanPage() {
           ))}
         </svg>
 
-        {/* A4 framing guide — purely visual, never affects detection/capture/warp.
-            Centered, A4 aspect (1:√2), fades out once detection is locking on. */}
+        {/* Safe-area guide — purely visual, never affects detection/capture/warp.
+            Matches the real camera frame (aspect-fill mapped) minus the corner
+            margin the capture gate enforces, and uses the same amber styling as
+            the "search" phase of the live detection frame so the handover to the
+            detected quad has no visual jump. */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 z-[15] flex items-center justify-center px-8"
+          className="pointer-events-none absolute inset-0 z-[15] overflow-hidden"
           style={{
-            opacity: guideVisible ? 0.55 : 0,
+            opacity: guideVisible && guideBox ? 1 : 0,
             transition: "opacity 320ms ease",
           }}
         >
-          <div
-            className="relative"
-            style={{
-              aspectRatio: "1 / 1.4142",
-              maxHeight: "78%",
-              width: "min(72%, calc(78vh / 1.4142))",
-              border: "1px solid rgba(255,255,255,0.55)",
-              borderRadius: 2,
-              boxShadow: "0 0 0 1px rgba(0,0,0,0.18)",
-            }}
+          {guideBox && (
+            <div
+              className="absolute"
+              style={{
+                left: guideBox.left,
+                top: guideBox.top,
+                width: guideBox.width,
+                height: guideBox.height,
+                border: "1.25px solid rgb(255,214,90)",
+                backgroundColor: "color-mix(in oklab, rgb(255,214,90) 5%, transparent)",
+                boxShadow: "0 0 6px rgba(255,193,7,0.35)",
+                opacity: 0.85,
+              }}
+            />
+          )}
+          <span
+            className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/45 px-3 py-1 text-[12px] font-medium text-white/90 backdrop-blur-sm"
+            style={{ top: Math.max((guideBox?.top ?? 0) + 12, 88) }}
           >
-            <span
-              className="absolute left-1/2 -translate-x-1/2 -top-8 whitespace-nowrap rounded-full bg-black/45 px-3 py-1 text-[12px] font-medium text-white/90 backdrop-blur-sm"
-            >
-              {guideHint}
-            </span>
-          </div>
+            {guideHint}
+          </span>
         </div>
+
 
       </div>
 
