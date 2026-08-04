@@ -1272,9 +1272,14 @@ function ScanPage() {
     if (!corners) {
       stableCount.current = 0;
       captureStableCount.current = 0;
-      detectCount.current = Math.max(0, detectCount.current - frameWeight);
+      // Miss-räkning är kalibrerad i detekteringspass, inte i tid: den ska
+      // INTE skalas med frameWeight (då förbrukas DETECT_COUNT_MAX /
+      // LOST_RESET_MISS_FRAMES 2-3x för snabbt och den temporala biasen
+      // hinner aldrig byggas upp).
+      detectCount.current = Math.max(0, detectCount.current - 1);
       detectionMeta.current = null;
-      missCount.current += frameWeight;
+      missCount.current += 1;
+
       lockedRef.current = false;
       lockBreakFramesRef.current = 0;
       hiResTightConfirmedRef.current = false;
@@ -1331,7 +1336,10 @@ function ScanPage() {
       return;
     }
 
-    detectCount.current = Math.min(detectCount.current + frameWeight, DETECT_COUNT_MAX);
+    // Pass-baserad (som miss-grenen ovan) så DETECT_COUNT_MAX behåller sin
+    // ursprungliga kalibrering i detekteringspass.
+    detectCount.current = Math.min(detectCount.current + 1, DETECT_COUNT_MAX);
+
     missCount.current = 0;
     detectionMeta.current = detection;
 
@@ -1537,7 +1545,10 @@ function ScanPage() {
       // frame) no longer erases progress. Only a sustained miss streak
       // decays captureStableCount. Without this, a ~50% pass rate meant the
       // counter could never reach STABLE_FRAMES at all.
-      captureMissStreakRef.current += frameWeight;
+      // Grace-fönstret räknas i pass, inte i tid (weight 1), medan själva
+      // decay av stabilitetsprogressen förblir tidsbaserad.
+      captureMissStreakRef.current += 1;
+
       if (captureMissStreakRef.current > CAPTURE_MISS_GRACE_FRAMES) {
         captureStableCount.current = Math.max(0, captureStableCount.current - frameWeight);
       }
