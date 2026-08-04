@@ -365,15 +365,26 @@ function ScanPage() {
   // the same document again.
   const armedAtRef = useRef(0);
   const REARM_DELAY_MS = 1200;
+  // Identisk uppstart varje gång skannervyn startar: efter att första riktiga
+  // videoframen kommit får AF/AE exakt lika lång tid att konvergera innan
+  // auto-capture blir aktiv — oavsett om det är sidan 1 eller "skanna fler".
+  const CAMERA_WARMUP_MS = REARM_DELAY_MS;
   // Gyro / motion stability — exponential moving average of |acceleration|
   // (gravity removed). Stays near 0 when the phone is held still; spikes on
   // jitter. Used as an extra gate before auto-capture so we never snap a
   // shaky frame even if the detected quad looks stable.
   const motionMagRef = useRef(0);
   const motionAvailableRef = useRef(false);
+  // Gyrot anses tillförlitligt först när EMA:n hunnit fyllas med lika många
+  // samples varje session. Utan detta blev gyrot "tillgängligt och helt
+  // stilla" direkt vid sida 2+ (listenern var redan permission-godkänd),
+  // vilket aktiverade steady-tröskeln innan mätningen var meningsfull.
+  const motionSamplesRef = useRef(0);
+  const MOTION_MIN_SAMPLES = 8;
   const MOTION_STILL_THRESHOLD = 0.45; // m/s² — empirical, tolerates breathing
   // Tydligt lugnare än ovan: telefonen ligger nästan helt still (stöd/armstöd).
   const MOTION_VERY_STILL_THRESHOLD = 0.18;
+
 
   // Document-targeted exposure metering. We periodically nudge the camera to
   // expose for the paper itself (point-of-interest on the quad centroid, plus
