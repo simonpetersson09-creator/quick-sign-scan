@@ -371,6 +371,9 @@ function ScanPage() {
   const motionMagRef = useRef(0);
   const motionAvailableRef = useRef(false);
   const MOTION_STILL_THRESHOLD = 0.45; // m/s² — empirical, tolerates breathing
+  // Tydligt lugnare än ovan: telefonen ligger nästan helt still (stöd/armstöd).
+  const MOTION_VERY_STILL_THRESHOLD = 0.18;
+
   // Document-targeted exposure metering. We periodically nudge the camera to
   // expose for the paper itself (point-of-interest on the quad centroid, plus
   // a brightness-driven exposureCompensation fallback) so a backlit window or
