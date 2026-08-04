@@ -1871,6 +1871,31 @@ function evaluateEdgeQuad(args: {
   else if (edgeTightness < tightnessThreshold)
     strictReason = adaptiveQualifies ? "edgeTightnessLowAdaptive" : "edgeTightnessLow";
 
+  // ===== Minimum per-side edge support (feature-flagged) =====
+  // Three strong sides can hide one side that has locked onto a floor line
+  // or other background contrast. Global tightness stays high in that case,
+  // so gate separately on the weakest side.
+  const ENABLE_MIN_SIDE_SUPPORT = true;
+  const perSideTightness = snap
+    ? snap.perSideTightness
+    : ([0, 0, 0, 0] as [number, number, number, number]);
+  const minSideTightness = Math.min(...perSideTightness);
+  if (
+    ENABLE_MIN_SIDE_SUPPORT &&
+    strictReason === null &&
+    snap &&
+    minSideTightness < 0.25 &&
+    edgeTightness >= tightnessThreshold
+  ) {
+    strictReason = "weakSideSupport";
+  }
+  lastDetectDiagnostics.sideSupport = {
+    perSideTightness,
+    minSideTightness,
+    tightness: edgeTightness,
+    reason: strictReason,
+  };
+
   // ===== Generous overlay candidate (feature-flagged) =====
   // Record best structurally-plausible quad regardless of strict-gate
   // outcome. detectDocumentQuad uses this only when caller passes
@@ -1973,7 +1998,12 @@ function refineQuadToEdges(
   edgeThreshold: number,
   width: number,
   height: number,
-): { quad: [Point, Point, Point, Point]; tightness: number; meanOffset: number } | null {
+): {
+  quad: [Point, Point, Point, Point];
+  tightness: number;
+  meanOffset: number;
+  perSideTightness: [number, number, number, number];
+} | null {
   const minDim = Math.min(width, height);
   // Search ±~4% of the short side perpendicular to each side. Big enough to
   // cover the dilation slack from contour extraction; small enough not to
@@ -1987,6 +2017,7 @@ function refineQuadToEdges(
   const allOffsets: number[] = [];
   let totalSamples = 0;
   let totalHits = 0;
+  const perSideTightness: [number, number, number, number] = [0, 0, 0, 0];
   // Refined sides expressed as new endpoints. Initially identical to input.
   const refined: [Point, Point, Point, Point] = [
     { ...quad[0] },
@@ -2022,11 +2053,14 @@ function refineQuadToEdges(
     }
 
     const samples: Sample[] = [];
+    let sideSamples = 0;
+    let sideHits = 0;
     for (let s = 1; s < SAMPLES_PER_SIDE - 1; s++) {
       const t = s / (SAMPLES_PER_SIDE - 1);
       const px = a.x + dx * t;
       const py = a.y + dy * t;
       totalSamples++;
+      sideSamples++;
 
       let bestOffset = 0;
       let bestPeak = 0;
@@ -2044,8 +2078,10 @@ function refineQuadToEdges(
         samples.push({ t, offset: bestOffset, peak: bestPeak });
         allOffsets.push(Math.abs(bestOffset));
         totalHits++;
+        sideHits++;
       }
     }
+    perSideTightness[side] = sideSamples > 0 ? sideHits / sideSamples : 0;
 
     // Need enough samples to fit a stable line. Otherwise keep original side.
     if (samples.length >= 8) {
@@ -2124,7 +2160,7 @@ function refineQuadToEdges(
   const tightness = totalSamples > 0 ? totalHits / totalSamples : 0;
   const meanOffset =
     allOffsets.length > 0 ? allOffsets.reduce((a, b) => a + b, 0) / allOffsets.length : 999;
-  return { quad: finalQuad, tightness, meanOffset };
+  return { quad: finalQuad, tightness, meanOffset, perSideTightness };
 }
 
 function lineIntersection(p1: Point, p2: Point, p3: Point, p4: Point): Point | null {
