@@ -1618,6 +1618,13 @@ export type DetectDiagnostics = {
   };
   /** Best structurally-plausible overlay candidate this frame (generous
    *  detection). May be present even when no strict result is returned. */
+  /** Per-side edge support of the last evaluated candidate (min-side gate). */
+  sideSupport: null | {
+    perSideTightness: [number, number, number, number];
+    minSideTightness: number;
+    tightness: number;
+    reason: string | null;
+  };
   overlayBest: null | {
     corners: [Point, Point, Point, Point];
     a4Ratio: number;
