@@ -152,6 +152,10 @@ const BRIGHTNESS_MIN = 38;
 // skevhet här eftersom warp-steget rätar upp dokumentet ändå; den verkliga
 // kvalitetskontrollen är skärpa + ljus + post-capture Laplacian.
 const A4_RATIO_TOLERANCE = 0.6;
+// Frame-inset gate — samtliga fyra hörn måste ligga minst 2 % innanför
+// bildytan (normaliserat 0..1). Skyddar mot att ett dokument som skär
+// kanten fångas och sparas beskuret.
+const CORNER_FRAME_INSET = 0.02;
 
 type StartCameraOptions = {
   restartStream?: boolean;
