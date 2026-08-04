@@ -185,6 +185,22 @@ const EXPANSION_INWARD_SLACK = 0.004; // tillåt minimal inåtrörelse per hörn
 // detektorn kan söka fritt igen istället för att fastna i samma felaktiga quad.
 const OUTLIER_BIAS_DECAY_FRAMES = 6;
 
+// ===== Stagnationsdetektor =====
+// Läge: samma underkända quad fortsätter vinna utan verklig förbättring.
+// Mäts i verklig tid, inte i antal frames/detect-pass.
+const STAGNATION_MS = 900;
+// Hur lika två på varandra följande quads måste vara för att räknas som "samma".
+const STAGNATION_CENTROID_EPS = 0.012; // normaliserade enheter
+const STAGNATION_AREA_EPS = 0.04; // 4 % relativ areaskillnad
+// Antal helt unbiased detect-pass som körs när stagnation upptäckts.
+const STAGNATION_FREE_PASSES = 3;
+// Minsta tid mellan två stagnations-utbrott, så vi inte loopar.
+const STAGNATION_COOLDOWN_MS = 2500;
+// En fri kandidat adopteras bara om den är tydligt bättre än den fastnade.
+const FREE_PASS_ADOPT_AREA_GAIN = 1.06;
+const FREE_PASS_ADOPT_CONF_GAIN = 0.08;
+
+
 /** Yta för en quad (shoelace, absolutbelopp). */
 function quadArea(q: readonly Point[]): number {
   let a = 0;
@@ -549,6 +565,20 @@ function ScanPage() {
   // för att låta temporal bias förfalla så detektorn kan hitta ut ur en
   // felaktig, för liten låsning.
   const outlierRejectFramesRef = useRef(0);
+  // Stagnation: signatur för senaste underkända quad + när den blev oförändrad.
+  const stagnationSigRef = useRef<{
+    cx: number;
+    cy: number;
+    area: number;
+    reason: string;
+  } | null>(null);
+  const stagnationSinceRef = useRef(0);
+  const lastStagnationAtRef = useRef(0);
+  // Antal återstående helt unbiased detect-pass (0 = normal tracking).
+  const freePassesLeftRef = useRef(0);
+  const freePassRunRef = useRef(0);
+  const freePassBaselineRef = useRef<{ area: number; conf: number } | null>(null);
+
   const brightnessRef = useRef(255);
   const lowLightFramesRef = useRef(0);
   const exposureLockedRef = useRef(false);
@@ -770,6 +800,13 @@ function ScanPage() {
       smoothQuad.current = null;
       lastRawQuad.current = null;
       detectionMeta.current = null;
+      stagnationSigRef.current = null;
+      stagnationSinceRef.current = 0;
+      lastStagnationAtRef.current = 0;
+      freePassesLeftRef.current = 0;
+      freePassRunRef.current = 0;
+      freePassBaselineRef.current = null;
+
       recentSmoothQuadsRef.current = [];
       candidateHistoryRef.current = [];
       ambiguousFramesRef.current = 0;
@@ -1211,8 +1248,13 @@ function ScanPage() {
     // spårade quaden sannolikt fel. Släpp temporal bias så detektorn får söka
     // fritt istället för att förstärka samma felaktiga kandidat.
     const biasDecayed = outlierRejectFramesRef.current >= OUTLIER_BIAS_DECAY_FRAMES;
+    // Fritt pass: under stagnations-återhämtning körs detektorn helt utan
+    // temporal bias (ingen preferQuad, ingen smoothQuad-bias) så den kan hitta
+    // en bättre kandidat än den som fastnat.
+    const freePass = freePassesLeftRef.current > 0;
+    if (freePass) freePassesLeftRef.current--;
     const preferQuad =
-      prevSmooth && prevConfidentEnough && !biasDecayed
+      !freePass && prevSmooth && prevConfidentEnough && !biasDecayed
         ? (prevSmooth.map((p) => ({ x: p.x * dw, y: p.y * dh })) as [Point, Point, Point, Point])
         : undefined;
     let detection: DocumentDetection | null;
@@ -1225,6 +1267,7 @@ function ScanPage() {
     } finally {
       detectInFlightRef.current = false;
     }
+
     // The camera may have been torn down / captured while we awaited.
     if (capturedRef.current || cancelledRef.current) return;
     // Separate live-detection (overlay) from capture-readiness. A detection
@@ -1439,6 +1482,55 @@ function ScanPage() {
     // Normalize to 0..1
     const norm = corners.map((p) => ({ x: p.x / dw, y: p.y / dh })) as [Point, Point, Point, Point];
 
+    // ===== Stagnationsdetektor =====
+    // Om samma underkända quad (samma centroid/area/reasonNotReady) fortsätter
+    // vinna i ~1 s utan verklig förbättring, kör några helt unbiased pass.
+    // Rör inga scoring-, edge-, crop-, capture- eller hi-res-gates.
+    {
+      const areaNow = quadArea(norm);
+      const cxNow = (norm[0].x + norm[1].x + norm[2].x + norm[3].x) / 4;
+      const cyNow = (norm[0].y + norm[1].y + norm[2].y + norm[3].y) / 4;
+      const reasonNow = reasonNotReady ?? "unknown";
+      if (readyForCapture) {
+        stagnationSigRef.current = null;
+        stagnationSinceRef.current = 0;
+      } else {
+        const prevSig = stagnationSigRef.current;
+        const same =
+          prevSig !== null &&
+          prevSig.reason === reasonNow &&
+          Math.hypot(prevSig.cx - cxNow, prevSig.cy - cyNow) <= STAGNATION_CENTROID_EPS &&
+          Math.abs(areaNow - prevSig.area) <= STAGNATION_AREA_EPS * Math.max(prevSig.area, 1e-6);
+        if (!same) {
+          stagnationSigRef.current = { cx: cxNow, cy: cyNow, area: areaNow, reason: reasonNow };
+          stagnationSinceRef.current = now;
+        } else if (
+          freePassesLeftRef.current === 0 &&
+          !freePass &&
+          stagnationSinceRef.current > 0 &&
+          now - stagnationSinceRef.current >= STAGNATION_MS &&
+          now - lastStagnationAtRef.current >= STAGNATION_COOLDOWN_MS
+        ) {
+          const heldMs = Math.round(now - stagnationSinceRef.current);
+          lastStagnationAtRef.current = now;
+          stagnationSinceRef.current = now;
+          freePassesLeftRef.current = STAGNATION_FREE_PASSES;
+          freePassRunRef.current = 0;
+          freePassBaselineRef.current = { area: areaNow, conf: detection?.confidence ?? 0 };
+          // eslint-disable-next-line no-console
+          console.log("[scan] stagnation-detected", {
+            heldMs,
+
+            reason: reasonNow,
+            area: +areaNow.toFixed(4),
+            centroid: [+cxNow.toFixed(3), +cyNow.toFixed(3)],
+            freePassesQueued: STAGNATION_FREE_PASSES,
+          });
+        }
+      }
+    }
+
+
     // ===== visibleCandidate vs captureCandidate =====
     // visibleCandidate: detection passed structural gates → overlay får visas
     //                   och stabilitet får byggas upp.
@@ -1497,7 +1589,9 @@ function ScanPage() {
     // LOCK_BREAK_DELTA och kastas som brus.
     const previousSmooth = smoothQuad.current;
     let rawDeltaFromSmooth = 0;
-    if (previousSmooth) {
+    // Under fria pass hoppas outlier-grinden över helt — annars kan den kasta
+    // just den bättre kandidat som passet är till för att hitta.
+    if (previousSmooth && !freePass) {
       rawDeltaFromSmooth = maxCornerDelta(norm, previousSmooth);
       if (rawDeltaFromSmooth > OUTLIER_DELTA && rawDeltaFromSmooth < LOCK_BREAK_DELTA) {
         if (isOutwardExpansion(norm, previousSmooth, detection?.confidence ?? 0)) {
@@ -1532,11 +1626,55 @@ function ScanPage() {
       }
     }
 
+    // ===== Fritt pass: adoptera bara en tydligt bättre kandidat =====
+    let freePassAdopted = false;
+    if (freePass) {
+      freePassRunRef.current++;
+      const baseline = freePassBaselineRef.current;
+      const areaNew = quadArea(norm);
+      const confNew = detection?.confidence ?? 0;
+      freePassAdopted =
+        !baseline ||
+        areaNew >= baseline.area * FREE_PASS_ADOPT_AREA_GAIN ||
+        confNew >= baseline.conf + FREE_PASS_ADOPT_CONF_GAIN;
+      const passesRun = freePassRunRef.current;
+      const done = freePassesLeftRef.current === 0 || freePassAdopted;
+      if (freePassAdopted) {
+        // Hoppa över EMA: byt direkt till den nya kandidaten.
+        smoothQuad.current = norm;
+        freePassesLeftRef.current = 0;
+        stagnationSigRef.current = null;
+        stagnationSinceRef.current = 0;
+        outlierRejectFramesRef.current = 0;
+      }
+      // eslint-disable-next-line no-console
+      console.log("[scan] stagnation-free-pass", {
+        pass: passesRun,
+        of: STAGNATION_FREE_PASSES,
+        adopted: freePassAdopted,
+        area: +areaNew.toFixed(4),
+        baselineArea: baseline ? +baseline.area.toFixed(4) : null,
+        conf: +confNew.toFixed(2),
+        baselineConf: baseline ? +baseline.conf.toFixed(2) : null,
+        outcome: freePassAdopted
+          ? "adopted-new-quad"
+          : done
+            ? "resumed-normal-tracking"
+            : "continue-free-passes",
+      });
+      if (done && !freePassAdopted) {
+        // Ingen bättre kandidat — ingen full reset, bara normal tracking igen.
+        freePassBaselineRef.current = null;
+        stagnationSinceRef.current = now;
+      }
+    }
+
     // Adaptive smoothing — gentler once locked, so the on-screen polygon
     // barely moves frame-to-frame.
     const alpha = lockedRef.current ? ALPHA_POST_LOCK : ALPHA_PRE_LOCK;
-    const smoothed = emaQuad(smoothQuad.current, norm, alpha);
+    const smoothed = freePassAdopted ? norm : emaQuad(smoothQuad.current, norm, alpha);
     smoothQuad.current = smoothed;
+
     // Push to the voting ring buffer (only the most recent frames count).
     const buf = recentSmoothQuadsRef.current;
     buf.push(smoothed.map((p) => ({ x: p.x, y: p.y })) as [Point, Point, Point, Point]);
@@ -2995,6 +3133,13 @@ function ScanPage() {
     recentSmoothQuadsRef.current = [];
     lastRawQuad.current = null;
     detectionMeta.current = null;
+    stagnationSigRef.current = null;
+    stagnationSinceRef.current = 0;
+    lastStagnationAtRef.current = 0;
+    freePassesLeftRef.current = 0;
+    freePassRunRef.current = 0;
+    freePassBaselineRef.current = null;
+
     blurFramesRef.current = 0;
     captureRetryRef.current = 0;
     hiResTightConfirmedRef.current = false;
