@@ -2124,7 +2124,7 @@ function sobelMagnitude(
   width: number,
   height: number,
 ): Float32Array {
-  const out = new Float32Array(width * height);
+  const out = scratch("sobel", Float32Array, width * height);
   for (let y = 1; y < height - 1; y++) {
     for (let x = 1; x < width - 1; x++) {
       const i = y * width + x;
