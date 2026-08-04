@@ -4141,6 +4141,21 @@ export function sharpenInk(
 // edge. If the strip's mean luminance is below `minMeanL` OR its luminance
 // stddev is above `maxStdL` (texture/shadow), peel it off. Repeat per side
 // up to `maxFraction` of that dimension. Pure 2D crop — no re-warp needed.
+export interface WhiteCropSideLog {
+  side: "top" | "right" | "bottom" | "left";
+  trimmedPx: number;
+  trimFraction: number;
+  meanBefore: number;
+  stdBefore: number;
+  meanAfter: number;
+  stdAfter: number;
+  stopReason:
+    | "paper-white"
+    | "not-clearly-background"
+    | "max-fraction"
+    | "no-trim-needed";
+}
+
 export function cropToWhiteEdges(
   canvas: HTMLCanvasElement,
   options: {
@@ -4152,14 +4167,31 @@ export function cropToWhiteEdges(
     /** Per-axis caps. Override top/bottom and left/right independently. */
     maxTopBottom?: number;
     maxLeftRight?: number;
+    /**
+     * Feature flag: need-driven per-side trimming. Only peels a strip when it
+     * is *clearly* background (well below paper luminance or clearly textured),
+     * which allows a slightly higher cap without risking document content.
+     */
+    adaptive?: boolean;
+    /** Extra margin required beyond the paper-white gate in adaptive mode. */
+    adaptiveMeanMargin?: number;
+    adaptiveStdMargin?: number;
   } = {},
-): { canvas: HTMLCanvasElement; cropped: { top: number; right: number; bottom: number; left: number } } {
+): {
+  canvas: HTMLCanvasElement;
+  cropped: { top: number; right: number; bottom: number; left: number };
+  sideLogs?: WhiteCropSideLog[];
+} {
   const stripPx = options.stripPx ?? 6;
   const minMeanL = options.minMeanL ?? 200;
   const maxStdL = options.maxStdL ?? 28;
   const baseFraction = options.maxFraction ?? 0.03;
   const fracTopBottom = options.maxTopBottom ?? baseFraction;
   const fracLeftRight = options.maxLeftRight ?? baseFraction;
+  const adaptive = options.adaptive === true;
+  const meanMargin = options.adaptiveMeanMargin ?? 18;
+  const stdMargin = options.adaptiveStdMargin ?? 6;
+
   const w = canvas.width;
   const h = canvas.height;
   if (w < stripPx * 4 || h < stripPx * 4) {
@@ -4217,31 +4249,87 @@ export function cropToWhiteEdges(
   let right = 0;
   const isPaperWhite = (s: { mean: number; std: number }) =>
     s.mean >= minMeanL && s.std <= maxStdL;
-  // Peel one side at a time in the order that has the worst stats first.
-  for (let iter = 0; iter < 64; iter++) {
-    const sides = [
-      { name: "top" as const, offset: top, max: maxTop },
-      { name: "bottom" as const, offset: bottom, max: maxBottom },
-      { name: "left" as const, offset: left, max: maxLeft },
-      { name: "right" as const, offset: right, max: maxRight },
-    ];
-    let worst: { name: "top" | "bottom" | "left" | "right"; score: number } | null = null;
-    for (const s of sides) {
-      if (s.offset >= s.max) continue;
-      const stat = sideStats(s.name, s.offset);
-      if (isPaperWhite(stat)) continue;
-      // Higher score = worse (darker or noisier).
-      const score = (minMeanL - stat.mean) + (stat.std - maxStdL) * 2;
-      if (!worst || score > worst.score) worst = { name: s.name, score };
+  // Adaptive mode: only peel when the strip is *clearly* background, i.e. it
+  // fails the paper gate by a margin. A strip that is merely borderline is
+  // left alone so document content can never be trimmed.
+  const isClearlyBackground = (s: { mean: number; std: number }) =>
+    s.mean < minMeanL - meanMargin || s.std > maxStdL + stdMargin;
+
+  const sideLogs: WhiteCropSideLog[] = [];
+
+  if (adaptive) {
+    const offsets = { top: 0, right: 0, bottom: 0, left: 0 };
+    const maxes = { top: maxTop, right: maxRight, bottom: maxBottom, left: maxLeft };
+    const dims = { top: h, bottom: h, left: w, right: w };
+    for (const side of ["top", "right", "bottom", "left"] as const) {
+      const first = sideStats(side, 0);
+      let stat = first;
+      let stopReason: WhiteCropSideLog["stopReason"] = "no-trim-needed";
+      let offset = 0;
+      for (let iter = 0; iter < 64; iter++) {
+        if (offset >= maxes[side]) {
+          stopReason = "max-fraction";
+          break;
+        }
+        stat = sideStats(side, offset);
+        if (isPaperWhite(stat)) {
+          stopReason = offset === 0 ? "no-trim-needed" : "paper-white";
+          break;
+        }
+        if (!isClearlyBackground(stat)) {
+          stopReason = offset === 0 ? "no-trim-needed" : "not-clearly-background";
+          break;
+        }
+        offset += stripPx;
+      }
+      offsets[side] = offset;
+      const after = offset > 0 ? sideStats(side, offset) : first;
+      sideLogs.push({
+        side,
+        trimmedPx: offset,
+        trimFraction: offset / dims[side],
+        meanBefore: Math.round(first.mean * 10) / 10,
+        stdBefore: Math.round(first.std * 10) / 10,
+        meanAfter: Math.round(after.mean * 10) / 10,
+        stdAfter: Math.round(after.std * 10) / 10,
+        stopReason,
+      });
     }
-    if (!worst) break;
-    if (worst.name === "top") top += stripPx;
-    else if (worst.name === "bottom") bottom += stripPx;
-    else if (worst.name === "left") left += stripPx;
-    else right += stripPx;
+    top = offsets.top;
+    right = offsets.right;
+    bottom = offsets.bottom;
+    left = offsets.left;
+  } else {
+    // Peel one side at a time in the order that has the worst stats first.
+    for (let iter = 0; iter < 64; iter++) {
+      const sides = [
+        { name: "top" as const, offset: top, max: maxTop },
+        { name: "bottom" as const, offset: bottom, max: maxBottom },
+        { name: "left" as const, offset: left, max: maxLeft },
+        { name: "right" as const, offset: right, max: maxRight },
+      ];
+      let worst: { name: "top" | "bottom" | "left" | "right"; score: number } | null = null;
+      for (const s of sides) {
+        if (s.offset >= s.max) continue;
+        const stat = sideStats(s.name, s.offset);
+        if (isPaperWhite(stat)) continue;
+        // Higher score = worse (darker or noisier).
+        const score = (minMeanL - stat.mean) + (stat.std - maxStdL) * 2;
+        if (!worst || score > worst.score) worst = { name: s.name, score };
+      }
+      if (!worst) break;
+      if (worst.name === "top") top += stripPx;
+      else if (worst.name === "bottom") bottom += stripPx;
+      else if (worst.name === "left") left += stripPx;
+      else right += stripPx;
+    }
   }
   if (top === 0 && bottom === 0 && left === 0 && right === 0) {
-    return { canvas, cropped: { top: 0, right: 0, bottom: 0, left: 0 } };
+    return {
+      canvas,
+      cropped: { top: 0, right: 0, bottom: 0, left: 0 },
+      ...(adaptive ? { sideLogs } : {}),
+    };
   }
   const nw = w - left - right;
   const nh = h - top - bottom;
@@ -4250,8 +4338,14 @@ export function cropToWhiteEdges(
   out.height = nh;
   const octx = out.getContext("2d")!;
   octx.drawImage(canvas, left, top, nw, nh, 0, 0, nw, nh);
-  return { canvas: out, cropped: { top, right, bottom, left } };
+  return {
+    canvas: out,
+    cropped: { top, right, bottom, left },
+    ...(adaptive ? { sideLogs } : {}),
+  };
 }
+
+
 
 // ============================================================================
 // Auto-straighten — fine rotation correction within ±3°
