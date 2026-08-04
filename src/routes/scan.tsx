@@ -1459,12 +1459,12 @@ function ScanPage() {
     if (previousSmooth) {
       rawDeltaFromSmooth = maxCornerDelta(norm, previousSmooth);
       if (rawDeltaFromSmooth > OUTLIER_DELTA && rawDeltaFromSmooth < LOCK_BREAK_DELTA) {
-        if (isOutwardExpansion(norm, previousSmooth, detection.confidence)) {
+        if (isOutwardExpansion(norm, previousSmooth, detection?.confidence ?? 0)) {
           outlierRejectFramesRef.current = 0;
-          if (DEBUG_AUTOCAPTURE) {
+          if (debugEnabled) {
             console.log("[autocapture] expansion accepted", {
               delta: rawDeltaFromSmooth.toFixed(3),
-              conf: detection.confidence.toFixed(2),
+              conf: (detection?.confidence ?? 0).toFixed(2),
             });
           }
         } else {
