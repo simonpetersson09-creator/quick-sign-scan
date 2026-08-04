@@ -1170,8 +1170,8 @@ function ScanPage() {
     // returned with readyForCapture=false has only passed structural gates
     // and is shown to coach the user — auto-capture must not fire.
     const detectedForOverlay = !!detection;
-    const readyForCapture = !!detection && detection.readyForCapture !== false;
-    const reasonNotReady = detection?.reasonNotReady;
+    let readyForCapture = !!detection && detection.readyForCapture !== false;
+    let reasonNotReady = detection?.reasonNotReady;
 
     // Optional hi-res local corner refinement on the full video frame. Does
     // NOT run a new detection — only nudges already-detected corners toward
@@ -1262,6 +1262,15 @@ function ScanPage() {
       } catch {
         // ignore — keep 280px-derived tightness
       }
+    }
+
+    // Write back hi-res outcome: the block above may have flipped
+    // detection.readyForCapture to true, but the locals were captured before
+    // it ran. Re-derive so downstream capture/status logic sees the update.
+    // Monotonic by construction: the hi-res block never sets it to false.
+    if (detection && detection.readyForCapture !== false) {
+      readyForCapture = true;
+      reasonNotReady = detection.reasonNotReady;
     }
 
     // Reference unused hi-res symbols so TS doesn't complain when flags off.
