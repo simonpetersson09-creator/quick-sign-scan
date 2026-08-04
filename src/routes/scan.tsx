@@ -1123,9 +1123,16 @@ function ScanPage() {
       lockedRef.current = false;
       lockBreakFramesRef.current = 0;
       hiResTightConfirmedRef.current = false;
-      if (detectCount.current === 0) {
+      if (detectCount.current === 0 || missCount.current >= LOST_RESET_MISS_FRAMES) {
+        // Full reset av quad-state så återdetektering startar rent: ingen
+        // prefer-bias mot en gammal position, ingen EMA-svans, inga gamla
+        // röster och ingen outlier-gate som kastar det nya quadet.
+        detectCount.current = 0;
         smoothQuad.current = null;
         lastRawQuad.current = null;
+        recentSmoothQuadsRef.current = [];
+        candidateHistoryRef.current = [];
+        ambiguousFramesRef.current = 0;
         drawOverlay(null, "search");
         setProgress(0);
       }
