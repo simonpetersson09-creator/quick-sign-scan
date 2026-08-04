@@ -271,6 +271,7 @@ function ScanPage() {
   const lastDetectAtRef = useRef(0);
   const lastRejectLogAtRef = useRef(0);
   const lastAdaptiveLogAtRef = useRef(0);
+  const lastSideSupportLogAtRef = useRef(0);
   const lastGateLogAtRef = useRef(0);
   // Per-frame compact debug log (throttled). Always fires while debugEnabled
   // is on, so we can see the full live-detection picture each ~250 ms.
