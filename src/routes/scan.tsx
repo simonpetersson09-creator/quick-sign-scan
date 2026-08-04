@@ -1091,6 +1091,17 @@ function ScanPage() {
         // eslint-disable-next-line no-console
         console.log("[scan] adaptive-edge-tightness", adaptive);
       }
+      const side = getLastDetectDiagnostics().sideSupport;
+      if (side && now - lastSideSupportLogAtRef.current > 750) {
+        lastSideSupportLogAtRef.current = now;
+        // eslint-disable-next-line no-console
+        console.log("[scan] side-support", {
+          perSideTightness: side.perSideTightness.map((v) => +v.toFixed(2)),
+          minSideTightness: +side.minSideTightness.toFixed(2),
+          tightness: +side.tightness.toFixed(2),
+          reason: side.reason,
+        });
+      }
     }
 
     // Normalize to 0..1
