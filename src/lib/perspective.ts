@@ -1225,8 +1225,8 @@ function stretchContrast(
   // Skip remap when contrast is already good — avoids touching well-lit frames.
   if (span >= 170) return { lum, hist };
   if (span < 20) return { lum, hist }; // degenerate / nearly flat image — leave untouched
-  const out = new Uint8ClampedArray(lum.length);
-  const outHist = new Uint32Array(256);
+  const out = scratch("lumStretched", Uint8ClampedArray, lum.length, false);
+  const outHist = scratch("histStretched", Uint32Array, 256);
   const scale = 255 / span;
   for (let i = 0; i < lum.length; i++) {
     let v = (lum[i] - lo) * scale;
