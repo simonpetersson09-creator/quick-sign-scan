@@ -1757,11 +1757,77 @@ function ScanPage() {
     capturedRef.current = true;
     resetStageDump();
     triggerCaptureHaptic();
-    const vw = video.videoWidth;
-    const vh = video.videoHeight;
+    let vw = video.videoWidth;
+    let vh = video.videoHeight;
+
+    // === Punkt 2: full-upplöst stillbild i stället för preview-frame ===
+    // Preview-strömmen är oftast begränsad (t.ex. 1920x1080) medan sensorn
+    // kan leverera flera gånger fler pixlar. Om ImageCapture finns tar vi en
+    // riktig stillbild och använder den som källa för warp/enhance. Quaden är
+    // normaliserad, så den skalas automatiskt till stillbildens upplösning.
+    // Falls back tyst till preview-burst där API:t saknas (iOS/WKWebView).
+    let stillFrame: HTMLCanvasElement | null = null;
+    try {
+      const track = streamRef.current?.getVideoTracks()[0];
+      const ImageCaptureCtor = (
+        globalThis as unknown as { ImageCapture?: new (t: MediaStreamTrack) => {
+          takePhoto: (opts?: Record<string, unknown>) => Promise<Blob>;
+          getPhotoCapabilities?: () => Promise<{ imageWidth?: { max?: number }; imageHeight?: { max?: number } }>;
+        } }
+      ).ImageCapture;
+      if (track && track.readyState === "live" && typeof ImageCaptureCtor === "function") {
+        const ic = new ImageCaptureCtor(track);
+        let photoOpts: Record<string, unknown> | undefined;
+        try {
+          const caps = await ic.getPhotoCapabilities?.();
+          if (caps?.imageWidth?.max && caps?.imageHeight?.max) {
+            photoOpts = { imageWidth: caps.imageWidth.max, imageHeight: caps.imageHeight.max };
+          }
+        } catch {
+          // capabilities är optional — ta default-upplösning i så fall
+        }
+        const blob = await Promise.race([
+          ic.takePhoto(photoOpts),
+          new Promise<Blob>((_, reject) =>
+            window.setTimeout(() => reject(new Error("still-timeout")), 1500),
+          ),
+        ]);
+        const bitmap = await createImageBitmap(blob);
+        const videoAspect = vw / vh;
+        const stillAspect = bitmap.width / bitmap.height;
+        const aspectDrift = Math.abs(stillAspect - videoAspect) / videoAspect;
+        // Bara acceptera stillbilden om den täcker samma bildfält (samma
+        // aspect) och faktiskt har fler pixlar än preview-framen.
+        if (bitmap.width > vw && aspectDrift < 0.02) {
+          const c = document.createElement("canvas");
+          c.width = bitmap.width;
+          c.height = bitmap.height;
+          c.getContext("2d")!.drawImage(bitmap, 0, 0);
+          stillFrame = c;
+          vw = bitmap.width;
+          vh = bitmap.height;
+        }
+        logScanStage("still-capture", {
+          applied: Boolean(stillFrame),
+          stillSize: { width: bitmap.width, height: bitmap.height },
+          previewSize: { width: video.videoWidth, height: video.videoHeight },
+          aspectDrift: +aspectDrift.toFixed(4),
+        });
+        bitmap.close?.();
+      } else {
+        logScanStage("still-capture", { applied: false, reason: "image-capture-unavailable" });
+      }
+    } catch (e) {
+      logScanStage("still-capture", {
+        applied: false,
+        reason: e instanceof Error ? e.message : "exception",
+      });
+    }
+
     if (debugEnabled) {
       setDebugInfo((d) => ({ ...d, vw, vh, ready: true, lastCapture: Date.now() }));
     }
+
 
     // Don't show the raw (uncropped) frame here — it briefly reveals the
     // background/"floor" around the document and then jumps to the warped
@@ -1886,8 +1952,9 @@ function ScanPage() {
       const bboxW = Math.max(1, bboxMaxX - bboxMinX);
       const bboxH = Math.max(1, bboxMaxY - bboxMinY);
 
-      let bestFrame: HTMLCanvasElement | null = null;
+      let bestFrame: HTMLCanvasElement | null = stillFrame;
       let bestScore = -1;
+      if (!stillFrame) {
       const scoreCanvas = document.createElement("canvas");
       const SCORE_W = 320;
       const scoreH = Math.max(1, Math.round((bboxH / bboxW) * SCORE_W));
@@ -1939,10 +2006,13 @@ function ScanPage() {
           bestFrame = frame;
         }
       }
+      }
       logScanStage("burst-capture", {
+        source: stillFrame ? "still-photo" : "preview-burst",
         bestSharpness: bestScore,
         scoredBbox: { x: bboxMinX, y: bboxMinY, w: bboxW, h: bboxH },
       });
+
 
       // ===== Motion-sync guard (A + B) =====
       // Live-`srcQuad` was locked BEFORE the burst window opened. The phone
