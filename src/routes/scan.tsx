@@ -859,11 +859,19 @@ function ScanPage() {
       const a = e.acceleration ?? e.accelerationIncludingGravity;
       if (!a) return;
       const mag = Math.sqrt((a.x ?? 0) ** 2 + (a.y ?? 0) ** 2 + (a.z ?? 0) ** 2);
-      motionAvailableRef.current = true;
-      // EMA — heavy weight on history so brief spikes still register but
-      // sustained calm wins quickly.
-      motionMagRef.current = motionMagRef.current * 0.7 + mag * 0.3;
-    };
+      motionSamplesRef.current++;
+      if (motionSamplesRef.current === 1) {
+        // Seeda EMA:n med första mätvärdet i stället för 0 — annars såg en
+        // nystartad session alltid "helt stilla" ut de första framesen.
+        motionMagRef.current = mag;
+      } else {
+        // EMA — heavy weight on history so brief spikes still register but
+        // sustained calm wins quickly.
+        motionMagRef.current = motionMagRef.current * 0.7 + mag * 0.3;
+      }
+      // Gyrot anses tillförlitligt först efter lika många samples varje gång.
+      motionAvailableRef.current = motionSamplesRef.current >= MOTION_MIN_SAMPLES;
+
     let motionAttached = false;
     const attachMotion = () => {
       if (motionAttached) return;
