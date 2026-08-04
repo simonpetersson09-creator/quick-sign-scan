@@ -174,6 +174,16 @@ const ALPHA_PRE_LOCK = 0.18;
 const ALPHA_POST_LOCK = 0.07;
 const OUTLIER_DELTA = 0.13; // raw frames further than this from smoothed are rejected
 const LOCK_BREAK_DELTA = 0.2; // sustained delta this large breaks the lock and re-detects
+// Riktningsmedveten outlier-grind: en rå-quad som *expanderar* utåt (dvs som
+// innehåller den nuvarande utjämnade quaden) är nästan alltid en korrektion
+// mot dokumentets verkliga ytterkant, inte brus. Sådana frames släpps igenom
+// dödbandet mellan OUTLIER_DELTA och LOCK_BREAK_DELTA om konfidensen håller.
+const EXPANSION_MIN_CONFIDENCE = 0.45;
+const EXPANSION_MIN_AREA_GAIN = 1.02; // minst 2 % större yta för att räknas som expansion
+const EXPANSION_INWARD_SLACK = 0.004; // tillåt minimal inåtrörelse per hörn (brus)
+// Efter så här många raka förkastade frames släpper vi temporal bias helt så
+// detektorn kan söka fritt igen istället för att fastna i samma felaktiga quad.
+const OUTLIER_BIAS_DECAY_FRAMES = 6;
 // Sharpness gates — Laplacian variance computed on a 280px detect frame
 // (in-camera) and the warped doc (post-capture). Tuned conservatively så
 // en suddig sida aldrig sparas, oavsett hur snabbt användaren rör mobilen.
