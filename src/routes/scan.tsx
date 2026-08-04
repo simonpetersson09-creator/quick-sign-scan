@@ -179,6 +179,12 @@ const LOCK_BREAK_DELTA = 0.2; // sustained delta this large breaks the lock and 
 // en suddig sida aldrig sparas, oavsett hur snabbt användaren rör mobilen.
 const SHARPNESS_LIVE_MIN = 35;
 const SHARPNESS_CAPTURE_MIN = 110;
+// Max antal automatiska omtag när den warpade sidan är för suddig. Manuella
+// captures gör aldrig omtag.
+const MAX_CAPTURE_RETRIES = 2;
+// Post-capture kontrastgräns (luma-varians). Medvetet låg: alla riktiga
+// dokument med text passerar, bara helt blanka/överexponerade frames fastnar.
+const CONTRAST_CAPTURE_MIN = 3;
 const BLUR_HINT_FRAMES = 75; // ~2.5s of blur before suggesting "move back"
 // Lighting gate — mean luminance below this is "too dark to scan reliably".
 // Lowered from 55 to 38: detection itself is now tolerant of dim scenes
