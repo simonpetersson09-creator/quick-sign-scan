@@ -4141,6 +4141,21 @@ export function sharpenInk(
 // edge. If the strip's mean luminance is below `minMeanL` OR its luminance
 // stddev is above `maxStdL` (texture/shadow), peel it off. Repeat per side
 // up to `maxFraction` of that dimension. Pure 2D crop — no re-warp needed.
+export interface WhiteCropSideLog {
+  side: "top" | "right" | "bottom" | "left";
+  trimmedPx: number;
+  trimFraction: number;
+  meanBefore: number;
+  stdBefore: number;
+  meanAfter: number;
+  stdAfter: number;
+  stopReason:
+    | "paper-white"
+    | "not-clearly-background"
+    | "max-fraction"
+    | "no-trim-needed";
+}
+
 export function cropToWhiteEdges(
   canvas: HTMLCanvasElement,
   options: {
@@ -4152,14 +4167,31 @@ export function cropToWhiteEdges(
     /** Per-axis caps. Override top/bottom and left/right independently. */
     maxTopBottom?: number;
     maxLeftRight?: number;
+    /**
+     * Feature flag: need-driven per-side trimming. Only peels a strip when it
+     * is *clearly* background (well below paper luminance or clearly textured),
+     * which allows a slightly higher cap without risking document content.
+     */
+    adaptive?: boolean;
+    /** Extra margin required beyond the paper-white gate in adaptive mode. */
+    adaptiveMeanMargin?: number;
+    adaptiveStdMargin?: number;
   } = {},
-): { canvas: HTMLCanvasElement; cropped: { top: number; right: number; bottom: number; left: number } } {
+): {
+  canvas: HTMLCanvasElement;
+  cropped: { top: number; right: number; bottom: number; left: number };
+  sideLogs?: WhiteCropSideLog[];
+} {
   const stripPx = options.stripPx ?? 6;
   const minMeanL = options.minMeanL ?? 200;
   const maxStdL = options.maxStdL ?? 28;
   const baseFraction = options.maxFraction ?? 0.03;
   const fracTopBottom = options.maxTopBottom ?? baseFraction;
   const fracLeftRight = options.maxLeftRight ?? baseFraction;
+  const adaptive = options.adaptive === true;
+  const meanMargin = options.adaptiveMeanMargin ?? 18;
+  const stdMargin = options.adaptiveStdMargin ?? 6;
+
   const w = canvas.width;
   const h = canvas.height;
   if (w < stripPx * 4 || h < stripPx * 4) {
