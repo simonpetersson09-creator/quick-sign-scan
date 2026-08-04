@@ -174,6 +174,53 @@ const ALPHA_PRE_LOCK = 0.18;
 const ALPHA_POST_LOCK = 0.07;
 const OUTLIER_DELTA = 0.13; // raw frames further than this from smoothed are rejected
 const LOCK_BREAK_DELTA = 0.2; // sustained delta this large breaks the lock and re-detects
+// Riktningsmedveten outlier-grind: en rå-quad som *expanderar* utåt (dvs som
+// innehåller den nuvarande utjämnade quaden) är nästan alltid en korrektion
+// mot dokumentets verkliga ytterkant, inte brus. Sådana frames släpps igenom
+// dödbandet mellan OUTLIER_DELTA och LOCK_BREAK_DELTA om konfidensen håller.
+const EXPANSION_MIN_CONFIDENCE = 0.45;
+const EXPANSION_MIN_AREA_GAIN = 1.02; // minst 2 % större yta för att räknas som expansion
+const EXPANSION_INWARD_SLACK = 0.004; // tillåt minimal inåtrörelse per hörn (brus)
+// Efter så här många raka förkastade frames släpper vi temporal bias helt så
+// detektorn kan söka fritt igen istället för att fastna i samma felaktiga quad.
+const OUTLIER_BIAS_DECAY_FRAMES = 6;
+
+/** Yta för en quad (shoelace, absolutbelopp). */
+function quadArea(q: readonly Point[]): number {
+  let a = 0;
+  for (let i = 0; i < q.length; i++) {
+    const p = q[i];
+    const n = q[(i + 1) % q.length];
+    a += p.x * n.y - n.x * p.y;
+  }
+  return Math.abs(a) / 2;
+}
+
+/**
+ * Sant när `next` är en trovärdig utåtgående korrektion av `prev`: större yta
+ * och inget hörn som rör sig nämnvärt inåt mot den gemensamma centroiden.
+ * Används för att släppa igenom expansioner som annars fastnar i det osignerade
+ * dödbandet i outlier-grinden.
+ */
+function isOutwardExpansion(
+  next: readonly Point[],
+  prev: readonly Point[],
+  confidence: number,
+): boolean {
+  if (confidence < EXPANSION_MIN_CONFIDENCE) return false;
+  const prevArea = quadArea(prev);
+  if (prevArea <= 0) return false;
+  if (quadArea(next) / prevArea < EXPANSION_MIN_AREA_GAIN) return false;
+  const cx = prev.reduce((s, p) => s + p.x, 0) / prev.length;
+  const cy = prev.reduce((s, p) => s + p.y, 0) / prev.length;
+  for (let i = 0; i < prev.length; i++) {
+    const rPrev = Math.hypot(prev[i].x - cx, prev[i].y - cy);
+    const rNext = Math.hypot(next[i].x - cx, next[i].y - cy);
+    // Varje hörn måste ligga minst lika långt ut som förut (med lite slack).
+    if (rNext < rPrev - EXPANSION_INWARD_SLACK) return false;
+  }
+  return true;
+}
 // Sharpness gates — Laplacian variance computed on a 280px detect frame
 // (in-camera) and the warped doc (post-capture). Tuned conservatively så
 // en suddig sida aldrig sparas, oavsett hur snabbt användaren rör mobilen.
@@ -498,6 +545,10 @@ function ScanPage() {
   const tooCloseRejectFramesRef = useRef(0);
   const lockedRef = useRef(false);
   const lockBreakFramesRef = useRef(0);
+  // Antal raka frames där en rå-quad förkastats av outlier-grinden. Används
+  // för att låta temporal bias förfalla så detektorn kan hitta ut ur en
+  // felaktig, för liten låsning.
+  const outlierRejectFramesRef = useRef(0);
   const brightnessRef = useRef(255);
   const lowLightFramesRef = useRef(0);
   const exposureLockedRef = useRef(false);
@@ -1156,8 +1207,12 @@ function ScanPage() {
             prevMeta.confidence >= PREFER_BIAS_EARLY_MIN_CONF &&
             prevMeta.debug.edgeTightness >= PREFER_BIAS_EARLY_MIN_EDGE)
         ));
+    // Bias-förfall: har flera raka frames förkastats av outlier-grinden är den
+    // spårade quaden sannolikt fel. Släpp temporal bias så detektorn får söka
+    // fritt istället för att förstärka samma felaktiga kandidat.
+    const biasDecayed = outlierRejectFramesRef.current >= OUTLIER_BIAS_DECAY_FRAMES;
     const preferQuad =
-      prevSmooth && prevConfidentEnough
+      prevSmooth && prevConfidentEnough && !biasDecayed
         ? (prevSmooth.map((p) => ({ x: p.x * dw, y: p.y * dh })) as [Point, Point, Point, Point])
         : undefined;
     let detection: DocumentDetection | null;
@@ -1434,14 +1489,33 @@ function ScanPage() {
     // Outlier rejection — if a raw frame jumped wildly from the smoothed
     // estimate, treat it as noise and skip the update. Prevents the polygon
     // from twitching when one frame detects a wrong contour.
+    //
+    // Undantag: en rå-quad som expanderar utåt och innehåller den nuvarande
+    // utjämnade quaden är en korrektion mot dokumentets verkliga ytterkant.
+    // Utan det här undantaget kan ramen fastna innanför pappret, eftersom en
+    // typisk expansion (~0.15) hamnar i dödbandet mellan OUTLIER_DELTA och
+    // LOCK_BREAK_DELTA och kastas som brus.
     const previousSmooth = smoothQuad.current;
     let rawDeltaFromSmooth = 0;
     if (previousSmooth) {
       rawDeltaFromSmooth = maxCornerDelta(norm, previousSmooth);
       if (rawDeltaFromSmooth > OUTLIER_DELTA && rawDeltaFromSmooth < LOCK_BREAK_DELTA) {
-        // mild outlier — keep current smooth, don't add to stability either
-        drawOverlay(previousSmooth, lockedRef.current ? "ready" : "hold");
-        return;
+        if (isOutwardExpansion(norm, previousSmooth, detection?.confidence ?? 0)) {
+          outlierRejectFramesRef.current = 0;
+          if (debugEnabled) {
+            console.log("[autocapture] expansion accepted", {
+              delta: rawDeltaFromSmooth.toFixed(3),
+              conf: (detection?.confidence ?? 0).toFixed(2),
+            });
+          }
+        } else {
+          // mild outlier — keep current smooth, don't add to stability either
+          outlierRejectFramesRef.current++;
+          drawOverlay(previousSmooth, lockedRef.current ? "ready" : "hold");
+          return;
+        }
+      } else {
+        outlierRejectFramesRef.current = 0;
       }
       if (rawDeltaFromSmooth >= LOCK_BREAK_DELTA) {
         // large movement — break the lock and re-track
