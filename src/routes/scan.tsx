@@ -1264,6 +1264,15 @@ function ScanPage() {
       }
     }
 
+    // Write back hi-res outcome: the block above may have flipped
+    // detection.readyForCapture to true, but the locals were captured before
+    // it ran. Re-derive so downstream capture/status logic sees the update.
+    // Monotonic by construction: the hi-res block never sets it to false.
+    if (detection && detection.readyForCapture !== false) {
+      readyForCapture = true;
+      reasonNotReady = detection.reasonNotReady;
+    }
+
     // Reference unused hi-res symbols so TS doesn't complain when flags off.
     void ENABLE_HI_RES_DETECT;
     void HI_DETECT_WIDTH;
