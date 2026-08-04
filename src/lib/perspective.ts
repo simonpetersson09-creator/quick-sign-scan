@@ -1523,13 +1523,12 @@ function buildWhitenessMask(
   lumThreshold: number,
   maxChroma: number,
 ): Uint8Array {
-  const mask = new Uint8Array(lum.length);
+  const mask = scratch("mask.src", Uint8Array, lum.length, false);
   for (let i = 0; i < lum.length; i++) {
     mask[i] = lum[i] >= lumThreshold && chroma[i] <= maxChroma ? 1 : 0;
   }
-  let closed: Uint8Array<ArrayBufferLike> = mask;
-  for (let i = 0; i < 3; i++) closed = dilateMask(closed, width, height);
-  for (let i = 0; i < 3; i++) closed = erodeMask(closed, width, height);
+  const closed = scratch("mask.whiteness", Uint8Array, lum.length, false);
+  morphClose(mask, width, height, 3, closed);
   return closed;
 }
 
