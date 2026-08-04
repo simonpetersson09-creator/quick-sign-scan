@@ -498,6 +498,10 @@ function ScanPage() {
   const tooCloseRejectFramesRef = useRef(0);
   const lockedRef = useRef(false);
   const lockBreakFramesRef = useRef(0);
+  // Antal raka frames där en rå-quad förkastats av outlier-grinden. Används
+  // för att låta temporal bias förfalla så detektorn kan hitta ut ur en
+  // felaktig, för liten låsning.
+  const outlierRejectFramesRef = useRef(0);
   const brightnessRef = useRef(255);
   const lowLightFramesRef = useRef(0);
   const exposureLockedRef = useRef(false);
