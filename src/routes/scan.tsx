@@ -3133,6 +3133,13 @@ function ScanPage() {
     recentSmoothQuadsRef.current = [];
     lastRawQuad.current = null;
     detectionMeta.current = null;
+    stagnationSigRef.current = null;
+    stagnationSinceRef.current = 0;
+    lastStagnationAtRef.current = 0;
+    freePassesLeftRef.current = 0;
+    freePassRunRef.current = 0;
+    freePassBaselineRef.current = null;
+
     blurFramesRef.current = 0;
     captureRetryRef.current = 0;
     hiResTightConfirmedRef.current = false;
