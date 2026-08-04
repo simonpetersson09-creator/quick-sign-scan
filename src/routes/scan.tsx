@@ -2245,8 +2245,8 @@ function ScanPage() {
             stripPx: 6,
             minMeanL: 200,
             maxStdL: 28,
-            maxTopBottom: 0.02,
-            maxLeftRight: 0.02,
+            maxTopBottom: 0.01,
+            maxLeftRight: 0.01,
           });
           const didCrop = amount.top + amount.right + amount.bottom + amount.left > 0;
           let rescaledToA4 = false;
