@@ -94,17 +94,15 @@ export async function getServerSentCount(deviceId: string): Promise<number> {
 
 export async function incrementServerSentCount(deviceId: string): Promise<void> {
   if (!deviceId) return;
-  const current = await getServerSentCount(deviceId);
-  const { error } = await supabaseAdmin.from("device_send_usage").upsert(
-    {
-      device_id: deviceId,
-      sent_count: current + 1,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "device_id" },
-  );
+  // Atomic server-side increment. A read-then-write would let two concurrent
+  // sends from the same device write the same value, undercounting usage and
+  // allowing the free quota to be exceeded.
+  const { error } = await supabaseAdmin.rpc("increment_device_send_usage", {
+    _device_id: deviceId,
+  });
   if (error) console.error("[usage] increment failed", error.code);
 }
+
 
 /**
  * Authoritative paywall decision. Premium devices are unlimited; everyone else
