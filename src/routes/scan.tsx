@@ -130,6 +130,11 @@ const DETECT_FRAMES = 3; // mjukare intro innan ramen visas
 const HOLD_FRAMES = 7; // ~0.23s — "Håll stilla" phase
 const READY_FRAMES = 9; // ~0.30s — "Dokument hittat" lock-in (sänkt från 14)
 const STABLE_FRAMES = 15; // ~0.50s total before auto-capture (sänkt från 22)
+// Dynamic stability: om gyrot bekräftar att telefonen är mycket stilla kan vi
+// avfyra tidigare — hårdvaran har redan uteslutit skakningsrisken.
+const ENABLE_DYNAMIC_STABLE_TARGET = true;
+const STABLE_FRAMES_STEADY = 10; // ~0.34s när telefonen är riktigt still
+
 // Feature flag: mjukare nedbrytning av captureStableCount. Tidigare drog varje
 // enskild gate-miss av 1, vilket gjorde att countern stod stilla eller backade
 // vid ~50-70% pass-rate (t.ex. lite sned telefon) och auto-capture kändes
