@@ -1952,8 +1952,9 @@ function ScanPage() {
       const bboxW = Math.max(1, bboxMaxX - bboxMinX);
       const bboxH = Math.max(1, bboxMaxY - bboxMinY);
 
-      let bestFrame: HTMLCanvasElement | null = null;
+      let bestFrame: HTMLCanvasElement | null = stillFrame;
       let bestScore = -1;
+      if (!stillFrame) {
       const scoreCanvas = document.createElement("canvas");
       const SCORE_W = 320;
       const scoreH = Math.max(1, Math.round((bboxH / bboxW) * SCORE_W));
@@ -2005,10 +2006,13 @@ function ScanPage() {
           bestFrame = frame;
         }
       }
+      }
       logScanStage("burst-capture", {
+        source: stillFrame ? "still-photo" : "preview-burst",
         bestSharpness: bestScore,
         scoredBbox: { x: bboxMinX, y: bboxMinY, w: bboxW, h: bboxH },
       });
+
 
       // ===== Motion-sync guard (A + B) =====
       // Live-`srcQuad` was locked BEFORE the burst window opened. The phone
