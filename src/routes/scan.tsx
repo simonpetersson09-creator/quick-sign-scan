@@ -1591,13 +1591,13 @@ function ScanPage() {
 
     poly.setAttribute("stroke", stroke);
     poly.setAttribute("fill", fill);
-    poly.setAttribute("stroke-width", phase === "ready" ? "4.5" : phase === "hold" ? "3.5" : "2.5");
+    poly.setAttribute("stroke-width", phase === "ready" ? "2.25" : phase === "hold" ? "1.75" : "1.25");
     poly.style.opacity = phase === "search" ? "0.85" : "1";
 
     if (glow) {
       // Outer halo that pulses softer in search, intensifies on hold/ready.
       glow.setAttribute("stroke", YELLOW);
-      glow.setAttribute("stroke-width", phase === "ready" ? "14" : phase === "hold" ? "10" : "6");
+      glow.setAttribute("stroke-width", phase === "ready" ? "7" : phase === "hold" ? "5" : "3");
       glow.style.opacity =
         phase === "ready" ? "0.45" : phase === "hold" ? "0.28" : "0.15";
     }
@@ -1606,7 +1606,7 @@ function ScanPage() {
       // Bright traveling segment along the perimeter when ready — gives the
       // "scanning sweep" feel of Genius Scan.
       trace.setAttribute("stroke", "rgb(255,224,130)");
-      trace.setAttribute("stroke-width", "5");
+      trace.setAttribute("stroke-width", "2.5");
       trace.style.opacity = phase === "ready" ? "1" : "0";
     }
 
@@ -2784,7 +2784,7 @@ function ScanPage() {
           <polygon
             ref={polyRef}
             points=""
-            strokeWidth={3}
+            strokeWidth={1.5}
             strokeLinejoin="round"
             strokeLinecap="round"
             style={{
