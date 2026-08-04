@@ -133,7 +133,8 @@ const STABLE_FRAMES = 15; // ~0.50s total before auto-capture (sänkt från 22)
 // Dynamic stability: om gyrot bekräftar att telefonen är mycket stilla kan vi
 // avfyra tidigare — hårdvaran har redan uteslutit skakningsrisken.
 const ENABLE_DYNAMIC_STABLE_TARGET = true;
-const STABLE_FRAMES_STEADY = 10; // ~0.34s när telefonen är riktigt still
+const STABLE_FRAMES_STEADY = 13; // ~0.44s när telefonen är riktigt still (försiktigare än 10)
+const READY_FRAMES_STEADY = 8; // lock-in när gyrot bekräftar stillhet
 
 // Feature flag: mjukare nedbrytning av captureStableCount. Tidigare drog varje
 // enskild gate-miss av 1, vilket gjorde att countern stod stilla eller backade
