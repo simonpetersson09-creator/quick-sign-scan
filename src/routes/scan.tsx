@@ -7,6 +7,9 @@ import {
   detectDocumentQuad,
   detectPaperByThreshold,
   getLastDetectDiagnostics,
+  setLastDetectDiagnostics,
+  type DocumentDetection,
+
   laplacianVariance,
   MIN_DOCUMENT_CONFIDENCE,
   MIN_EDGE_TIGHTNESS_FOR_CAPTURE,
