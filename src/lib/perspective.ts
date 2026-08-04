@@ -1347,6 +1347,17 @@ function morphV(src: Uint8Array, dst: Uint8Array, w: number, h: number, r: numbe
   }
 }
 
+function zeroBorderRing(buf: Uint8Array, width: number, height: number) {
+  for (let x = 0; x < width; x++) {
+    buf[x] = 0;
+    buf[(height - 1) * width + x] = 0;
+  }
+  for (let y = 0; y < height; y++) {
+    buf[y * width] = 0;
+    buf[y * width + width - 1] = 0;
+  }
+}
+
 /** Balanced closing: dilate by r, then erode by r, written into `out`. */
 function morphClose(src: Uint8Array, width: number, height: number, r: number, out: Uint8Array) {
   const n = width * height;
@@ -1361,14 +1372,7 @@ function morphClose(src: Uint8Array, width: number, height: number, r: number, o
   morphH(t2, t1, width, height, r, false);
   morphV(t1, out, width, height, r, false);
   // The iterative version always left the outermost ring at 0.
-  for (let x = 0; x < width; x++) {
-    out[x] = 0;
-    out[(height - 1) * width + x] = 0;
-  }
-  for (let y = 0; y < height; y++) {
-    out[y * width] = 0;
-    out[y * width + width - 1] = 0;
-  }
+  zeroBorderRing(out, width, height);
 }
 
 function gaussianBlur(lum: Uint8ClampedArray, width: number, height: number): Uint8ClampedArray {
