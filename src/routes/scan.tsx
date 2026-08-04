@@ -1056,6 +1056,7 @@ function ScanPage() {
       capturedRef.current = true; // stop RAF loop
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       stopCamera("scan-unmount");
+      terminateDetectWorker();
       window.removeEventListener("devicemotion", onMotion);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1066,7 +1067,7 @@ function ScanPage() {
       const now = performance.now();
       if (now - lastDetectAtRef.current >= DETECT_INTERVAL_MS) {
         lastDetectAtRef.current = now;
-        detect();
+        void detect();
       }
       if (!capturedRef.current) {
         rafRef.current = requestAnimationFrame(tick);
@@ -1075,14 +1076,25 @@ function ScanPage() {
     rafRef.current = requestAnimationFrame(tick);
   }
 
-  function detect() {
+  async function detect() {
     if (capturedRef.current) return;
+    // A pass is already awaiting the worker — skip this tick instead of
+    // queueing overlapping detections on the same canvas.
+    if (detectInFlightRef.current) return;
     const video = videoRef.current;
     if (!video || video.readyState < 2) return;
     const vw = video.videoWidth;
     const vh = video.videoHeight;
     if (!vw || !vh) return;
     const now = performance.now();
+    // Time-based stability: weight each counter step by how much wall-clock
+    // time this pass actually represents, so "15 frames" means ~600 ms
+    // regardless of how fast detection runs on this device/CPU load.
+    const dtMs = lastDetectTickAtRef.current ? now - lastDetectTickAtRef.current : NOMINAL_FRAME_MS;
+    lastDetectTickAtRef.current = now;
+    const frameWeight = useTimeStability
+      ? Math.min(FRAME_WEIGHT_MAX, Math.max(FRAME_WEIGHT_MIN, dtMs / NOMINAL_FRAME_MS))
+      : 1;
 
     if (!detectCanvas.current) detectCanvas.current = document.createElement("canvas");
     const dc = detectCanvas.current;
@@ -1137,7 +1149,18 @@ function ScanPage() {
       prevSmooth && prevConfidentEnough
         ? (prevSmooth.map((p) => ({ x: p.x * dw, y: p.y * dh })) as [Point, Point, Point, Point])
         : undefined;
-    let detection = detectDocumentQuad(data, dw, dh, { prefer: preferQuad, allowOverlay: ENABLE_GENEROUS_OVERLAY });
+    let detection: DocumentDetection | null;
+    detectInFlightRef.current = true;
+    try {
+      detection = await runDetectPass(data, dw, dh, {
+        prefer: preferQuad,
+        allowOverlay: ENABLE_GENEROUS_OVERLAY,
+      });
+    } finally {
+      detectInFlightRef.current = false;
+    }
+    // The camera may have been torn down / captured while we awaited.
+    if (capturedRef.current || cancelledRef.current) return;
     // Separate live-detection (overlay) from capture-readiness. A detection
     // returned with readyForCapture=false has only passed structural gates
     // and is shown to coach the user — auto-capture must not fire.
@@ -1246,9 +1269,9 @@ function ScanPage() {
     if (!corners) {
       stableCount.current = 0;
       captureStableCount.current = 0;
-      detectCount.current = Math.max(0, detectCount.current - 1);
+      detectCount.current = Math.max(0, detectCount.current - frameWeight);
       detectionMeta.current = null;
-      missCount.current++;
+      missCount.current += frameWeight;
       lockedRef.current = false;
       lockBreakFramesRef.current = 0;
       hiResTightConfirmedRef.current = false;
@@ -1305,7 +1328,7 @@ function ScanPage() {
       return;
     }
 
-    detectCount.current = Math.min(detectCount.current + 1, DETECT_COUNT_MAX);
+    detectCount.current = Math.min(detectCount.current + frameWeight, DETECT_COUNT_MAX);
     missCount.current = 0;
     detectionMeta.current = detection;
 
@@ -1425,8 +1448,8 @@ function ScanPage() {
         ? maxCornerDelta(norm, last)
         : 1;
 
-    if (delta < STABLE_DELTA) stableCount.current++;
-    else stableCount.current = Math.max(0, stableCount.current - 1);
+    if (delta < STABLE_DELTA) stableCount.current += frameWeight;
+    else stableCount.current = Math.max(0, stableCount.current - frameWeight);
 
     // Measure sharpness within the detected quad. If the doc is too blurry
     // we must not auto-capture — wait for continuous autofocus to settle.
@@ -1476,15 +1499,15 @@ function ScanPage() {
     if (!isSharp) {
       blurFramesRef.current++;
       // Soft regression: a single blurry frame shouldn't wipe ~0.3s of progress.
-      stableCount.current = Math.max(0, stableCount.current - 2);
-      captureStableCount.current = Math.max(0, captureStableCount.current - 2);
+      stableCount.current = Math.max(0, stableCount.current - 2 * frameWeight);
+      captureStableCount.current = Math.max(0, captureStableCount.current - 2 * frameWeight);
     } else {
       blurFramesRef.current = 0;
     }
     if (!isBrightEnough) {
       // Soft regression — exposure metering naturally causes 1-2 dim frames.
-      stableCount.current = Math.max(0, stableCount.current - 2);
-      captureStableCount.current = Math.max(0, captureStableCount.current - 2);
+      stableCount.current = Math.max(0, stableCount.current - 2 * frameWeight);
+      captureStableCount.current = Math.max(0, captureStableCount.current - 2 * frameWeight);
     }
 
     // ===== Update captureStableCount =====
@@ -1504,19 +1527,19 @@ function ScanPage() {
       captureStableCount.current = 0;
       captureMissStreakRef.current = 0;
     } else if (captureCandidate && delta < STABLE_DELTA) {
-      captureStableCount.current++;
+      captureStableCount.current += frameWeight;
       captureMissStreakRef.current = 0;
     } else if (ENABLE_SOFT_STABLE_DECAY) {
       // Grace window: an isolated gate-miss (jitter, a single borderline
       // frame) no longer erases progress. Only a sustained miss streak
       // decays captureStableCount. Without this, a ~50% pass rate meant the
       // counter could never reach STABLE_FRAMES at all.
-      captureMissStreakRef.current++;
+      captureMissStreakRef.current += frameWeight;
       if (captureMissStreakRef.current > CAPTURE_MISS_GRACE_FRAMES) {
-        captureStableCount.current = Math.max(0, captureStableCount.current - 1);
+        captureStableCount.current = Math.max(0, captureStableCount.current - frameWeight);
       }
     } else {
-      captureStableCount.current = Math.max(0, captureStableCount.current - 1);
+      captureStableCount.current = Math.max(0, captureStableCount.current - frameWeight);
     }
 
     // Engage lock once we've reached the READY threshold with good conditions.
