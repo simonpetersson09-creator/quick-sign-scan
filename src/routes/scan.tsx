@@ -365,15 +365,26 @@ function ScanPage() {
   // the same document again.
   const armedAtRef = useRef(0);
   const REARM_DELAY_MS = 1200;
+  // Identisk uppstart varje gång skannervyn startar: efter att första riktiga
+  // videoframen kommit får AF/AE exakt lika lång tid att konvergera innan
+  // auto-capture blir aktiv — oavsett om det är sidan 1 eller "skanna fler".
+  const CAMERA_WARMUP_MS = REARM_DELAY_MS;
   // Gyro / motion stability — exponential moving average of |acceleration|
   // (gravity removed). Stays near 0 when the phone is held still; spikes on
   // jitter. Used as an extra gate before auto-capture so we never snap a
   // shaky frame even if the detected quad looks stable.
   const motionMagRef = useRef(0);
   const motionAvailableRef = useRef(false);
+  // Gyrot anses tillförlitligt först när EMA:n hunnit fyllas med lika många
+  // samples varje session. Utan detta blev gyrot "tillgängligt och helt
+  // stilla" direkt vid sida 2+ (listenern var redan permission-godkänd),
+  // vilket aktiverade steady-tröskeln innan mätningen var meningsfull.
+  const motionSamplesRef = useRef(0);
+  const MOTION_MIN_SAMPLES = 8;
   const MOTION_STILL_THRESHOLD = 0.45; // m/s² — empirical, tolerates breathing
   // Tydligt lugnare än ovan: telefonen ligger nästan helt still (stöd/armstöd).
   const MOTION_VERY_STILL_THRESHOLD = 0.18;
+
 
   // Document-targeted exposure metering. We periodically nudge the camera to
   // expose for the paper itself (point-of-interest on the quad centroid, plus
@@ -540,6 +551,9 @@ function ScanPage() {
         rafRef.current = null;
       }
       if (options.restartStream || streamRef.current) stopCamera("restart-before-startCamera");
+      // Fullständig nollställning av ALL scanner-state. Detta körs vid varje
+      // start av skannervyn (första sidan såväl som "skanna fler sidor"), så
+      // motorn börjar i exakt samma tillstånd varje gång.
       capturedRef.current = false;
       sharpnessRef.current = 0;
       blurFramesRef.current = 0;
@@ -551,11 +565,44 @@ function ScanPage() {
       lowLightFramesRef.current = 0;
       stableCount.current = 0;
       captureStableCount.current = 0;
+      captureMissStreakRef.current = 0;
+      captureCooldownUntilRef.current = 0;
       detectCount.current = 0;
       missCount.current = 0;
       smoothQuad.current = null;
       lastRawQuad.current = null;
       detectionMeta.current = null;
+      recentSmoothQuadsRef.current = [];
+      candidateHistoryRef.current = [];
+      ambiguousFramesRef.current = 0;
+      tooFarFramesRef.current = 0;
+      tooCloseRejectFramesRef.current = 0;
+      captureGateRef.current = null;
+      // Timers/throttles
+      lastDetectAtRef.current = 0;
+      lastRefineAtRef.current = 0;
+      lastHiResTightAtRef.current = 0;
+      lastHiResTightLogAtRef.current = 0;
+      lastMeterAtRef.current = 0;
+      lastOverlayLogAtRef.current = 0;
+      lastRejectLogAtRef.current = 0;
+      lastAdaptiveLogAtRef.current = 0;
+      lastSideSupportLogAtRef.current = 0;
+      lastGateLogAtRef.current = 0;
+      lastFrameLogAtRef.current = 0;
+      // Exponerings-/mätstate
+      docLumRef.current = 0;
+      ecAppliedRef.current = 0;
+      exposureLockedRef.current = false;
+      // Motion/gyro: EMA och sampleräknare nollställs så gyrot måste bevisa
+      // stillhet på nytt med lika många samples varje gång.
+      motionMagRef.current = 0;
+      motionSamplesRef.current = 0;
+      motionAvailableRef.current = false;
+      // Auto-capture är inte armad förrän warm-upen passerat (sätts om exakt
+      // när första riktiga videoframen kommit, se nedan).
+      armedAtRef.current = performance.now() + CAMERA_WARMUP_MS;
+
       setProgress(0);
       setCameraReady(false);
       drawOverlay(null, "search");
@@ -735,11 +782,16 @@ function ScanPage() {
             streamRef.current = null;
             return;
           }
+          // Warm-up-fönstret räknas från första riktiga videoframen, inte från
+          // startCamera-anropet — så AF/AE får identisk konvergenstid oavsett
+          // hur lång tid permission/getUserMedia tog denna gång.
+          armedAtRef.current = performance.now() + CAMERA_WARMUP_MS;
           setCameraReady(
             videoEl.readyState >= 2 &&
               videoEl.videoWidth > 0 &&
               videoEl.videoHeight > 0,
           );
+
         }
         if (isStaleStart()) {
           stopDetachedVideoStream(stream, "startCamera-cancelled-before-loop");
@@ -807,11 +859,22 @@ function ScanPage() {
       const a = e.acceleration ?? e.accelerationIncludingGravity;
       if (!a) return;
       const mag = Math.sqrt((a.x ?? 0) ** 2 + (a.y ?? 0) ** 2 + (a.z ?? 0) ** 2);
-      motionAvailableRef.current = true;
-      // EMA — heavy weight on history so brief spikes still register but
-      // sustained calm wins quickly.
-      motionMagRef.current = motionMagRef.current * 0.7 + mag * 0.3;
+      motionSamplesRef.current++;
+      if (motionSamplesRef.current === 1) {
+        // Seeda EMA:n med första mätvärdet i stället för 0 — annars såg en
+        // nystartad session alltid "helt stilla" ut de första framesen.
+        motionMagRef.current = mag;
+      } else {
+        // EMA — heavy weight on history so brief spikes still register but
+        // sustained calm wins quickly.
+        motionMagRef.current = motionMagRef.current * 0.7 + mag * 0.3;
+      }
+      // Gyrot anses tillförlitligt först efter lika många samples varje gång.
+      motionAvailableRef.current = motionSamplesRef.current >= MOTION_MIN_SAMPLES;
     };
+
+
+
     let motionAttached = false;
     const attachMotion = () => {
       if (motionAttached) return;
