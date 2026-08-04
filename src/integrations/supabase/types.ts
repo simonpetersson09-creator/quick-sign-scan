@@ -100,7 +100,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      increment_device_send_usage: {
+        Args: { _device_id: string }
+        Returns: number
+      }
     }
     Enums: {
       [_ in never]: never

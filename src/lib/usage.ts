@@ -79,7 +79,10 @@ function setCount(n: number, persist: { keychain: boolean }) {
   notify();
 }
 
-// Seed sync state from localStorage immediately so the first render is correct.
+// Seed sync state from localStorage immediately so non-React consumers get a
+// correct count. React components must NOT use this for their initial render
+// (see hydrateUsage below) — the server renders with 0 and any other initial
+// value causes a hydration mismatch.
 if (typeof window !== "undefined") {
   memCount = readLocal();
 }

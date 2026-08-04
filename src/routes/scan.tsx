@@ -179,6 +179,12 @@ const LOCK_BREAK_DELTA = 0.2; // sustained delta this large breaks the lock and 
 // en suddig sida aldrig sparas, oavsett hur snabbt användaren rör mobilen.
 const SHARPNESS_LIVE_MIN = 35;
 const SHARPNESS_CAPTURE_MIN = 110;
+// Max antal automatiska omtag när den warpade sidan är för suddig. Manuella
+// captures gör aldrig omtag.
+const MAX_CAPTURE_RETRIES = 2;
+// Post-capture kontrastgräns (luma-varians). Medvetet låg: alla riktiga
+// dokument med text passerar, bara helt blanka/överexponerade frames fastnar.
+const CONTRAST_CAPTURE_MIN = 3;
 const BLUR_HINT_FRAMES = 75; // ~2.5s of blur before suggesting "move back"
 // Lighting gate — mean luminance below this is "too dark to scan reliably".
 // Lowered from 55 to 38: detection itself is now tolerant of dim scenes
@@ -1954,7 +1960,7 @@ function ScanPage() {
   }
 
 
-  async function capture(normQuad: [Point, Point, Point, Point]) {
+  async function capture(normQuad: [Point, Point, Point, Point], manual = false) {
     if (capturedRef.current) return;
     const meta = detectionMeta.current;
     if (!meta || meta.confidence < MIN_DOCUMENT_CONFIDENCE) {
@@ -2711,7 +2717,8 @@ function ScanPage() {
       // Post-capture sharpness gate. If the warped doc is blurry we abandon
       // this capture and let auto-focus retry — better to wait a second
       // longer than to save an unreadable PDF page. Bail after a few retries
-      // so the user is never stuck.
+      // so the user is never stuck. Manual captures are never retried: the
+      // user pressed the button and must get a page back.
       const postSharpness = canvasLaplacianVariance(warped);
       logScanStage("post-capture-sharpness", {
         value: postSharpness,
@@ -2719,9 +2726,19 @@ function ScanPage() {
         retries: captureRetryRef.current,
       });
       if (postSharpness < SHARPNESS_CAPTURE_MIN) {
+        if (!manual && captureRetryRef.current < MAX_CAPTURE_RETRIES) {
+          captureRetryRef.current += 1;
+          abortCaptureAndRearm("post-capture-blurry", {
+            value: +postSharpness.toFixed(1),
+            threshold: SHARPNESS_CAPTURE_MIN,
+            retry: captureRetryRef.current,
+          });
+          return;
+        }
         console.info("[scan] post-capture sharpness below target; keeping captured page", {
           value: postSharpness,
           threshold: SHARPNESS_CAPTURE_MIN,
+          retries: captureRetryRef.current,
         });
       }
       // Post-capture contrast gate. A washed-out / blown-out frame with
@@ -2732,13 +2749,14 @@ function ScanPage() {
       const postContrast = canvasContrast(warped);
       logScanStage("post-capture-contrast", {
         value: postContrast,
-        threshold: 12,
+        threshold: CONTRAST_CAPTURE_MIN,
         retries: captureRetryRef.current,
       });
-      if (postContrast < 3) {
+      if (postContrast < CONTRAST_CAPTURE_MIN) {
         throw new Error("Processed scan is nearly blank; falling back to raw camera frame");
       }
       captureRetryRef.current = 0;
+
 
       // Use high-quality JPEG so tiny footer/header text survives PDF output.
       const JPEG_QUALITY = 0.94;
@@ -2799,7 +2817,7 @@ function ScanPage() {
       detectCount.current >= DETECT_FRAMES;
     if (hasGoodDetection && q) {
       setStatus("capturing");
-      capture(q);
+      capture(q, true);
     } else {
       // Fallback: no document detected — capture the raw frame as-is so the
       // user is never stuck if detection fails (poor lighting, low contrast,
