@@ -782,11 +782,16 @@ function ScanPage() {
             streamRef.current = null;
             return;
           }
+          // Warm-up-fönstret räknas från första riktiga videoframen, inte från
+          // startCamera-anropet — så AF/AE får identisk konvergenstid oavsett
+          // hur lång tid permission/getUserMedia tog denna gång.
+          armedAtRef.current = performance.now() + CAMERA_WARMUP_MS;
           setCameraReady(
             videoEl.readyState >= 2 &&
               videoEl.videoWidth > 0 &&
               videoEl.videoHeight > 0,
           );
+
         }
         if (isStaleStart()) {
           stopDetachedVideoStream(stream, "startCamera-cancelled-before-loop");
