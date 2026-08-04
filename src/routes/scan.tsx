@@ -2397,7 +2397,16 @@ function ScanPage() {
           }
         });
 
-      for (let attempt = 0; attempt < 3; attempt++) {
+      // Burstlängd: 3 frames som standard. När hi-res redan bekräftat
+      // tightness OCH gyrot säger att telefonen är mycket stilla finns det
+      // inget att vinna på en tredje frame — vi sparar ~80–160 ms vid knäppet.
+      const burstFrames =
+        hiResTightConfirmedRef.current &&
+        motionAvailableRef.current &&
+        motionMagRef.current < MOTION_VERY_STILL_THRESHOLD
+          ? 2
+          : 3;
+      for (let attempt = 0; attempt < burstFrames; attempt++) {
         if (attempt > 0) {
           await waitForNextFrame();
         }
