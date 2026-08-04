@@ -1354,6 +1354,10 @@ function morphClose(src: Uint8Array, width: number, height: number, r: number, o
   const t2 = scratch("morph.t2", Uint8Array, n, false);
   morphH(src, t1, width, height, r, true);
   morphV(t1, t2, width, height, r, true);
+  // The iterative dilate zeroed the outer ring after every pass; the erode
+  // that follows must see those zeros, otherwise pixels one step inside the
+  // border survive that the old code removed.
+  zeroBorderRing(t2, width, height);
   morphH(t2, t1, width, height, r, false);
   morphV(t1, out, width, height, r, false);
   // The iterative version always left the outermost ring at 0.
