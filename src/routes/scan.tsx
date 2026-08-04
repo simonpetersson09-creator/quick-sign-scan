@@ -185,6 +185,22 @@ const EXPANSION_INWARD_SLACK = 0.004; // tillåt minimal inåtrörelse per hörn
 // detektorn kan söka fritt igen istället för att fastna i samma felaktiga quad.
 const OUTLIER_BIAS_DECAY_FRAMES = 6;
 
+// ===== Stagnationsdetektor =====
+// Läge: samma underkända quad fortsätter vinna utan verklig förbättring.
+// Mäts i verklig tid, inte i antal frames/detect-pass.
+const STAGNATION_MS = 900;
+// Hur lika två på varandra följande quads måste vara för att räknas som "samma".
+const STAGNATION_CENTROID_EPS = 0.012; // normaliserade enheter
+const STAGNATION_AREA_EPS = 0.04; // 4 % relativ areaskillnad
+// Antal helt unbiased detect-pass som körs när stagnation upptäckts.
+const STAGNATION_FREE_PASSES = 3;
+// Minsta tid mellan två stagnations-utbrott, så vi inte loopar.
+const STAGNATION_COOLDOWN_MS = 2500;
+// En fri kandidat adopteras bara om den är tydligt bättre än den fastnade.
+const FREE_PASS_ADOPT_AREA_GAIN = 1.06;
+const FREE_PASS_ADOPT_CONF_GAIN = 0.08;
+
+
 /** Yta för en quad (shoelace, absolutbelopp). */
 function quadArea(q: readonly Point[]): number {
   let a = 0;
