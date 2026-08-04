@@ -589,9 +589,12 @@ function ScanPage() {
   const armedAtRef = useRef(0);
   const REARM_DELAY_MS = 1200;
   // Identisk uppstart varje gång skannervyn startar: efter att första riktiga
-  // videoframen kommit får AF/AE exakt lika lång tid att konvergera innan
+  // videoframen kommit får AF/AE lika lång tid att konvergera innan
   // auto-capture blir aktiv — oavsett om det är sidan 1 eller "skanna fler".
-  const CAMERA_WARMUP_MS = REARM_DELAY_MS;
+  // Frikopplat från REARM_DELAY_MS: re-arm efter en sparad sida behöver vara
+  // längre (användaren ska hinna byta papper), men kall kamerastart behöver
+  // bara AF/AE-konvergens — 500 ms räcker och sparar ~700 ms till capture.
+  const CAMERA_WARMUP_MS = 500;
   // Gyro / motion stability — exponential moving average of |acceleration|
   // (gravity removed). Stays near 0 when the phone is held still; spikes on
   // jitter. Used as an extra gate before auto-capture so we never snap a
@@ -602,8 +605,10 @@ function ScanPage() {
   // samples varje session. Utan detta blev gyrot "tillgängligt och helt
   // stilla" direkt vid sida 2+ (listenern var redan permission-godkänd),
   // vilket aktiverade steady-tröskeln innan mätningen var meningsfull.
+  // 4 samples (~65 ms @60 Hz) räcker för att EMA:n ska vara meningsfull och
+  // låter steady-tröskeln aktiveras tidigare.
   const motionSamplesRef = useRef(0);
-  const MOTION_MIN_SAMPLES = 8;
+  const MOTION_MIN_SAMPLES = 4;
   const MOTION_STILL_THRESHOLD = 0.45; // m/s² — empirical, tolerates breathing
   // Tydligt lugnare än ovan: telefonen ligger nästan helt still (stöd/armstöd).
   const MOTION_VERY_STILL_THRESHOLD = 0.18;
@@ -2392,7 +2397,16 @@ function ScanPage() {
           }
         });
 
-      for (let attempt = 0; attempt < 3; attempt++) {
+      // Burstlängd: 3 frames som standard. När hi-res redan bekräftat
+      // tightness OCH gyrot säger att telefonen är mycket stilla finns det
+      // inget att vinna på en tredje frame — vi sparar ~80–160 ms vid knäppet.
+      const burstFrames =
+        hiResTightConfirmedRef.current &&
+        motionAvailableRef.current &&
+        motionMagRef.current < MOTION_VERY_STILL_THRESHOLD
+          ? 2
+          : 3;
+      for (let attempt = 0; attempt < burstFrames; attempt++) {
         if (attempt > 0) {
           await waitForNextFrame();
         }
