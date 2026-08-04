@@ -2115,13 +2115,21 @@ function ScanPage() {
       // Stäng av med ?refineCorners=0 för debugging.
       const refineCornersEnabled = urlParams.get("refineCorners") !== "0";
       let refinedSrcQuad = baseSrcQuad;
+      let refineCornerDeltas: number[] | null = null;
+      let refineMaxDelta: number | null = null;
       if (refineCornersEnabled) {
         try {
           refinedSrcQuad = refineQuadCorners(refineSource, vw, vh, baseSrcQuad);
+          refineCornerDeltas = baseSrcQuad.map((p, i) =>
+            Math.hypot(p.x - refinedSrcQuad[i].x, p.y - refinedSrcQuad[i].y),
+          );
+          refineMaxDelta = Math.max(...refineCornerDeltas);
           logScanStage("subpixel-refine", {
             applied: true,
             before: formatQuad(baseSrcQuad),
             after: formatQuad(refinedSrcQuad),
+            cornerDeltasPx: refineCornerDeltas.map((d) => Number(d.toFixed(3))),
+            maxDeltaPx: Number(refineMaxDelta.toFixed(3)),
           });
         } catch (e) {
           console.warn("[scan] subpixel refine failed, using raw quad", e);
@@ -2130,6 +2138,7 @@ function ScanPage() {
       } else {
         logScanStage("subpixel-refine", { applied: false, reason: "disabled-by-default" });
       }
+
 
       // Threshold-paper-lock — kan ERSÄTTA hela quaden med en Otsu-baserad
       // kandidat upp till 60 % större. Var huvudorsaken till att bakgrund
