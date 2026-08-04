@@ -1614,6 +1614,34 @@ function ScanPage() {
     cornerRefs.current.forEach((c) => c && (c.style.opacity = "0"));
   }
 
+  // Gemensam rollback för en påbörjad men avbruten capture. Återställer
+  // stabilitetsräknare, sätter både kort discard-cooldown och re-aim-fönstret
+  // (armedAtRef) så samma frame inte kan trigga capture igen, och startar om
+  // RAF-loopen (capture() satte capturedRef=true vilket stoppade tick()).
+  function abortCaptureAndRearm(reason: string, detail: Record<string, unknown>) {
+    // eslint-disable-next-line no-console
+    console.info("[scan] capture-aborted", { reason, ...detail });
+    if (stageTimerRef.current) {
+      window.clearTimeout(stageTimerRef.current);
+      stageTimerRef.current = null;
+    }
+    setCaptureStage(null);
+    capturedRef.current = false;
+    captureStableCount.current = 0;
+    stableCount.current = Math.max(0, stableCount.current - 4);
+    lockedRef.current = false;
+    setProgress(0);
+    // 450 ms cooldown: capture-stability cannot accumulate during this window.
+    captureCooldownUntilRef.current = performance.now() + 450;
+    // Re-aim-fönstret: auto-capture är inte "armed" förrän detta passerat,
+    // så en avbruten capture inte omedelbart kan repeteras på samma bild.
+    armedAtRef.current = performance.now() + REARM_DELAY_MS;
+    setStatus("align");
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = null;
+    loop();
+  }
+
 
   async function capture(normQuad: [Point, Point, Point, Point]) {
     if (capturedRef.current) return;
