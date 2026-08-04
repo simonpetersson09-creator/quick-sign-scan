@@ -307,6 +307,117 @@ function ScanPage() {
   // while giving the GPU/ISP room to breathe.
   const DETECT_INTERVAL_MS = 45;
   const lastDetectAtRef = useRef(0);
+  // ===== Web Worker detection =====
+  const detectWorkerRef = useRef<Worker | null>(null);
+  const detectWorkerFailedRef = useRef(false);
+  const detectInFlightRef = useRef(false);
+  const detectReqIdRef = useRef(0);
+  const detectPendingRef = useRef(
+    new Map<number, (value: { detection: DocumentDetection | null; diagnostics: unknown } | null) => void>(),
+  );
+  // ===== Time-based stability =====
+  const lastDetectTickAtRef = useRef(0);
+  const urlFlagOff = (name: string) => {
+    try {
+      return new URL(window.location.href).searchParams.get(name) === "0";
+    } catch {
+      return false;
+    }
+  };
+  const useDetectWorker =
+    ENABLE_DETECT_WORKER && typeof Worker !== "undefined" && !urlFlagOff("worker");
+  const useTimeStability = ENABLE_TIME_BASED_STABILITY && !urlFlagOff("timestable");
+
+  function getDetectWorker(): Worker | null {
+    if (!useDetectWorker || detectWorkerFailedRef.current) return null;
+    if (detectWorkerRef.current) return detectWorkerRef.current;
+    try {
+      const w = new Worker(new URL("@/lib/detect.worker.ts", import.meta.url), {
+        type: "module",
+      });
+      w.onmessage = (e: MessageEvent) => {
+        const { id, ok, detection, diagnostics } = e.data ?? {};
+        const resolve = detectPendingRef.current.get(id);
+        if (!resolve) return;
+        detectPendingRef.current.delete(id);
+        resolve(ok ? { detection: detection ?? null, diagnostics } : null);
+      };
+      w.onerror = () => {
+        detectWorkerFailedRef.current = true;
+        for (const resolve of detectPendingRef.current.values()) resolve(null);
+        detectPendingRef.current.clear();
+        try {
+          w.terminate();
+        } catch {}
+        detectWorkerRef.current = null;
+      };
+      detectWorkerRef.current = w;
+      return w;
+    } catch {
+      detectWorkerFailedRef.current = true;
+      return null;
+    }
+  }
+
+  function terminateDetectWorker() {
+    const w = detectWorkerRef.current;
+    detectWorkerRef.current = null;
+    for (const resolve of detectPendingRef.current.values()) resolve(null);
+    detectPendingRef.current.clear();
+    if (w) {
+      try {
+        w.terminate();
+      } catch {}
+    }
+  }
+
+  /** Run detectDocumentQuad — in the worker when available, otherwise inline
+   *  on the main thread (identical algorithm and result either way). */
+  async function runDetectPass(
+    pixels: Uint8ClampedArray,
+    w: number,
+    h: number,
+    options: { prefer?: [Point, Point, Point, Point]; allowOverlay?: boolean },
+  ): Promise<DocumentDetection | null> {
+    const worker = getDetectWorker();
+    if (!worker) return detectDocumentQuad(pixels, w, h, options);
+    const id = ++detectReqIdRef.current;
+    try {
+      const result = await new Promise<{
+        detection: DocumentDetection | null;
+        diagnostics: unknown;
+      } | null>((resolve) => {
+        const timer = window.setTimeout(() => {
+          detectPendingRef.current.delete(id);
+          resolve(null);
+        }, DETECT_WORKER_TIMEOUT_MS);
+        detectPendingRef.current.set(id, (value) => {
+          window.clearTimeout(timer);
+          resolve(value);
+        });
+        // Structured clone (not transfer) — the main thread keeps its own
+        // pixel buffer for sharpness/luminance measurements after the await.
+        worker.postMessage({
+          id,
+          width: w,
+          height: h,
+          pixels,
+          prefer: options.prefer,
+          allowOverlay: options.allowOverlay,
+        });
+      });
+      if (result) {
+        // Mirror the worker's diagnostics into this thread so the existing
+        // getLastDetectDiagnostics() consumers behave exactly as before.
+        setLastDetectDiagnostics(result.diagnostics as never);
+        return result.detection;
+      }
+    } catch {
+      /* fall through to the synchronous path */
+    }
+    return detectDocumentQuad(pixels, w, h, options);
+  }
+
   const lastRejectLogAtRef = useRef(0);
   const lastAdaptiveLogAtRef = useRef(0);
   const lastSideSupportLogAtRef = useRef(0);
