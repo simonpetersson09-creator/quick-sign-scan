@@ -1,0 +1,48 @@
+<!doctype html><html><body><script type="module">
+import { detectDocumentQuad, getLastDetectDiagnostics, warpQuadToRect, orderQuad, whitenBackground, cropToWhiteEdges, autoStraighten, canvasLaplacianVariance, canvasContrast, orientQuadForA4Portrait, refineQuadCorners, computeHiResEdgeTightness } from '/src/lib/perspective.ts';
+window.run = async () => {
+  const img = new Image(); img.src='/__scantest.jpg'; await img.decode();
+  const out = { imgW: img.naturalWidth, imgH: img.naturalHeight };
+  // simulate live detect at 280px width like scan loop
+  const DW = 280, DH = Math.round(DW * img.naturalHeight / img.naturalWidth);
+  const c = document.createElement('canvas'); c.width=DW; c.height=DH;
+  const cx=c.getContext('2d',{willReadFrequently:true}); cx.drawImage(img,0,0,DW,DH);
+  const data = cx.getImageData(0,0,DW,DH);
+  const t0=performance.now();
+  const det = detectDocumentQuad(data, DW, DH, {});
+  out.detectMs = +(performance.now()-t0).toFixed(1);
+  out.diag = getLastDetectDiagnostics();
+  out.detected = !!det;
+  if (det) {
+    out.confidence = det.confidence; out.a4Ratio = det.a4Ratio; out.debug = det.debug;
+    const quad = orderQuad(det.corners.map(p=>({x:p.x/DW,y:p.y/DH})));
+    out.quadNorm = quad.map(p=>[+p.x.toFixed(4),+p.y.toFixed(4)]);
+    // full-res warp
+    const full = document.createElement('canvas'); full.width=img.naturalWidth; full.height=img.naturalHeight;
+    full.getContext('2d').drawImage(img,0,0);
+    const src = quad.map(p=>({x:p.x*full.width,y:p.y*full.height}));
+    const W=1240,H=1754;
+    const dst = document.createElement('canvas'); dst.width=W; dst.height=H;
+    warpQuadToRect(full, dst, src, W, H);
+    out.warpSharp = +canvasLaplacianVariance(dst).toFixed(1);
+    out.warpContrast = +canvasContrast(dst).toFixed(3);
+    let w = whitenBackground(dst);
+    out.whiteSharp = +canvasLaplacianVariance(w).toFixed(1);
+    out.whiteContrast = +canvasContrast(w).toFixed(3);
+    const cropped = cropToWhiteEdges(w, { maxTopBottom:0.01, maxLeftRight:0.01 });
+    out.croppedSize = [cropped.width, cropped.height];
+    const st = autoStraighten(cropped);
+    out.straight = st && st.width ? [st.width, st.height] : null;
+    const final = st || cropped;
+    document.body.innerHTML='';
+    final.style.width='420px'; final.id='final'; document.body.appendChild(final);
+    // also show overlay of detection
+    const ov=document.createElement('canvas'); ov.width=img.naturalWidth; ov.height=img.naturalHeight;
+    const oc=ov.getContext('2d'); oc.drawImage(img,0,0); oc.strokeStyle='#ff0'; oc.lineWidth=8; oc.beginPath();
+    src.forEach((p,i)=> i? oc.lineTo(p.x,p.y):oc.moveTo(p.x,p.y)); oc.closePath(); oc.stroke();
+    ov.style.width='320px'; ov.id='ov'; document.body.appendChild(ov);
+  }
+  return out;
+};
+window.ready = true;
+</script></body></html>
