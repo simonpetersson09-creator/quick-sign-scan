@@ -130,6 +130,11 @@ const DETECT_FRAMES = 3; // mjukare intro innan ramen visas
 const HOLD_FRAMES = 7; // ~0.23s — "Håll stilla" phase
 const READY_FRAMES = 9; // ~0.30s — "Dokument hittat" lock-in (sänkt från 14)
 const STABLE_FRAMES = 15; // ~0.50s total before auto-capture (sänkt från 22)
+// Dynamic stability: om gyrot bekräftar att telefonen är mycket stilla kan vi
+// avfyra tidigare — hårdvaran har redan uteslutit skakningsrisken.
+const ENABLE_DYNAMIC_STABLE_TARGET = true;
+const STABLE_FRAMES_STEADY = 10; // ~0.34s när telefonen är riktigt still
+
 // Feature flag: mjukare nedbrytning av captureStableCount. Tidigare drog varje
 // enskild gate-miss av 1, vilket gjorde att countern stod stilla eller backade
 // vid ~50-70% pass-rate (t.ex. lite sned telefon) och auto-capture kändes
@@ -366,6 +371,9 @@ function ScanPage() {
   const motionMagRef = useRef(0);
   const motionAvailableRef = useRef(false);
   const MOTION_STILL_THRESHOLD = 0.45; // m/s² — empirical, tolerates breathing
+  // Tydligt lugnare än ovan: telefonen ligger nästan helt still (stöd/armstöd).
+  const MOTION_VERY_STILL_THRESHOLD = 0.18;
+
   // Document-targeted exposure metering. We periodically nudge the camera to
   // expose for the paper itself (point-of-interest on the quad centroid, plus
   // a brightness-driven exposureCompensation fallback) so a backlit window or
@@ -1314,9 +1322,19 @@ function ScanPage() {
     // by requiring more consecutive stable visual frames before auto-
     // capture. Same threshold used everywhere captureStableCount is
     // compared to STABLE_FRAMES below.
+    // Dynamic stability: when the gyro says the phone is *very* still
+    // (well under the general stillness threshold) we can fire sooner —
+    // the visual jitter risk is already ruled out by hardware.
+    const verySteady =
+      ENABLE_DYNAMIC_STABLE_TARGET &&
+      motionAvailableRef.current &&
+      motionMagRef.current < MOTION_VERY_STILL_THRESHOLD;
     const stableTarget = motionAvailableRef.current
-      ? STABLE_FRAMES
+      ? verySteady
+        ? STABLE_FRAMES_STEADY
+        : STABLE_FRAMES
       : STABLE_FRAMES + 8; // ~+0.27s extra hold without gyro confirmation
+
 
     // Progress 0..1 — fills up as capture-stability builds, hits 1.0 right before capture.
     const pct = Math.max(0, Math.min(1, captureStableCount.current / stableTarget));
