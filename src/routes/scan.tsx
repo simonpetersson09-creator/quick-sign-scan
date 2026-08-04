@@ -2817,7 +2817,7 @@ function ScanPage() {
       detectCount.current >= DETECT_FRAMES;
     if (hasGoodDetection && q) {
       setStatus("capturing");
-      capture(q);
+      capture(q, true);
     } else {
       // Fallback: no document detected — capture the raw frame as-is so the
       // user is never stuck if detection fails (poor lighting, low contrast,
