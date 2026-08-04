@@ -133,7 +133,8 @@ const STABLE_FRAMES = 15; // ~0.50s total before auto-capture (sänkt från 22)
 // Dynamic stability: om gyrot bekräftar att telefonen är mycket stilla kan vi
 // avfyra tidigare — hårdvaran har redan uteslutit skakningsrisken.
 const ENABLE_DYNAMIC_STABLE_TARGET = true;
-const STABLE_FRAMES_STEADY = 10; // ~0.34s när telefonen är riktigt still
+const STABLE_FRAMES_STEADY = 13; // ~0.44s när telefonen är riktigt still (försiktigare än 10)
+const READY_FRAMES_STEADY = 8; // lock-in när gyrot bekräftar stillhet
 
 // Feature flag: mjukare nedbrytning av captureStableCount. Tidigare drog varje
 // enskild gate-miss av 1, vilket gjorde att countern stod stilla eller backade
@@ -1313,7 +1314,17 @@ function ScanPage() {
     }
 
     // Engage lock once we've reached the READY threshold with good conditions.
-    if (captureStableCount.current >= READY_FRAMES && isSharp && isBrightEnough) {
+    // Dynamic stability: when the gyro says the phone is *very* still
+    // (well under the general stillness threshold) we can fire sooner —
+    // the visual jitter risk is already ruled out by hardware.
+    const verySteady =
+      ENABLE_DYNAMIC_STABLE_TARGET &&
+      motionAvailableRef.current &&
+      motionMagRef.current < MOTION_VERY_STILL_THRESHOLD;
+
+    // Engage lock once we've reached the READY threshold with good conditions.
+    const readyTarget = verySteady ? READY_FRAMES_STEADY : READY_FRAMES;
+    if (captureStableCount.current >= readyTarget && isSharp && isBrightEnough) {
       lockedRef.current = true;
     }
 
@@ -1322,18 +1333,12 @@ function ScanPage() {
     // by requiring more consecutive stable visual frames before auto-
     // capture. Same threshold used everywhere captureStableCount is
     // compared to STABLE_FRAMES below.
-    // Dynamic stability: when the gyro says the phone is *very* still
-    // (well under the general stillness threshold) we can fire sooner —
-    // the visual jitter risk is already ruled out by hardware.
-    const verySteady =
-      ENABLE_DYNAMIC_STABLE_TARGET &&
-      motionAvailableRef.current &&
-      motionMagRef.current < MOTION_VERY_STILL_THRESHOLD;
     const stableTarget = motionAvailableRef.current
       ? verySteady
         ? STABLE_FRAMES_STEADY
         : STABLE_FRAMES
       : STABLE_FRAMES + 8; // ~+0.27s extra hold without gyro confirmation
+
 
 
     // Progress 0..1 — fills up as capture-stability builds, hits 1.0 right before capture.
