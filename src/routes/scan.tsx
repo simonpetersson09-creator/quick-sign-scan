@@ -1448,14 +1448,33 @@ function ScanPage() {
     // Outlier rejection — if a raw frame jumped wildly from the smoothed
     // estimate, treat it as noise and skip the update. Prevents the polygon
     // from twitching when one frame detects a wrong contour.
+    //
+    // Undantag: en rå-quad som expanderar utåt och innehåller den nuvarande
+    // utjämnade quaden är en korrektion mot dokumentets verkliga ytterkant.
+    // Utan det här undantaget kan ramen fastna innanför pappret, eftersom en
+    // typisk expansion (~0.15) hamnar i dödbandet mellan OUTLIER_DELTA och
+    // LOCK_BREAK_DELTA och kastas som brus.
     const previousSmooth = smoothQuad.current;
     let rawDeltaFromSmooth = 0;
     if (previousSmooth) {
       rawDeltaFromSmooth = maxCornerDelta(norm, previousSmooth);
       if (rawDeltaFromSmooth > OUTLIER_DELTA && rawDeltaFromSmooth < LOCK_BREAK_DELTA) {
-        // mild outlier — keep current smooth, don't add to stability either
-        drawOverlay(previousSmooth, lockedRef.current ? "ready" : "hold");
-        return;
+        if (isOutwardExpansion(norm, previousSmooth, detection.confidence)) {
+          outlierRejectFramesRef.current = 0;
+          if (DEBUG_AUTOCAPTURE) {
+            console.log("[autocapture] expansion accepted", {
+              delta: rawDeltaFromSmooth.toFixed(3),
+              conf: detection.confidence.toFixed(2),
+            });
+          }
+        } else {
+          // mild outlier — keep current smooth, don't add to stability either
+          outlierRejectFramesRef.current++;
+          drawOverlay(previousSmooth, lockedRef.current ? "ready" : "hold");
+          return;
+        }
+      } else {
+        outlierRejectFramesRef.current = 0;
       }
       if (rawDeltaFromSmooth >= LOCK_BREAK_DELTA) {
         // large movement — break the lock and re-track
