@@ -540,6 +540,16 @@ function ScanPage() {
   const [error, setError] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<ErrorType | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
+  // Safe-area guide box in container CSS px. Mirrors the region where all four
+  // document corners must land for capture to be accepted (CORNER_FRAME_INSET),
+  // mapped through the same object-cover math the detection overlay uses.
+  const [guideBox, setGuideBox] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
+
   const [pageCount, setPageCount] = useState(() => scanStore.getPages().length);
   const [lastThumbnail, setLastThumbnail] = useState<string | null>(() => {
     const pages = scanStore.getPages();
@@ -607,6 +617,62 @@ function ScanPage() {
     });
     stream.getVideoTracks().forEach((track) => track.stop());
   }, []);
+
+  // Compute the safe-area guide box. Uses the real camera frame size and the
+  // same aspect-fill (object-cover, center-crop) mapping as drawOverlay, so the
+  // guide matches the actual sensor area rather than the CSS box. Purely visual.
+  useEffect(() => {
+    let raf = 0;
+    const compute = () => {
+      const el = containerRef.current;
+      const video = videoRef.current;
+      if (!el || !video) return;
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
+      const rect = el.getBoundingClientRect();
+      if (!vw || !vh || !rect.width || !rect.height) return;
+      const scale = Math.max(rect.width / vw, rect.height / vh);
+      const dispW = vw * scale;
+      const dispH = vh * scale;
+      const offX = (rect.width - dispW) / 2;
+      const offY = (rect.height - dispH) / 2;
+      const inset = CORNER_FRAME_INSET;
+      const next = {
+        left: offX + inset * dispW,
+        top: offY + inset * dispH,
+        width: (1 - 2 * inset) * dispW,
+        height: (1 - 2 * inset) * dispH,
+      };
+      setGuideBox((prev) =>
+        prev &&
+        Math.abs(prev.left - next.left) < 0.5 &&
+        Math.abs(prev.top - next.top) < 0.5 &&
+        Math.abs(prev.width - next.width) < 0.5 &&
+        Math.abs(prev.height - next.height) < 0.5
+          ? prev
+          : next,
+      );
+    };
+    const schedule = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(compute);
+    };
+    schedule();
+    const ro = new ResizeObserver(schedule);
+    if (containerRef.current) ro.observe(containerRef.current);
+    window.addEventListener("orientationchange", schedule);
+    const v = videoRef.current;
+    v?.addEventListener("loadedmetadata", schedule);
+    v?.addEventListener("resize", schedule);
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+      window.removeEventListener("orientationchange", schedule);
+      v?.removeEventListener("loadedmetadata", schedule);
+      v?.removeEventListener("resize", schedule);
+    };
+  }, [cameraReady]);
+
 
   // Exposure lock: when the doc is "ready" lock exposure so brightness doesn't
   // shift in the milliseconds before capture. Release it as soon as we're no
@@ -3170,34 +3236,42 @@ function ScanPage() {
           ))}
         </svg>
 
-        {/* A4 framing guide — purely visual, never affects detection/capture/warp.
-            Centered, A4 aspect (1:√2), fades out once detection is locking on. */}
+        {/* Safe-area guide — purely visual, never affects detection/capture/warp.
+            Matches the real camera frame (aspect-fill mapped) minus the corner
+            margin the capture gate enforces, and uses the same amber styling as
+            the "search" phase of the live detection frame so the handover to the
+            detected quad has no visual jump. */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 z-[15] flex items-center justify-center px-8"
+          className="pointer-events-none absolute inset-0 z-[15] overflow-hidden"
           style={{
-            opacity: guideVisible ? 0.55 : 0,
+            opacity: guideVisible && guideBox ? 1 : 0,
             transition: "opacity 320ms ease",
           }}
         >
-          <div
-            className="relative"
-            style={{
-              aspectRatio: "1 / 1.4142",
-              maxHeight: "78%",
-              width: "min(72%, calc(78vh / 1.4142))",
-              border: "1px solid rgba(255,255,255,0.55)",
-              borderRadius: 2,
-              boxShadow: "0 0 0 1px rgba(0,0,0,0.18)",
-            }}
+          {guideBox && (
+            <div
+              className="absolute"
+              style={{
+                left: guideBox.left,
+                top: guideBox.top,
+                width: guideBox.width,
+                height: guideBox.height,
+                border: "1.25px solid rgb(255,214,90)",
+                backgroundColor: "color-mix(in oklab, rgb(255,214,90) 5%, transparent)",
+                boxShadow: "0 0 6px rgba(255,193,7,0.35)",
+                opacity: 0.85,
+              }}
+            />
+          )}
+          <span
+            className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/45 px-3 py-1 text-[12px] font-medium text-white/90 backdrop-blur-sm"
+            style={{ top: Math.max((guideBox?.top ?? 0) + 12, 88) }}
           >
-            <span
-              className="absolute left-1/2 -translate-x-1/2 -top-8 whitespace-nowrap rounded-full bg-black/45 px-3 py-1 text-[12px] font-medium text-white/90 backdrop-blur-sm"
-            >
-              {guideHint}
-            </span>
-          </div>
+            {guideHint}
+          </span>
         </div>
+
 
       </div>
 
