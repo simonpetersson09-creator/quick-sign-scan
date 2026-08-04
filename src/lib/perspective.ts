@@ -1653,6 +1653,14 @@ export function getLastDetectDiagnostics(): DetectDiagnostics {
   return lastDetectDiagnostics;
 }
 
+/** Adopt diagnostics produced by a detection that ran in a Web Worker, so
+ *  main-thread consumers of getLastDetectDiagnostics() see the same data
+ *  they would have seen from a synchronous detect pass. */
+export function setLastDetectDiagnostics(d: DetectDiagnostics) {
+  lastDetectDiagnostics = d;
+}
+
+
 function resetDetectDiagnostics() {
   lastDetectDiagnostics = { rejects: {}, bestRejected: null, candidateCount: 0, adaptiveUsed: null, sideSupport: null, overlayBest: null };
 }
