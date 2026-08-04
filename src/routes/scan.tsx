@@ -871,6 +871,9 @@ function ScanPage() {
       }
       // Gyrot anses tillförlitligt först efter lika många samples varje gång.
       motionAvailableRef.current = motionSamplesRef.current >= MOTION_MIN_SAMPLES;
+    };
+
+
 
     let motionAttached = false;
     const attachMotion = () => {
