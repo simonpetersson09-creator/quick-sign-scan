@@ -1580,19 +1580,18 @@ function buildBrightPaperMask(
   height: number,
   threshold: number,
 ): Uint8Array {
-  const mask = new Uint8Array(lum.length);
+  const mask = scratch("mask.src", Uint8Array, lum.length, false);
   for (let i = 0; i < lum.length; i++) mask[i] = lum[i] >= threshold ? 1 : 0;
   // Balanced closing: dilate N, erode N. The previous extra dilate at the
   // end grew the mask by 1px on every side, which propagated through to the
   // boundary contour and put the polygon outside the actual paper.
-  let closed: Uint8Array<ArrayBufferLike> = mask;
-  for (let i = 0; i < 3; i++) closed = dilateMask(closed, width, height);
-  for (let i = 0; i < 3; i++) closed = erodeMask(closed, width, height);
+  const closed = scratch("mask.paper", Uint8Array, lum.length, false);
+  morphClose(mask, width, height, 3, closed);
   return closed;
 }
 
 function maskBoundary(mask: Uint8Array, width: number, height: number): Uint8Array {
-  const out = new Uint8Array(mask.length);
+  const out = scratch("mask.boundary", Uint8Array, mask.length);
   for (let y = 1; y < height - 1; y++) {
     for (let x = 1; x < width - 1; x++) {
       const i = y * width + x;
