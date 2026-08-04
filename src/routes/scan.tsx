@@ -2261,7 +2261,17 @@ function ScanPage() {
           "innercrop",
         ) === "0"
       );
-      const INNER_CROP_FRACTION = 0.01;
+      // Adaptiv inner-crop (flagga: ?adaptiveinnercrop=0 stänger av).
+      // Om refineQuadCorners knappt flyttade något hörn (≤ 2 px) är hörnen
+      // redan mycket väl bestämda → mindre marginal behövs (0.5 %).
+      // Annars behålls nuvarande 1 %.
+      const adaptiveInnerCropEnabled =
+        urlParams.get("adaptiveinnercrop") !== "0" && refineMaxDelta !== null;
+      const REFINE_STABLE_MAX_PX = 2;
+      const INNER_CROP_FRACTION =
+        adaptiveInnerCropEnabled && (refineMaxDelta as number) <= REFINE_STABLE_MAX_PX
+          ? 0.005
+          : 0.01;
       let warpQuad = finalSrcQuad;
       if (innerCropEnabled && INNER_CROP_FRACTION > 0) {
         const cx =
@@ -2273,12 +2283,24 @@ function ScanPage() {
           x: p.x + (cx - p.x) * t,
           y: p.y + (cy - p.y) * t,
         })) as typeof finalSrcQuad;
+        const cropShiftPx = finalSrcQuad.map((p, i) =>
+          Number(Math.hypot(p.x - warpQuad[i].x, p.y - warpQuad[i].y).toFixed(2)),
+        );
         logScanStage("warp-trace/5b-inner-crop", {
           fraction: INNER_CROP_FRACTION,
+          adaptive: adaptiveInnerCropEnabled,
+          refineCornerDeltasPx: refineCornerDeltas
+            ? refineCornerDeltas.map((d) => Number(d.toFixed(3)))
+            : null,
+          refineMaxDeltaPx: refineMaxDelta !== null ? Number(refineMaxDelta.toFixed(3)) : null,
+          refineStableThresholdPx: REFINE_STABLE_MAX_PX,
+          cropShiftPxPerCorner: cropShiftPx,
+          cropShiftMaxPx: Math.max(...cropShiftPx),
           beforePixels: formatQuad(finalSrcQuad),
           afterPixels: formatQuad(warpQuad),
         });
       }
+
 
       // ── Quad equality check ────────────────────────────────────────────
       // preview / capture / warp i samma pixelrymd. Om overlay-ramen låg
