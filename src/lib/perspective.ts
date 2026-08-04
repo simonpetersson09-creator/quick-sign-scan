@@ -2780,49 +2780,7 @@ function uniqueThresholds(values: number[]): number[] {
   return out;
 }
 
-function erodeMask(mask: Uint8Array, width: number, height: number): Uint8Array {
-  const out = new Uint8Array(mask.length);
-  for (let y = 1; y < height - 1; y++) {
-    for (let x = 1; x < width - 1; x++) {
-      const i = y * width + x;
-      if (
-        mask[i] &&
-        mask[i - 1] &&
-        mask[i + 1] &&
-        mask[i - width] &&
-        mask[i + width] &&
-        mask[i - width - 1] &&
-        mask[i - width + 1] &&
-        mask[i + width - 1] &&
-        mask[i + width + 1]
-      )
-        out[i] = 1;
-    }
-  }
-  return out;
-}
-
-function dilateMask(mask: Uint8Array, width: number, height: number): Uint8Array {
-  const out = new Uint8Array(mask.length);
-  for (let y = 1; y < height - 1; y++) {
-    for (let x = 1; x < width - 1; x++) {
-      const i = y * width + x;
-      if (
-        mask[i] ||
-        mask[i - 1] ||
-        mask[i + 1] ||
-        mask[i - width] ||
-        mask[i + width] ||
-        mask[i - width - 1] ||
-        mask[i - width + 1] ||
-        mask[i + width - 1] ||
-        mask[i + width + 1]
-      )
-        out[i] = 1;
-    }
-  }
-  return out;
-}
+// (erodeMask/dilateMask removed — replaced by the separable morphClose above.)
 
 function pushIf(
   mask: Uint8Array,
