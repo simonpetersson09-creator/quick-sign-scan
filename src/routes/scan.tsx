@@ -618,6 +618,62 @@ function ScanPage() {
     stream.getVideoTracks().forEach((track) => track.stop());
   }, []);
 
+  // Compute the safe-area guide box. Uses the real camera frame size and the
+  // same aspect-fill (object-cover, center-crop) mapping as drawOverlay, so the
+  // guide matches the actual sensor area rather than the CSS box. Purely visual.
+  useEffect(() => {
+    let raf = 0;
+    const compute = () => {
+      const el = containerRef.current;
+      const video = videoRef.current;
+      if (!el || !video) return;
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
+      const rect = el.getBoundingClientRect();
+      if (!vw || !vh || !rect.width || !rect.height) return;
+      const scale = Math.max(rect.width / vw, rect.height / vh);
+      const dispW = vw * scale;
+      const dispH = vh * scale;
+      const offX = (rect.width - dispW) / 2;
+      const offY = (rect.height - dispH) / 2;
+      const inset = CORNER_FRAME_INSET;
+      const next = {
+        left: offX + inset * dispW,
+        top: offY + inset * dispH,
+        width: (1 - 2 * inset) * dispW,
+        height: (1 - 2 * inset) * dispH,
+      };
+      setGuideBox((prev) =>
+        prev &&
+        Math.abs(prev.left - next.left) < 0.5 &&
+        Math.abs(prev.top - next.top) < 0.5 &&
+        Math.abs(prev.width - next.width) < 0.5 &&
+        Math.abs(prev.height - next.height) < 0.5
+          ? prev
+          : next,
+      );
+    };
+    const schedule = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(compute);
+    };
+    schedule();
+    const ro = new ResizeObserver(schedule);
+    if (containerRef.current) ro.observe(containerRef.current);
+    window.addEventListener("orientationchange", schedule);
+    const v = videoRef.current;
+    v?.addEventListener("loadedmetadata", schedule);
+    v?.addEventListener("resize", schedule);
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+      window.removeEventListener("orientationchange", schedule);
+      v?.removeEventListener("loadedmetadata", schedule);
+      v?.removeEventListener("resize", schedule);
+    };
+  }, [cameraReady]);
+
+
   // Exposure lock: when the doc is "ready" lock exposure so brightness doesn't
   // shift in the milliseconds before capture. Release it as soon as we're no
   // longer ready so the next document gets a fresh metering.
