@@ -1504,6 +1504,7 @@ function ScanPage() {
           now - stagnationSinceRef.current >= STAGNATION_MS &&
           now - lastStagnationAtRef.current >= STAGNATION_COOLDOWN_MS
         ) {
+          const heldMs = Math.round(now - stagnationSinceRef.current);
           lastStagnationAtRef.current = now;
           stagnationSinceRef.current = now;
           freePassesLeftRef.current = STAGNATION_FREE_PASSES;
@@ -1511,7 +1512,8 @@ function ScanPage() {
           freePassBaselineRef.current = { area: areaNow, conf: detection?.confidence ?? 0 };
           // eslint-disable-next-line no-console
           console.log("[scan] stagnation-detected", {
-            heldMs: Math.round(now - (stagnationSinceRef.current || now)) || STAGNATION_MS,
+            heldMs,
+
             reason: reasonNow,
             area: +areaNow.toFixed(4),
             centroid: [+cxNow.toFixed(3), +cyNow.toFixed(3)],
