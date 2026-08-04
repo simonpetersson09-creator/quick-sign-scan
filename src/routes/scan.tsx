@@ -1336,7 +1336,10 @@ function ScanPage() {
       return;
     }
 
-    detectCount.current = Math.min(detectCount.current + frameWeight, DETECT_COUNT_MAX);
+    // Pass-baserad (som miss-grenen ovan) så DETECT_COUNT_MAX behåller sin
+    // ursprungliga kalibrering i detekteringspass.
+    detectCount.current = Math.min(detectCount.current + 1, DETECT_COUNT_MAX);
+
     missCount.current = 0;
     detectionMeta.current = detection;
 
