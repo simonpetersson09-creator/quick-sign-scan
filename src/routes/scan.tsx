@@ -540,6 +540,16 @@ function ScanPage() {
   const [error, setError] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<ErrorType | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
+  // Safe-area guide box in container CSS px. Mirrors the region where all four
+  // document corners must land for capture to be accepted (CORNER_FRAME_INSET),
+  // mapped through the same object-cover math the detection overlay uses.
+  const [guideBox, setGuideBox] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
+
   const [pageCount, setPageCount] = useState(() => scanStore.getPages().length);
   const [lastThumbnail, setLastThumbnail] = useState<string | null>(() => {
     const pages = scanStore.getPages();
