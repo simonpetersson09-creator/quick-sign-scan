@@ -1960,7 +1960,7 @@ function ScanPage() {
   }
 
 
-  async function capture(normQuad: [Point, Point, Point, Point]) {
+  async function capture(normQuad: [Point, Point, Point, Point], manual = false) {
     if (capturedRef.current) return;
     const meta = detectionMeta.current;
     if (!meta || meta.confidence < MIN_DOCUMENT_CONFIDENCE) {
