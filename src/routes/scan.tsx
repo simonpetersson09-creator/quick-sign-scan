@@ -2711,7 +2711,8 @@ function ScanPage() {
       // Post-capture sharpness gate. If the warped doc is blurry we abandon
       // this capture and let auto-focus retry — better to wait a second
       // longer than to save an unreadable PDF page. Bail after a few retries
-      // so the user is never stuck.
+      // so the user is never stuck. Manual captures are never retried: the
+      // user pressed the button and must get a page back.
       const postSharpness = canvasLaplacianVariance(warped);
       logScanStage("post-capture-sharpness", {
         value: postSharpness,
@@ -2719,9 +2720,19 @@ function ScanPage() {
         retries: captureRetryRef.current,
       });
       if (postSharpness < SHARPNESS_CAPTURE_MIN) {
+        if (!manual && captureRetryRef.current < MAX_CAPTURE_RETRIES) {
+          captureRetryRef.current += 1;
+          abortCaptureAndRearm("post-capture-blurry", {
+            value: +postSharpness.toFixed(1),
+            threshold: SHARPNESS_CAPTURE_MIN,
+            retry: captureRetryRef.current,
+          });
+          return;
+        }
         console.info("[scan] post-capture sharpness below target; keeping captured page", {
           value: postSharpness,
           threshold: SHARPNESS_CAPTURE_MIN,
+          retries: captureRetryRef.current,
         });
       }
       // Post-capture contrast gate. A washed-out / blown-out frame with
@@ -2732,13 +2743,14 @@ function ScanPage() {
       const postContrast = canvasContrast(warped);
       logScanStage("post-capture-contrast", {
         value: postContrast,
-        threshold: 12,
+        threshold: CONTRAST_CAPTURE_MIN,
         retries: captureRetryRef.current,
       });
-      if (postContrast < 3) {
+      if (postContrast < CONTRAST_CAPTURE_MIN) {
         throw new Error("Processed scan is nearly blank; falling back to raw camera frame");
       }
       captureRetryRef.current = 0;
+
 
       // Use high-quality JPEG so tiny footer/header text survives PDF output.
       const JPEG_QUALITY = 0.94;
