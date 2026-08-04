@@ -1922,34 +1922,10 @@ function ScanPage() {
               maxCornerDeltaPx: +maxCornerDelta.toFixed(2),
               thresholdPx: +motionThresholdPx.toFixed(2),
             });
-            if (stageTimerRef.current) {
-              window.clearTimeout(stageTimerRef.current);
-              stageTimerRef.current = null;
-            }
-            setCaptureStage(null);
-            capturedRef.current = false;
-            captureStableCount.current = 0;
-            stableCount.current = Math.max(0, stableCount.current - 4);
-            lockedRef.current = false;
-            // Force the progress bar back down immediately so the UI doesn't
-            // sit at 100 % while we wait for the next processFrame tick.
-            setProgress(0);
-            // 450 ms cooldown: capture-stability cannot accumulate and
-            // auto-capture cannot fire during this window. Prevents the
-            // exact-same frame from re-triggering capture and gives the
-            // user a moment to actually steady the phone.
-            captureCooldownUntilRef.current = performance.now() + 450;
-            // Use "align" rather than "hold": "hold" reads as "we're about
-            // to capture", but we just rejected a capture. processFrame will
-            // recompute the correct status on the next tick anyway.
-            setStatus("align");
-            // CRITICAL: re-arm the RAF loop. capture() set capturedRef=true
-            // which caused tick() to stop re-scheduling itself (see loop()).
-            // Without this, detect() never runs again, overlay/status freeze,
-            // and recovery is impossible without a manual interaction.
-            if (rafRef.current) cancelAnimationFrame(rafRef.current);
-            rafRef.current = null;
-            loop();
+            abortCaptureAndRearm("motion-discard", {
+              maxCornerDeltaPx: +maxCornerDelta.toFixed(2),
+              thresholdPx: +motionThresholdPx.toFixed(2),
+            });
             return;
           }
 
@@ -1957,10 +1933,14 @@ function ScanPage() {
           // refine/snap/orient. The live quad is now known-stale.
           baseSrcQuad = reOrdered;
         } else {
-          logScanStage("motion-sync/redetect", {
-            applied: false,
+          // Re-detekteringen på full burst-frame hittade ingen quad alls.
+          // Tidigare fortsatte vi med den gamla overlay-quaden — det är en
+          // gissning och gav sneda/beskurna sidor. Avbryt istället.
+          logScanStage("motion-sync/discard", {
             reason: "no-detection-on-bestframe",
           });
+          abortCaptureAndRearm("no-detection-on-bestframe", {});
+          return;
         }
       } catch (e) {
         console.warn("[scan] motion-sync re-detect failed, keeping live quad", e);
