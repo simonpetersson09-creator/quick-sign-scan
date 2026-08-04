@@ -152,6 +152,10 @@ const BRIGHTNESS_MIN = 38;
 // skevhet här eftersom warp-steget rätar upp dokumentet ändå; den verkliga
 // kvalitetskontrollen är skärpa + ljus + post-capture Laplacian.
 const A4_RATIO_TOLERANCE = 0.6;
+// Frame-inset gate — samtliga fyra hörn måste ligga minst 2 % innanför
+// bildytan (normaliserat 0..1). Skyddar mot att ett dokument som skär
+// kanten fångas och sparas beskuret.
+const CORNER_FRAME_INSET = 0.02;
 
 type StartCameraOptions = {
   restartStream?: boolean;
@@ -1322,6 +1326,14 @@ function ScanPage() {
     const isShakyNow =
       motionAvailableRef.current && motionMagRef.current > MOTION_STILL_THRESHOLD;
     const cooldownMs = Math.max(0, armedAtRef.current - performance.now());
+    // Alla fyra hörn måste ligga minst CORNER_FRAME_INSET innanför bildytan.
+    const cornersInsideFrame = smoothed.every(
+      (p) =>
+        p.x >= CORNER_FRAME_INSET &&
+        p.x <= 1 - CORNER_FRAME_INSET &&
+        p.y >= CORNER_FRAME_INSET &&
+        p.y <= 1 - CORNER_FRAME_INSET,
+    );
     let captureBlockedBy: string | null = null;
     if (visibleOnly) captureBlockedBy = `edge:${reasonNotReady ?? "unknown"}`;
     else if (!isBrightEnough && lowLightFramesRef.current > 15) captureBlockedBy = "light";
@@ -1329,6 +1341,7 @@ function ScanPage() {
     else if (!isSharp) captureBlockedBy = "sharpness";
     else if (captureStableCount.current < READY_FRAMES) captureBlockedBy = "stability:ready";
     else if (captureStableCount.current < stableTarget) captureBlockedBy = "stability:stable";
+    else if (!cornersInsideFrame) captureBlockedBy = "corners-outside-frame";
     else if (cooldownMs > 0) captureBlockedBy = "cooldown";
     else if (isShakyNow) captureBlockedBy = "motion";
     // "ambiguous" is filled in below once it's computed.
@@ -1419,11 +1432,30 @@ function ScanPage() {
           ? ambiguousFramesRef.current + 1
           : 0;
       }
-      if (performance.now() < armedAtRef.current) {
+      if (!cornersInsideFrame) {
+        // Minst ett hörn ligger inom 2 % av bildkanten — dokumentet riskerar
+        // att bli beskuret. Håll kvar ramen men snappa inte.
+        setStatus("align");
+        captureStableCount.current = Math.min(captureStableCount.current, stableTarget - 1);
+        if (captureGateRef.current) captureGateRef.current.reason = "corners-outside-frame";
+        if (debugEnabled) {
+          // eslint-disable-next-line no-console
+          console.log("[scan] capture-blocked corners-outside-frame", {
+            inset: CORNER_FRAME_INSET,
+            quad: smoothed.map((p) => [+p.x.toFixed(4), +p.y.toFixed(4)]),
+          });
+        }
+      } else if (performance.now() < armedAtRef.current) {
         // Re-aim cooldown after a saved page — show "ready" but don't snap yet.
         setStatus("ready");
         captureStableCount.current = Math.min(captureStableCount.current, stableTarget - 1);
         if (captureGateRef.current) captureGateRef.current.reason = "cooldown";
+        if (debugEnabled) {
+          // eslint-disable-next-line no-console
+          console.log("[scan] capture-blocked rearm-cooldown", {
+            remainingMs: Math.round(armedAtRef.current - performance.now()),
+          });
+        }
       } else if (isShaky) {
         // Phone is moving — keep "ready" but don't auto-capture this frame.
         setStatus("ready");
@@ -1580,6 +1612,34 @@ function ScanPage() {
 
     // Hide corner dots entirely — Genius Scan-style frame is corner-free.
     cornerRefs.current.forEach((c) => c && (c.style.opacity = "0"));
+  }
+
+  // Gemensam rollback för en påbörjad men avbruten capture. Återställer
+  // stabilitetsräknare, sätter både kort discard-cooldown och re-aim-fönstret
+  // (armedAtRef) så samma frame inte kan trigga capture igen, och startar om
+  // RAF-loopen (capture() satte capturedRef=true vilket stoppade tick()).
+  function abortCaptureAndRearm(reason: string, detail: Record<string, unknown>) {
+    // eslint-disable-next-line no-console
+    console.info("[scan] capture-aborted", { reason, ...detail });
+    if (stageTimerRef.current) {
+      window.clearTimeout(stageTimerRef.current);
+      stageTimerRef.current = null;
+    }
+    setCaptureStage(null);
+    capturedRef.current = false;
+    captureStableCount.current = 0;
+    stableCount.current = Math.max(0, stableCount.current - 4);
+    lockedRef.current = false;
+    setProgress(0);
+    // 450 ms cooldown: capture-stability cannot accumulate during this window.
+    captureCooldownUntilRef.current = performance.now() + 450;
+    // Re-aim-fönstret: auto-capture är inte "armed" förrän detta passerat,
+    // så en avbruten capture inte omedelbart kan repeteras på samma bild.
+    armedAtRef.current = performance.now() + REARM_DELAY_MS;
+    setStatus("align");
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = null;
+    loop();
   }
 
 
@@ -1890,34 +1950,10 @@ function ScanPage() {
               maxCornerDeltaPx: +maxCornerDelta.toFixed(2),
               thresholdPx: +motionThresholdPx.toFixed(2),
             });
-            if (stageTimerRef.current) {
-              window.clearTimeout(stageTimerRef.current);
-              stageTimerRef.current = null;
-            }
-            setCaptureStage(null);
-            capturedRef.current = false;
-            captureStableCount.current = 0;
-            stableCount.current = Math.max(0, stableCount.current - 4);
-            lockedRef.current = false;
-            // Force the progress bar back down immediately so the UI doesn't
-            // sit at 100 % while we wait for the next processFrame tick.
-            setProgress(0);
-            // 450 ms cooldown: capture-stability cannot accumulate and
-            // auto-capture cannot fire during this window. Prevents the
-            // exact-same frame from re-triggering capture and gives the
-            // user a moment to actually steady the phone.
-            captureCooldownUntilRef.current = performance.now() + 450;
-            // Use "align" rather than "hold": "hold" reads as "we're about
-            // to capture", but we just rejected a capture. processFrame will
-            // recompute the correct status on the next tick anyway.
-            setStatus("align");
-            // CRITICAL: re-arm the RAF loop. capture() set capturedRef=true
-            // which caused tick() to stop re-scheduling itself (see loop()).
-            // Without this, detect() never runs again, overlay/status freeze,
-            // and recovery is impossible without a manual interaction.
-            if (rafRef.current) cancelAnimationFrame(rafRef.current);
-            rafRef.current = null;
-            loop();
+            abortCaptureAndRearm("motion-discard", {
+              maxCornerDeltaPx: +maxCornerDelta.toFixed(2),
+              thresholdPx: +motionThresholdPx.toFixed(2),
+            });
             return;
           }
 
@@ -1925,10 +1961,14 @@ function ScanPage() {
           // refine/snap/orient. The live quad is now known-stale.
           baseSrcQuad = reOrdered;
         } else {
-          logScanStage("motion-sync/redetect", {
-            applied: false,
+          // Re-detekteringen på full burst-frame hittade ingen quad alls.
+          // Tidigare fortsatte vi med den gamla overlay-quaden — det är en
+          // gissning och gav sneda/beskurna sidor. Avbryt istället.
+          logScanStage("motion-sync/discard", {
             reason: "no-detection-on-bestframe",
           });
+          abortCaptureAndRearm("no-detection-on-bestframe", {});
+          return;
         }
       } catch (e) {
         console.warn("[scan] motion-sync re-detect failed, keeping live quad", e);
@@ -2492,6 +2532,10 @@ function ScanPage() {
   function finishPageCapture(dataUrl: string, count: number) {
     setPageCount(count);
     setLastThumbnail(dataUrl);
+
+    // Re-aim-paus efter en sparad sida: auto-capture är inte "armed" förrän
+    // REARM_DELAY_MS passerat, så samma dokument inte snappas igen direkt.
+    armedAtRef.current = performance.now() + REARM_DELAY_MS;
 
     // Reset detection state so auto-capture starts fresh for the next page.
     stableCount.current = 0;
