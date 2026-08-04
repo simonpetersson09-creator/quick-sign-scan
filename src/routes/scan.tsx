@@ -1545,7 +1545,10 @@ function ScanPage() {
       // frame) no longer erases progress. Only a sustained miss streak
       // decays captureStableCount. Without this, a ~50% pass rate meant the
       // counter could never reach STABLE_FRAMES at all.
-      captureMissStreakRef.current += frameWeight;
+      // Grace-fönstret räknas i pass, inte i tid (weight 1), medan själva
+      // decay av stabilitetsprogressen förblir tidsbaserad.
+      captureMissStreakRef.current += 1;
+
       if (captureMissStreakRef.current > CAPTURE_MISS_GRACE_FRAMES) {
         captureStableCount.current = Math.max(0, captureStableCount.current - frameWeight);
       }
