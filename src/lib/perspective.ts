@@ -1645,6 +1645,7 @@ let lastDetectDiagnostics: DetectDiagnostics = {
   bestRejected: null,
   candidateCount: 0,
   adaptiveUsed: null,
+  sideSupport: null,
   overlayBest: null,
 };
 
@@ -1653,7 +1654,7 @@ export function getLastDetectDiagnostics(): DetectDiagnostics {
 }
 
 function resetDetectDiagnostics() {
-  lastDetectDiagnostics = { rejects: {}, bestRejected: null, candidateCount: 0, adaptiveUsed: null, overlayBest: null };
+  lastDetectDiagnostics = { rejects: {}, bestRejected: null, candidateCount: 0, adaptiveUsed: null, sideSupport: null, overlayBest: null };
 }
 
 function recordReject(
