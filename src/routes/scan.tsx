@@ -1432,11 +1432,30 @@ function ScanPage() {
           ? ambiguousFramesRef.current + 1
           : 0;
       }
-      if (performance.now() < armedAtRef.current) {
+      if (!cornersInsideFrame) {
+        // Minst ett hörn ligger inom 2 % av bildkanten — dokumentet riskerar
+        // att bli beskuret. Håll kvar ramen men snappa inte.
+        setStatus("align");
+        captureStableCount.current = Math.min(captureStableCount.current, stableTarget - 1);
+        if (captureGateRef.current) captureGateRef.current.reason = "corners-outside-frame";
+        if (debugEnabled) {
+          // eslint-disable-next-line no-console
+          console.log("[scan] capture-blocked corners-outside-frame", {
+            inset: CORNER_FRAME_INSET,
+            quad: smoothed.map((p) => [+p.x.toFixed(4), +p.y.toFixed(4)]),
+          });
+        }
+      } else if (performance.now() < armedAtRef.current) {
         // Re-aim cooldown after a saved page — show "ready" but don't snap yet.
         setStatus("ready");
         captureStableCount.current = Math.min(captureStableCount.current, stableTarget - 1);
         if (captureGateRef.current) captureGateRef.current.reason = "cooldown";
+        if (debugEnabled) {
+          // eslint-disable-next-line no-console
+          console.log("[scan] capture-blocked rearm-cooldown", {
+            remainingMs: Math.round(armedAtRef.current - performance.now()),
+          });
+        }
       } else if (isShaky) {
         // Phone is moving — keep "ready" but don't auto-capture this frame.
         setStatus("ready");
