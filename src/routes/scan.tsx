@@ -271,6 +271,7 @@ function ScanPage() {
   const lastDetectAtRef = useRef(0);
   const lastRejectLogAtRef = useRef(0);
   const lastAdaptiveLogAtRef = useRef(0);
+  const lastSideSupportLogAtRef = useRef(0);
   const lastGateLogAtRef = useRef(0);
   // Per-frame compact debug log (throttled). Always fires while debugEnabled
   // is on, so we can see the full live-detection picture each ~250 ms.
@@ -1090,6 +1091,17 @@ function ScanPage() {
         lastAdaptiveLogAtRef.current = now;
         // eslint-disable-next-line no-console
         console.log("[scan] adaptive-edge-tightness", adaptive);
+      }
+      const side = getLastDetectDiagnostics().sideSupport;
+      if (side && now - lastSideSupportLogAtRef.current > 750) {
+        lastSideSupportLogAtRef.current = now;
+        // eslint-disable-next-line no-console
+        console.log("[scan] side-support", {
+          perSideTightness: side.perSideTightness.map((v) => +v.toFixed(2)),
+          minSideTightness: +side.minSideTightness.toFixed(2),
+          tightness: +side.tightness.toFixed(2),
+          reason: side.reason,
+        });
       }
     }
 
