@@ -705,6 +705,9 @@ function ScanPage() {
       captureCooldownUntilRef.current = 0;
       detectCount.current = 0;
       missCount.current = 0;
+      lastDetectTickAtRef.current = 0;
+      detectInFlightRef.current = false;
+
       smoothQuad.current = null;
       lastRawQuad.current = null;
       detectionMeta.current = null;
