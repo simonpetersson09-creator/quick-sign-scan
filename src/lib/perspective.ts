@@ -4343,6 +4343,8 @@ export function cropToWhiteEdges(
     cropped: { top, right, bottom, left },
     ...(adaptive ? { sideLogs } : {}),
   };
+}
+
 
 
 // ============================================================================
