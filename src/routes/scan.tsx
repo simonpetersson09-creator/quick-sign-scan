@@ -1580,7 +1580,9 @@ function ScanPage() {
     // LOCK_BREAK_DELTA och kastas som brus.
     const previousSmooth = smoothQuad.current;
     let rawDeltaFromSmooth = 0;
-    if (previousSmooth) {
+    // Under fria pass hoppas outlier-grinden över helt — annars kan den kasta
+    // just den bättre kandidat som passet är till för att hitta.
+    if (previousSmooth && !freePass) {
       rawDeltaFromSmooth = maxCornerDelta(norm, previousSmooth);
       if (rawDeltaFromSmooth > OUTLIER_DELTA && rawDeltaFromSmooth < LOCK_BREAK_DELTA) {
         if (isOutwardExpansion(norm, previousSmooth, detection?.confidence ?? 0)) {
@@ -1615,11 +1617,55 @@ function ScanPage() {
       }
     }
 
+    // ===== Fritt pass: adoptera bara en tydligt bättre kandidat =====
+    let freePassAdopted = false;
+    if (freePass) {
+      freePassRunRef.current++;
+      const baseline = freePassBaselineRef.current;
+      const areaNew = quadArea(norm);
+      const confNew = detection?.confidence ?? 0;
+      freePassAdopted =
+        !baseline ||
+        areaNew >= baseline.area * FREE_PASS_ADOPT_AREA_GAIN ||
+        confNew >= baseline.conf + FREE_PASS_ADOPT_CONF_GAIN;
+      const passesRun = freePassRunRef.current;
+      const done = freePassesLeftRef.current === 0 || freePassAdopted;
+      if (freePassAdopted) {
+        // Hoppa över EMA: byt direkt till den nya kandidaten.
+        smoothQuad.current = norm;
+        freePassesLeftRef.current = 0;
+        stagnationSigRef.current = null;
+        stagnationSinceRef.current = 0;
+        outlierRejectFramesRef.current = 0;
+      }
+      // eslint-disable-next-line no-console
+      console.log("[scan] stagnation-free-pass", {
+        pass: passesRun,
+        of: STAGNATION_FREE_PASSES,
+        adopted: freePassAdopted,
+        area: +areaNew.toFixed(4),
+        baselineArea: baseline ? +baseline.area.toFixed(4) : null,
+        conf: +confNew.toFixed(2),
+        baselineConf: baseline ? +baseline.conf.toFixed(2) : null,
+        outcome: freePassAdopted
+          ? "adopted-new-quad"
+          : done
+            ? "resumed-normal-tracking"
+            : "continue-free-passes",
+      });
+      if (done && !freePassAdopted) {
+        // Ingen bättre kandidat — ingen full reset, bara normal tracking igen.
+        freePassBaselineRef.current = null;
+        stagnationSinceRef.current = now;
+      }
+    }
+
     // Adaptive smoothing — gentler once locked, so the on-screen polygon
     // barely moves frame-to-frame.
     const alpha = lockedRef.current ? ALPHA_POST_LOCK : ALPHA_PRE_LOCK;
-    const smoothed = emaQuad(smoothQuad.current, norm, alpha);
+    const smoothed = freePassAdopted ? norm : emaQuad(smoothQuad.current, norm, alpha);
     smoothQuad.current = smoothed;
+
     // Push to the voting ring buffer (only the most recent frames count).
     const buf = recentSmoothQuadsRef.current;
     buf.push(smoothed.map((p) => ({ x: p.x, y: p.y })) as [Point, Point, Point, Point]);
