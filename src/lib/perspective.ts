@@ -760,13 +760,13 @@ export function detectDocumentQuad(
 ): DocumentDetection | null {
   resetDetectDiagnostics();
   const total = width * height;
-  const rawLum = new Uint8ClampedArray(total);
-  const rawHist = new Uint32Array(256);
+  const rawLum = scratch("rawLum", Uint8ClampedArray, total, false);
+  const rawHist = scratch("rawHist", Uint32Array, 256);
   // Chroma proxy (max(R,G,B) − min(R,G,B)) — cheap saturation surrogate.
   // White paper has chroma ~0 even when its luminance matches a light
   // wooden floor; wood typically has chroma 20–80. Lets us separate
   // paper from background when grayscale contrast alone is too weak.
-  const chroma = ENABLE_WHITENESS_CHANNEL ? new Uint8ClampedArray(total) : null;
+  const chroma = ENABLE_WHITENESS_CHANNEL ? scratch("chroma", Uint8ClampedArray, total, false) : null;
   for (let i = 0, j = 0; i < data.length; i += 4, j++) {
     const r = data[i], g = data[i + 1], b = data[i + 2];
     const l = (0.299 * r + 0.587 * g + 0.114 * b) | 0;
@@ -1225,8 +1225,8 @@ function stretchContrast(
   // Skip remap when contrast is already good — avoids touching well-lit frames.
   if (span >= 170) return { lum, hist };
   if (span < 20) return { lum, hist }; // degenerate / nearly flat image — leave untouched
-  const out = new Uint8ClampedArray(lum.length);
-  const outHist = new Uint32Array(256);
+  const out = scratch("lumStretched", Uint8ClampedArray, lum.length, false);
+  const outHist = scratch("histStretched", Uint32Array, 256);
   const scale = 255 / span;
   for (let i = 0; i < lum.length; i++) {
     let v = (lum[i] - lo) * scale;
@@ -1239,8 +1239,144 @@ function stretchContrast(
   return { lum: out, hist: outHist };
 }
 
+// ---------------------------------------------------------------------------
+// Scratch buffer pool (perf item 3).
+//
+// The detect pipeline used to allocate ~15 typed arrays per frame (lum, blur,
+// Canny mag/dir/nonMax/edges/seen/stack, Sobel, masks, boundaries…). At ~22 Hz
+// that is enough garbage to trigger GC pauses in the middle of a detect pass,
+// which shows up as overlay jitter. Buffers are now reused per (key, length).
+// Every pooled buffer is either fully overwritten or zero-filled before use,
+// so results are bit-identical to the allocating version.
+const scratchPool = new Map<string, ArrayBufferView>();
+let bufferReuseEnabled = true;
+
+/** Escape hatch: disable pooling (e.g. for A/B measurements). */
+export function setDetectBufferReuse(enabled: boolean) {
+  bufferReuseEnabled = enabled;
+  if (!enabled) scratchPool.clear();
+}
+
+type TypedArrayCtor<T> = new (len: number) => T;
+
+function scratch<T extends { length: number; fill(value: number): T }>(
+  key: string,
+  ctor: TypedArrayCtor<T>,
+  len: number,
+  zero = true,
+): T {
+  if (!bufferReuseEnabled) return new ctor(len);
+  const k = `${key}:${len}`;
+  const existing = scratchPool.get(k) as unknown as T | undefined;
+  if (!existing) {
+    const created = new ctor(len);
+    scratchPool.set(k, created as unknown as ArrayBufferView);
+    return created;
+  }
+  if (zero) existing.fill(0);
+  return existing;
+}
+
+// ---------------------------------------------------------------------------
+// Separable binary morphology (perf item 4).
+//
+// A (2r+1)² square dilation/erosion is separable, so one horizontal + one
+// vertical sweep replaces the r full 3×3 neighbourhood passes we ran before
+// (6 passes for the 3×/3× closings). Each 1-D sweep uses a running
+// "distance to nearest hit" instead of a window scan, so it costs 2 reads per
+// pixel regardless of r. Zero padding outside the image and a forced-zero
+// 1-px border reproduce exactly what the iterative dilate/erode pairs did.
+function morphH(src: Uint8Array, dst: Uint8Array, w: number, h: number, r: number, dilate: boolean) {
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    if (dilate) {
+      let last = -1e9;
+      for (let x = 0; x < w; x++) {
+        if (src[row + x]) last = x;
+        dst[row + x] = x - last <= r ? 1 : 0;
+      }
+      let next = 1e9;
+      for (let x = w - 1; x >= 0; x--) {
+        if (src[row + x]) next = x;
+        if (next - x <= r) dst[row + x] = 1;
+      }
+    } else {
+      let last = -1; // zero padding: a background pixel sits just outside
+      for (let x = 0; x < w; x++) {
+        if (!src[row + x]) last = x;
+        dst[row + x] = x - last <= r ? 0 : 1;
+      }
+      let next = w;
+      for (let x = w - 1; x >= 0; x--) {
+        if (!src[row + x]) next = x;
+        if (next - x <= r) dst[row + x] = 0;
+      }
+    }
+  }
+}
+
+function morphV(src: Uint8Array, dst: Uint8Array, w: number, h: number, r: number, dilate: boolean) {
+  for (let x = 0; x < w; x++) {
+    if (dilate) {
+      let last = -1e9;
+      for (let y = 0; y < h; y++) {
+        const i = y * w + x;
+        if (src[i]) last = y;
+        dst[i] = y - last <= r ? 1 : 0;
+      }
+      let next = 1e9;
+      for (let y = h - 1; y >= 0; y--) {
+        const i = y * w + x;
+        if (src[i]) next = y;
+        if (next - y <= r) dst[i] = 1;
+      }
+    } else {
+      let last = -1;
+      for (let y = 0; y < h; y++) {
+        const i = y * w + x;
+        if (!src[i]) last = y;
+        dst[i] = y - last <= r ? 0 : 1;
+      }
+      let next = h;
+      for (let y = h - 1; y >= 0; y--) {
+        const i = y * w + x;
+        if (!src[i]) next = y;
+        if (next - y <= r) dst[i] = 0;
+      }
+    }
+  }
+}
+
+function zeroBorderRing(buf: Uint8Array, width: number, height: number) {
+  for (let x = 0; x < width; x++) {
+    buf[x] = 0;
+    buf[(height - 1) * width + x] = 0;
+  }
+  for (let y = 0; y < height; y++) {
+    buf[y * width] = 0;
+    buf[y * width + width - 1] = 0;
+  }
+}
+
+/** Balanced closing: dilate by r, then erode by r, written into `out`. */
+function morphClose(src: Uint8Array, width: number, height: number, r: number, out: Uint8Array) {
+  const n = width * height;
+  const t1 = scratch("morph.t1", Uint8Array, n, false);
+  const t2 = scratch("morph.t2", Uint8Array, n, false);
+  morphH(src, t1, width, height, r, true);
+  morphV(t1, t2, width, height, r, true);
+  // The iterative dilate zeroed the outer ring after every pass; the erode
+  // that follows must see those zeros, otherwise pixels one step inside the
+  // border survive that the old code removed.
+  zeroBorderRing(t2, width, height);
+  morphH(t2, t1, width, height, r, false);
+  morphV(t1, out, width, height, r, false);
+  // The iterative version always left the outermost ring at 0.
+  zeroBorderRing(out, width, height);
+}
+
 function gaussianBlur(lum: Uint8ClampedArray, width: number, height: number): Uint8ClampedArray {
-  const out = new Uint8ClampedArray(lum.length);
+  const out = scratch("blur", Uint8ClampedArray, lum.length);
   for (let y = 1; y < height - 1; y++) {
     for (let x = 1; x < width - 1; x++) {
       const i = y * width + x;
@@ -1260,40 +1396,54 @@ function gaussianBlur(lum: Uint8ClampedArray, width: number, height: number): Ui
   return out;
 }
 
+// Canny (perf item 6). Same algorithm and same thresholds; the hot loop just
+// avoids the three costly per-pixel calls it used to make:
+//   • Math.hypot → Math.sqrt of the squared sum (identical value, ~4× faster)
+//   • Math.atan2 + degree normalisation → tangent comparisons against
+//     tan(22.5°) and tan(67.5°), which pick exactly the same 0/45/90/135 bin
+//   • the growing `number[]` of magnitudes + full sort → a 1-unit-wide
+//     histogram percentile (threshold differs by <1 grey level, and it is
+//     clamped by the same Math.max(22, …) floor)
+const TAN_22_5 = 0.41421356237;
+const TAN_67_5 = 2.41421356237;
+const MAG_BINS = 1024;
+
 function cannyEdges(
   lum: Uint8ClampedArray,
   width: number,
   height: number,
 ): { edges: Uint8Array; highThreshold: number } {
   const total = width * height;
-  const mag = new Float32Array(total);
-  const dir = new Uint8Array(total);
-  const nonMax = new Float32Array(total);
-  const magnitudes: number[] = [];
+  const mag = scratch("canny.mag", Float32Array, total);
+  const dir = scratch("canny.dir", Uint8Array, total);
+  const nonMax = scratch("canny.nonMax", Float32Array, total);
+  const magHist = scratch("canny.hist", Uint32Array, MAG_BINS);
+  let magCount = 0;
 
   for (let y = 1; y < height - 1; y++) {
     for (let x = 1; x < width - 1; x++) {
       const i = y * width + x;
-      const gx =
-        -lum[i - width - 1] -
-        2 * lum[i - 1] -
-        lum[i + width - 1] +
-        lum[i - width + 1] +
-        2 * lum[i + 1] +
-        lum[i + width + 1];
-      const gy =
-        -lum[i - width - 1] -
-        2 * lum[i - width] -
-        lum[i - width + 1] +
-        lum[i + width - 1] +
-        2 * lum[i + width] +
-        lum[i + width + 1];
-      const m = Math.hypot(gx, gy);
+      const nw = lum[i - width - 1];
+      const n = lum[i - width];
+      const ne = lum[i - width + 1];
+      const wv = lum[i - 1];
+      const ev = lum[i + 1];
+      const sw = lum[i + width - 1];
+      const s = lum[i + width];
+      const se = lum[i + width + 1];
+      const gx = -nw - 2 * wv - sw + ne + 2 * ev + se;
+      const gy = -nw - 2 * n - ne + sw + 2 * s + se;
+      const m = Math.sqrt(gx * gx + gy * gy);
       mag[i] = m;
-      if (m > 8) magnitudes.push(m);
-      let angle = (Math.atan2(gy, gx) * 180) / Math.PI;
-      if (angle < 0) angle += 180;
-      dir[i] = angle < 22.5 || angle >= 157.5 ? 0 : angle < 67.5 ? 45 : angle < 112.5 ? 90 : 135;
+      if (m > 8) {
+        const bin = m >= MAG_BINS - 1 ? MAG_BINS - 1 : m | 0;
+        magHist[bin]++;
+        magCount++;
+      }
+      const ax = gx < 0 ? -gx : gx;
+      const ay = gy < 0 ? -gy : gy;
+      dir[i] =
+        ay <= TAN_22_5 * ax ? 0 : ay >= TAN_67_5 * ax ? 90 : (gx ^ gy) >= 0 ? 45 : 135;
     }
   }
 
@@ -1317,12 +1467,23 @@ function cannyEdges(
     }
   }
 
-  magnitudes.sort((a, b) => a - b);
-  const highThreshold = Math.max(22, magnitudes[Math.floor(magnitudes.length * 0.78)] ?? 32);
+  let percentileMag = 32;
+  if (magCount > 0) {
+    const target = Math.floor(magCount * 0.78);
+    let acc = 0;
+    for (let bin = 0; bin < MAG_BINS; bin++) {
+      acc += magHist[bin];
+      if (acc > target) {
+        percentileMag = bin;
+        break;
+      }
+    }
+  }
+  const highThreshold = Math.max(22, percentileMag);
   const lowThreshold = highThreshold * 0.38;
-  const edges = new Uint8Array(total);
-  const seen = new Uint8Array(total);
-  const stack = new Int32Array(total);
+  const edges = scratch("canny.edges", Uint8Array, total);
+  const seen = scratch("canny.seen", Uint8Array, total);
+  const stack = scratch("canny.stack", Int32Array, total, false);
 
   for (let i = 0; i < total; i++) {
     if (seen[i] || nonMax[i] < highThreshold) continue;
@@ -1354,8 +1515,9 @@ function closeEdgeGaps(edges: Uint8Array, width: number, height: number): Uint8A
   // The previous dilate-dilate-erode was a net +1px dilation which pushed
   // the detected contour OUTSIDE the real paper edge by a couple of pixels
   // per side — visible as a frame that floats a few mm/cm off the document.
-  const dilated = dilateMask(edges, width, height);
-  return erodeMask(dilated, width, height);
+  const out = scratch("mask.edgesClosed", Uint8Array, width * height, false);
+  morphClose(edges, width, height, 1, out);
+  return out;
 }
 
 // Bright AND low-chroma mask. Implements feature flag A (whiteness
@@ -1369,13 +1531,12 @@ function buildWhitenessMask(
   lumThreshold: number,
   maxChroma: number,
 ): Uint8Array {
-  const mask = new Uint8Array(lum.length);
+  const mask = scratch("mask.src", Uint8Array, lum.length, false);
   for (let i = 0; i < lum.length; i++) {
     mask[i] = lum[i] >= lumThreshold && chroma[i] <= maxChroma ? 1 : 0;
   }
-  let closed: Uint8Array<ArrayBufferLike> = mask;
-  for (let i = 0; i < 3; i++) closed = dilateMask(closed, width, height);
-  for (let i = 0; i < 3; i++) closed = erodeMask(closed, width, height);
+  const closed = scratch("mask.whiteness", Uint8Array, lum.length, false);
+  morphClose(mask, width, height, 3, closed);
   return closed;
 }
 
@@ -1427,19 +1588,18 @@ function buildBrightPaperMask(
   height: number,
   threshold: number,
 ): Uint8Array {
-  const mask = new Uint8Array(lum.length);
+  const mask = scratch("mask.src", Uint8Array, lum.length, false);
   for (let i = 0; i < lum.length; i++) mask[i] = lum[i] >= threshold ? 1 : 0;
   // Balanced closing: dilate N, erode N. The previous extra dilate at the
   // end grew the mask by 1px on every side, which propagated through to the
   // boundary contour and put the polygon outside the actual paper.
-  let closed: Uint8Array<ArrayBufferLike> = mask;
-  for (let i = 0; i < 3; i++) closed = dilateMask(closed, width, height);
-  for (let i = 0; i < 3; i++) closed = erodeMask(closed, width, height);
+  const closed = scratch("mask.paper", Uint8Array, lum.length, false);
+  morphClose(mask, width, height, 3, closed);
   return closed;
 }
 
 function maskBoundary(mask: Uint8Array, width: number, height: number): Uint8Array {
-  const out = new Uint8Array(mask.length);
+  const out = scratch("mask.boundary", Uint8Array, mask.length);
   for (let y = 1; y < height - 1; y++) {
     for (let x = 1; x < width - 1; x++) {
       const i = y * width + x;
@@ -1972,7 +2132,7 @@ function sobelMagnitude(
   width: number,
   height: number,
 ): Float32Array {
-  const out = new Float32Array(width * height);
+  const out = scratch("sobel", Float32Array, width * height);
   for (let y = 1; y < height - 1; y++) {
     for (let x = 1; x < width - 1; x++) {
       const i = y * width + x;
@@ -2628,49 +2788,7 @@ function uniqueThresholds(values: number[]): number[] {
   return out;
 }
 
-function erodeMask(mask: Uint8Array, width: number, height: number): Uint8Array {
-  const out = new Uint8Array(mask.length);
-  for (let y = 1; y < height - 1; y++) {
-    for (let x = 1; x < width - 1; x++) {
-      const i = y * width + x;
-      if (
-        mask[i] &&
-        mask[i - 1] &&
-        mask[i + 1] &&
-        mask[i - width] &&
-        mask[i + width] &&
-        mask[i - width - 1] &&
-        mask[i - width + 1] &&
-        mask[i + width - 1] &&
-        mask[i + width + 1]
-      )
-        out[i] = 1;
-    }
-  }
-  return out;
-}
-
-function dilateMask(mask: Uint8Array, width: number, height: number): Uint8Array {
-  const out = new Uint8Array(mask.length);
-  for (let y = 1; y < height - 1; y++) {
-    for (let x = 1; x < width - 1; x++) {
-      const i = y * width + x;
-      if (
-        mask[i] ||
-        mask[i - 1] ||
-        mask[i + 1] ||
-        mask[i - width] ||
-        mask[i + width] ||
-        mask[i - width - 1] ||
-        mask[i - width + 1] ||
-        mask[i + width - 1] ||
-        mask[i + width + 1]
-      )
-        out[i] = 1;
-    }
-  }
-  return out;
-}
+// (erodeMask/dilateMask removed — replaced by the separable morphClose above.)
 
 function pushIf(
   mask: Uint8Array,
