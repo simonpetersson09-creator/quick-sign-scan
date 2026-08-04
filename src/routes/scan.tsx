@@ -1326,6 +1326,14 @@ function ScanPage() {
     const isShakyNow =
       motionAvailableRef.current && motionMagRef.current > MOTION_STILL_THRESHOLD;
     const cooldownMs = Math.max(0, armedAtRef.current - performance.now());
+    // Alla fyra hörn måste ligga minst CORNER_FRAME_INSET innanför bildytan.
+    const cornersInsideFrame = smoothed.every(
+      (p) =>
+        p.x >= CORNER_FRAME_INSET &&
+        p.x <= 1 - CORNER_FRAME_INSET &&
+        p.y >= CORNER_FRAME_INSET &&
+        p.y <= 1 - CORNER_FRAME_INSET,
+    );
     let captureBlockedBy: string | null = null;
     if (visibleOnly) captureBlockedBy = `edge:${reasonNotReady ?? "unknown"}`;
     else if (!isBrightEnough && lowLightFramesRef.current > 15) captureBlockedBy = "light";
@@ -1333,6 +1341,7 @@ function ScanPage() {
     else if (!isSharp) captureBlockedBy = "sharpness";
     else if (captureStableCount.current < READY_FRAMES) captureBlockedBy = "stability:ready";
     else if (captureStableCount.current < stableTarget) captureBlockedBy = "stability:stable";
+    else if (!cornersInsideFrame) captureBlockedBy = "corners-outside-frame";
     else if (cooldownMs > 0) captureBlockedBy = "cooldown";
     else if (isShakyNow) captureBlockedBy = "motion";
     // "ambiguous" is filled in below once it's computed.
