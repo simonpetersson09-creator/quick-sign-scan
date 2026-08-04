@@ -760,13 +760,13 @@ export function detectDocumentQuad(
 ): DocumentDetection | null {
   resetDetectDiagnostics();
   const total = width * height;
-  const rawLum = new Uint8ClampedArray(total);
-  const rawHist = new Uint32Array(256);
+  const rawLum = scratch("rawLum", Uint8ClampedArray, total, false);
+  const rawHist = scratch("rawHist", Uint32Array, 256);
   // Chroma proxy (max(R,G,B) − min(R,G,B)) — cheap saturation surrogate.
   // White paper has chroma ~0 even when its luminance matches a light
   // wooden floor; wood typically has chroma 20–80. Lets us separate
   // paper from background when grayscale contrast alone is too weak.
-  const chroma = ENABLE_WHITENESS_CHANNEL ? new Uint8ClampedArray(total) : null;
+  const chroma = ENABLE_WHITENESS_CHANNEL ? scratch("chroma", Uint8ClampedArray, total, false) : null;
   for (let i = 0, j = 0; i < data.length; i += 4, j++) {
     const r = data[i], g = data[i + 1], b = data[i + 2];
     const l = (0.299 * r + 0.587 * g + 0.114 * b) | 0;
