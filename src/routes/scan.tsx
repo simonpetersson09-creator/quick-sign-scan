@@ -1241,8 +1241,13 @@ function ScanPage() {
     // spårade quaden sannolikt fel. Släpp temporal bias så detektorn får söka
     // fritt istället för att förstärka samma felaktiga kandidat.
     const biasDecayed = outlierRejectFramesRef.current >= OUTLIER_BIAS_DECAY_FRAMES;
+    // Fritt pass: under stagnations-återhämtning körs detektorn helt utan
+    // temporal bias (ingen preferQuad, ingen smoothQuad-bias) så den kan hitta
+    // en bättre kandidat än den som fastnat.
+    const freePass = freePassesLeftRef.current > 0;
+    if (freePass) freePassesLeftRef.current--;
     const preferQuad =
-      prevSmooth && prevConfidentEnough && !biasDecayed
+      !freePass && prevSmooth && prevConfidentEnough && !biasDecayed
         ? (prevSmooth.map((p) => ({ x: p.x * dw, y: p.y * dh })) as [Point, Point, Point, Point])
         : undefined;
     let detection: DocumentDetection | null;
@@ -1255,6 +1260,7 @@ function ScanPage() {
     } finally {
       detectInFlightRef.current = false;
     }
+
     // The camera may have been torn down / captured while we awaited.
     if (capturedRef.current || cancelledRef.current) return;
     // Separate live-detection (overlay) from capture-readiness. A detection
