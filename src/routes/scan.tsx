@@ -153,6 +153,21 @@ const CAPTURE_MISS_GRACE_FRAMES = 2; // ~90 ms tolerans vid 45 ms cadence
 // gör att återdetektering startar från ett rent tillstånd.
 const DETECT_COUNT_MAX = 6; // 2 × DETECT_FRAMES
 const LOST_RESET_MISS_FRAMES = 8; // ~0.36 s utan quad ⇒ full reset av quad-state
+// Feature flag: kör detektionen i en Web Worker. Exakt samma algoritm — den
+// flyttas bara av main thread, så overlay/React kan rendera mjukt medan ett
+// detect-pass pågår. Stäng av med ?worker=0 för att jämföra.
+const ENABLE_DETECT_WORKER = true;
+const DETECT_WORKER_TIMEOUT_MS = 1500;
+// Feature flag: tidsbaserad stabilitetsräkning. Räknarna nedan är uttryckta i
+// "frames", men en frame kostar olika mycket beroende på CPU-last. Genom att
+// öka/minska dem med dt / NOMINAL_FRAME_MS blir tröskeln en *tid* (t.ex.
+// STABLE_FRAMES 15 ≈ 600 ms) istället för ett antal detect-pass, så låstiden
+// blir förutsägbar oavsett detekteringshastighet. Stäng av med ?timestable=0.
+const ENABLE_TIME_BASED_STABILITY = true;
+const NOMINAL_FRAME_MS = 40; // referenscadence som frame-trösklarna är tunade mot
+const FRAME_WEIGHT_MIN = 0.25;
+const FRAME_WEIGHT_MAX = 4;
+
 // Adaptive smoothing — mjukare och mindre ryckig rörelse på ramen.
 // Lägre alpha = långsammare följning = lugnare upplevelse.
 const ALPHA_PRE_LOCK = 0.18;
