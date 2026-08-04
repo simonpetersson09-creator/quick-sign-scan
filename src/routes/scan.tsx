@@ -151,7 +151,7 @@ const BRIGHTNESS_MIN = 38;
 // projicerad proportion långt från sqrt(2). Vi accepterar generös perspektiv-
 // skevhet här eftersom warp-steget rätar upp dokumentet ändå; den verkliga
 // kvalitetskontrollen är skärpa + ljus + post-capture Laplacian.
-const A4_RATIO_TOLERANCE = 0.6;
+const A4_RATIO_TOLERANCE = 0.7;
 // Frame-inset gate — samtliga fyra hörn måste ligga minst 2 % innanför
 // bildytan (normaliserat 0..1). Skyddar mot att ett dokument som skär
 // kanten fångas och sparas beskuret.
