@@ -1207,8 +1207,12 @@ function ScanPage() {
             prevMeta.confidence >= PREFER_BIAS_EARLY_MIN_CONF &&
             prevMeta.debug.edgeTightness >= PREFER_BIAS_EARLY_MIN_EDGE)
         ));
+    // Bias-förfall: har flera raka frames förkastats av outlier-grinden är den
+    // spårade quaden sannolikt fel. Släpp temporal bias så detektorn får söka
+    // fritt istället för att förstärka samma felaktiga kandidat.
+    const biasDecayed = outlierRejectFramesRef.current >= OUTLIER_BIAS_DECAY_FRAMES;
     const preferQuad =
-      prevSmooth && prevConfidentEnough
+      prevSmooth && prevConfidentEnough && !biasDecayed
         ? (prevSmooth.map((p) => ({ x: p.x * dw, y: p.y * dh })) as [Point, Point, Point, Point])
         : undefined;
     let detection: DocumentDetection | null;
