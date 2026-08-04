@@ -1272,9 +1272,14 @@ function ScanPage() {
     if (!corners) {
       stableCount.current = 0;
       captureStableCount.current = 0;
-      detectCount.current = Math.max(0, detectCount.current - frameWeight);
+      // Miss-räkning är kalibrerad i detekteringspass, inte i tid: den ska
+      // INTE skalas med frameWeight (då förbrukas DETECT_COUNT_MAX /
+      // LOST_RESET_MISS_FRAMES 2-3x för snabbt och den temporala biasen
+      // hinner aldrig byggas upp).
+      detectCount.current = Math.max(0, detectCount.current - 1);
       detectionMeta.current = null;
-      missCount.current += frameWeight;
+      missCount.current += 1;
+
       lockedRef.current = false;
       lockBreakFramesRef.current = 0;
       hiResTightConfirmedRef.current = false;
