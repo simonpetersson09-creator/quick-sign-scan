@@ -143,6 +143,13 @@ const READY_FRAMES_STEADY = 8; // lock-in när gyrot bekräftar stillhet
 const ENABLE_SOFT_STABLE_DECAY = true;
 // Antal misslyckade frames i rad som tolereras innan progressen börjar sjunka.
 const CAPTURE_MISS_GRACE_FRAMES = 2; // ~90 ms tolerans vid 45 ms cadence
+// Dokumentförlust: detectCount fick tidigare växa obegränsat medan den bara
+// drogs av med 1 per miss-frame, vilket innebar att smoothQuad/lastRawQuad
+// (och därmed prefer-bias, EMA-start och outlier-gaten) kunde ligga kvar i
+// flera sekunder efter att dokumentet lämnat bilden. Taket + hård lost-reset
+// gör att återdetektering startar från ett rent tillstånd.
+const DETECT_COUNT_MAX = 6; // 2 × DETECT_FRAMES
+const LOST_RESET_MISS_FRAMES = 8; // ~0.36 s utan quad ⇒ full reset av quad-state
 // Adaptive smoothing — mjukare och mindre ryckig rörelse på ramen.
 // Lägre alpha = långsammare följning = lugnare upplevelse.
 const ALPHA_PRE_LOCK = 0.18;
@@ -1116,9 +1123,16 @@ function ScanPage() {
       lockedRef.current = false;
       lockBreakFramesRef.current = 0;
       hiResTightConfirmedRef.current = false;
-      if (detectCount.current === 0) {
+      if (detectCount.current === 0 || missCount.current >= LOST_RESET_MISS_FRAMES) {
+        // Full reset av quad-state så återdetektering startar rent: ingen
+        // prefer-bias mot en gammal position, ingen EMA-svans, inga gamla
+        // röster och ingen outlier-gate som kastar det nya quadet.
+        detectCount.current = 0;
         smoothQuad.current = null;
         lastRawQuad.current = null;
+        recentSmoothQuadsRef.current = [];
+        candidateHistoryRef.current = [];
+        ambiguousFramesRef.current = 0;
         drawOverlay(null, "search");
         setProgress(0);
       }
@@ -1162,7 +1176,7 @@ function ScanPage() {
       return;
     }
 
-    detectCount.current++;
+    detectCount.current = Math.min(detectCount.current + 1, DETECT_COUNT_MAX);
     missCount.current = 0;
     detectionMeta.current = detection;
 
