@@ -130,6 +130,13 @@ const DETECT_FRAMES = 3; // mjukare intro innan ramen visas
 const HOLD_FRAMES = 7; // ~0.23s — "Håll stilla" phase
 const READY_FRAMES = 9; // ~0.30s — "Dokument hittat" lock-in (sänkt från 14)
 const STABLE_FRAMES = 15; // ~0.50s total before auto-capture (sänkt från 22)
+// Feature flag: mjukare nedbrytning av captureStableCount. Tidigare drog varje
+// enskild gate-miss av 1, vilket gjorde att countern stod stilla eller backade
+// vid ~50-70% pass-rate (t.ex. lite sned telefon) och auto-capture kändes
+// långsam eller uteblev. Sätt till false för att återgå till gammalt beteende.
+const ENABLE_SOFT_STABLE_DECAY = true;
+// Antal misslyckade frames i rad som tolereras innan progressen börjar sjunka.
+const CAPTURE_MISS_GRACE_FRAMES = 2; // ~90 ms tolerans vid 45 ms cadence
 // Adaptive smoothing — mjukare och mindre ryckig rörelse på ramen.
 // Lägre alpha = långsammare följning = lugnare upplevelse.
 const ALPHA_PRE_LOCK = 0.18;
