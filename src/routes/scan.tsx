@@ -2318,12 +2318,24 @@ function ScanPage() {
       );
       if (whiteCropEnabled) {
         try {
-          const { canvas: cropped, cropped: amount } = cropToWhiteEdges(warped, {
+          // Feature flag: behovsstyrd per-sida-trimning med 2 %-tak.
+          // Av med ?adaptivecrop=0 (då används gamla 1 %-logiken).
+          const adaptiveCrop = !(
+            new URLSearchParams(typeof window !== "undefined" ? window.location.search : "").get(
+              "adaptivecrop",
+            ) === "0"
+          );
+          const {
+            canvas: cropped,
+            cropped: amount,
+            sideLogs,
+          } = cropToWhiteEdges(warped, {
             stripPx: 6,
             minMeanL: 200,
             maxStdL: 28,
-            maxTopBottom: 0.01,
-            maxLeftRight: 0.01,
+            maxTopBottom: adaptiveCrop ? 0.02 : 0.01,
+            maxLeftRight: adaptiveCrop ? 0.02 : 0.01,
+            adaptive: adaptiveCrop,
           });
           const didCrop = amount.top + amount.right + amount.bottom + amount.left > 0;
           let rescaledToA4 = false;
@@ -2350,11 +2362,14 @@ function ScanPage() {
           }
           logScanStage("white-edge-crop", {
             applied: didCrop,
+            adaptive: adaptiveCrop,
             cropped: amount,
+            sides: sideLogs ?? null,
             sizeAfter: { w: warped.width, h: warped.height },
             rescaledToA4,
           });
           logScanCanvas("after-white-edge-crop", warped, debugEnabled);
+
 
         } catch (e) {
           console.warn("[scan] cropToWhiteEdges failed; continuing", e);
