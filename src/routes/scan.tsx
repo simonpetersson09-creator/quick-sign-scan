@@ -130,6 +130,13 @@ const DETECT_FRAMES = 3; // mjukare intro innan ramen visas
 const HOLD_FRAMES = 7; // ~0.23s — "Håll stilla" phase
 const READY_FRAMES = 9; // ~0.30s — "Dokument hittat" lock-in (sänkt från 14)
 const STABLE_FRAMES = 15; // ~0.50s total before auto-capture (sänkt från 22)
+// Feature flag: mjukare nedbrytning av captureStableCount. Tidigare drog varje
+// enskild gate-miss av 1, vilket gjorde att countern stod stilla eller backade
+// vid ~50-70% pass-rate (t.ex. lite sned telefon) och auto-capture kändes
+// långsam eller uteblev. Sätt till false för att återgå till gammalt beteende.
+const ENABLE_SOFT_STABLE_DECAY = true;
+// Antal misslyckade frames i rad som tolereras innan progressen börjar sjunka.
+const CAPTURE_MISS_GRACE_FRAMES = 2; // ~90 ms tolerans vid 45 ms cadence
 // Adaptive smoothing — mjukare och mindre ryckig rörelse på ramen.
 // Lägre alpha = långsammare följning = lugnare upplevelse.
 const ALPHA_PRE_LOCK = 0.18;
@@ -325,6 +332,9 @@ function ScanPage() {
   // bygga upp denna. Auto-capture triggas endast när
   // captureStableCount >= STABLE_FRAMES. Nollställs när readyForCapture=false.
   const captureStableCount = useRef(0);
+  // Antal frames i rad där capture-gaten missat. Används av
+  // ENABLE_SOFT_STABLE_DECAY för att tolerera enstaka missar.
+  const captureMissStreakRef = useRef(0);
   const detectCount = useRef(0);
   const missCount = useRef(0);
   const capturedRef = useRef(false);
@@ -1273,11 +1283,23 @@ function ScanPage() {
       // Post-discard cooldown: progress must visibly drop and the user must
       // produce a fresh stable hold before we can fire again.
       captureStableCount.current = 0;
+      captureMissStreakRef.current = 0;
       lockedRef.current = false;
     } else if (!readyForCapture) {
       captureStableCount.current = 0;
+      captureMissStreakRef.current = 0;
     } else if (captureCandidate && delta < STABLE_DELTA) {
       captureStableCount.current++;
+      captureMissStreakRef.current = 0;
+    } else if (ENABLE_SOFT_STABLE_DECAY) {
+      // Grace window: an isolated gate-miss (jitter, a single borderline
+      // frame) no longer erases progress. Only a sustained miss streak
+      // decays captureStableCount. Without this, a ~50% pass rate meant the
+      // counter could never reach STABLE_FRAMES at all.
+      captureMissStreakRef.current++;
+      if (captureMissStreakRef.current > CAPTURE_MISS_GRACE_FRAMES) {
+        captureStableCount.current = Math.max(0, captureStableCount.current - 1);
+      }
     } else {
       captureStableCount.current = Math.max(0, captureStableCount.current - 1);
     }
