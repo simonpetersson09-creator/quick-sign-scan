@@ -551,6 +551,9 @@ function ScanPage() {
         rafRef.current = null;
       }
       if (options.restartStream || streamRef.current) stopCamera("restart-before-startCamera");
+      // Fullständig nollställning av ALL scanner-state. Detta körs vid varje
+      // start av skannervyn (första sidan såväl som "skanna fler sidor"), så
+      // motorn börjar i exakt samma tillstånd varje gång.
       capturedRef.current = false;
       sharpnessRef.current = 0;
       blurFramesRef.current = 0;
@@ -562,11 +565,44 @@ function ScanPage() {
       lowLightFramesRef.current = 0;
       stableCount.current = 0;
       captureStableCount.current = 0;
+      captureMissStreakRef.current = 0;
+      captureCooldownUntilRef.current = 0;
       detectCount.current = 0;
       missCount.current = 0;
       smoothQuad.current = null;
       lastRawQuad.current = null;
       detectionMeta.current = null;
+      recentSmoothQuadsRef.current = [];
+      candidateHistoryRef.current = [];
+      ambiguousFramesRef.current = 0;
+      tooFarFramesRef.current = 0;
+      tooCloseRejectFramesRef.current = 0;
+      captureGateRef.current = null;
+      // Timers/throttles
+      lastDetectAtRef.current = 0;
+      lastRefineAtRef.current = 0;
+      lastHiResTightAtRef.current = 0;
+      lastHiResTightLogAtRef.current = 0;
+      lastMeterAtRef.current = 0;
+      lastOverlayLogAtRef.current = 0;
+      lastRejectLogAtRef.current = 0;
+      lastAdaptiveLogAtRef.current = 0;
+      lastSideSupportLogAtRef.current = 0;
+      lastGateLogAtRef.current = 0;
+      lastFrameLogAtRef.current = 0;
+      // Exponerings-/mätstate
+      docLumRef.current = 0;
+      ecAppliedRef.current = 0;
+      exposureLockedRef.current = false;
+      // Motion/gyro: EMA och sampleräknare nollställs så gyrot måste bevisa
+      // stillhet på nytt med lika många samples varje gång.
+      motionMagRef.current = 0;
+      motionSamplesRef.current = 0;
+      motionAvailableRef.current = false;
+      // Auto-capture är inte armad förrän warm-upen passerat (sätts om exakt
+      // när första riktiga videoframen kommit, se nedan).
+      armedAtRef.current = performance.now() + CAMERA_WARMUP_MS;
+
       setProgress(0);
       setCameraReady(false);
       drawOverlay(null, "search");
