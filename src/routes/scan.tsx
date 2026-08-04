@@ -1273,11 +1273,23 @@ function ScanPage() {
       // Post-discard cooldown: progress must visibly drop and the user must
       // produce a fresh stable hold before we can fire again.
       captureStableCount.current = 0;
+      captureMissStreakRef.current = 0;
       lockedRef.current = false;
     } else if (!readyForCapture) {
       captureStableCount.current = 0;
+      captureMissStreakRef.current = 0;
     } else if (captureCandidate && delta < STABLE_DELTA) {
       captureStableCount.current++;
+      captureMissStreakRef.current = 0;
+    } else if (ENABLE_SOFT_STABLE_DECAY) {
+      // Grace window: an isolated gate-miss (jitter, a single borderline
+      // frame) no longer erases progress. Only a sustained miss streak
+      // decays captureStableCount. Without this, a ~50% pass rate meant the
+      // counter could never reach STABLE_FRAMES at all.
+      captureMissStreakRef.current++;
+      if (captureMissStreakRef.current > CAPTURE_MISS_GRACE_FRAMES) {
+        captureStableCount.current = Math.max(0, captureStableCount.current - 1);
+      }
     } else {
       captureStableCount.current = Math.max(0, captureStableCount.current - 1);
     }
