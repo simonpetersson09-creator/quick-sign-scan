@@ -1170,8 +1170,8 @@ function ScanPage() {
     // returned with readyForCapture=false has only passed structural gates
     // and is shown to coach the user — auto-capture must not fire.
     const detectedForOverlay = !!detection;
-    const readyForCapture = !!detection && detection.readyForCapture !== false;
-    const reasonNotReady = detection?.reasonNotReady;
+    let readyForCapture = !!detection && detection.readyForCapture !== false;
+    let reasonNotReady = detection?.reasonNotReady;
 
     // Optional hi-res local corner refinement on the full video frame. Does
     // NOT run a new detection — only nudges already-detected corners toward
