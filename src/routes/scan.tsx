@@ -1661,17 +1661,24 @@ function ScanPage() {
       }
     }
 
-    // ===== Fritt pass: adoptera bara en tydligt bättre kandidat =====
+    // ===== Fritt pass: adoptera en tydligt bättre ELLER tydligt omplacerad kandidat =====
     let freePassAdopted = false;
+    let freePassReason = "";
     if (freePass) {
       freePassRunRef.current++;
       const baseline = freePassBaselineRef.current;
       const areaNew = quadArea(norm);
       const confNew = detection?.confidence ?? 0;
-      freePassAdopted =
-        !baseline ||
-        areaNew >= baseline.area * FREE_PASS_ADOPT_AREA_GAIN ||
-        confNew >= baseline.conf + FREE_PASS_ADOPT_CONF_GAIN;
+      const cxNew = (norm[0].x + norm[1].x + norm[2].x + norm[3].x) / 4;
+      const cyNew = (norm[0].y + norm[1].y + norm[2].y + norm[3].y) / 4;
+      const moved = baseline ? Math.hypot(cxNew - baseline.cx, cyNew - baseline.cy) : 0;
+      // B: ny position + capture-klar quad räcker, även utan area-/conf-vinst.
+      const relocated = !!baseline && moved >= FREE_PASS_ADOPT_MOVE && readyForCapture;
+      if (!baseline) freePassReason = "no-baseline";
+      else if (areaNew >= baseline.area * FREE_PASS_ADOPT_AREA_GAIN) freePassReason = "area-gain";
+      else if (confNew >= baseline.conf + FREE_PASS_ADOPT_CONF_GAIN) freePassReason = "conf-gain";
+      else if (relocated) freePassReason = "relocated-ready";
+      freePassAdopted = freePassReason !== "";
       const passesRun = freePassRunRef.current;
       const done = freePassesLeftRef.current === 0 || freePassAdopted;
       if (freePassAdopted) {
