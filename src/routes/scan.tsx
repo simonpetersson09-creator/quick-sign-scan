@@ -588,7 +588,12 @@ function ScanPage() {
   // Antal återstående helt unbiased detect-pass (0 = normal tracking).
   const freePassesLeftRef = useRef(0);
   const freePassRunRef = useRef(0);
-  const freePassBaselineRef = useRef<{ area: number; conf: number } | null>(null);
+  const freePassBaselineRef = useRef<{
+    area: number;
+    conf: number;
+    cx: number;
+    cy: number;
+  } | null>(null);
 
   const brightnessRef = useRef(255);
   const lowLightFramesRef = useRef(0);
