@@ -415,16 +415,23 @@ function ReviewPage() {
                   style={{
                     left: `${sigPos.x * 100}%`,
                     top: `${sigPos.y * 100}%`,
-                    width: "28%",
+                    width: `${signatureBoxFractions(sigRatio).w * 100}%`,
                     transform: "translate(-50%, -50%)",
                   }}
                 >
                   <img
                     src={sigDataUrl}
                     alt=""
+                    onLoad={(e) => {
+                      const el = e.currentTarget;
+                      if (el.naturalWidth && el.naturalHeight) {
+                        setSigRatio(el.naturalWidth / el.naturalHeight);
+                      }
+                    }}
                     className="block w-full h-auto pointer-events-none"
                     draggable={false}
                   />
+
                 </div>
               )}
             </div>
