@@ -3706,10 +3706,13 @@ export function whitenBackground(
       const bl = d[i + 2];
       const L = 0.299 * r + 0.587 * g + 0.114 * bl;
       // weight 0 (keep original) for dark pixels, 1 (full whiten) for bright
+      const T_NONE = clampT(bgVal * T_NONE_RATIO, 96, 190);
+      const T_FULL = clampT(bgVal * T_FULL_RATIO, T_NONE + 12, 232);
       let wt: number;
       if (L <= T_NONE) wt = 0;
       else if (L >= T_FULL) wt = 1;
       else wt = (L - T_NONE) / (T_FULL - T_NONE);
+
 
       let nr = r * k;
       let ng = g * k;
