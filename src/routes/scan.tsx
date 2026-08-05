@@ -31,6 +31,7 @@ import {
   cropToWhiteEdges,
   measureWarpQuadGeometry,
 } from "@/lib/perspective";
+import { correctLocalIllumination, LOCAL_ILLUM_DEFAULTS } from "@/lib/localIllum";
 import { useT } from "@/lib/i18n";
 import { Camera, CameraOff, X, RefreshCw, ArrowLeft, ArrowRight, Zap, ZapOff, Settings, Loader2 } from "lucide-react";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
@@ -3071,11 +3072,16 @@ function ScanPage() {
       const disableWhiten = rawWarpOnly || readFlag("noWhiten");
       const enableInkBoost = !readFlag("noInkBoost"); // default PÅ
       const disableInkBoost = rawWarpOnly || !enableInkBoost;
+      //   enableLocalIllum  → (default AV) lokal ljusutjämning mot veck/skuggor
+      //   noLocalIllum      → nödbroms, tvingar av steget
+      const enableLocalIllum =
+        !rawWarpOnly && !readFlag("noLocalIllum") && readFlag("enableLocalIllum");
       logScanStage("post-warp-flags", {
         rawWarpOnly,
         disableWhiten,
         enableInkBoost,
         disableInkBoost,
+        enableLocalIllum,
       });
 
       // Mild flat-field whitening: shading correction + paper-level white
@@ -3098,6 +3104,31 @@ function ScanPage() {
         } catch (e) {
           console.warn("[scan] grayWorldWhiteBalance failed; continuing", e);
           logScanStage("gray-world-wb", { applied: false, reason: "exception" });
+        }
+        // Lokal ljusutjämning (veck/bucklor) — ligger MELLAN white balance och
+        // whitenBackground och rör inga andra steg. Bakom feature flag.
+        if (!enableLocalIllum) {
+          logScanStage("local-illum", { applied: false, reason: "feature-flag" });
+        } else {
+          try {
+            const beforeContrast = canvasContrast(warped);
+            const beforeSharp = canvasLaplacianVariance(warped);
+            const res = correctLocalIllumination(warped, LOCAL_ILLUM_DEFAULTS);
+            warped = res.canvas;
+            logScanCanvas("after-local-illum", warped, debugEnabled);
+            logScanStage("local-illum", {
+              applied: true,
+              params: LOCAL_ILLUM_DEFAULTS,
+              ...res.stats,
+              contrastBefore: beforeContrast,
+              contrastAfter: canvasContrast(warped),
+              sharpnessBefore: beforeSharp,
+              sharpnessAfter: canvasLaplacianVariance(warped),
+            });
+          } catch (e) {
+            console.warn("[scan] correctLocalIllumination failed; continuing", e);
+            logScanStage("local-illum", { applied: false, reason: "exception" });
+          }
         }
         try {
           warped = whitenBackground(warped);
