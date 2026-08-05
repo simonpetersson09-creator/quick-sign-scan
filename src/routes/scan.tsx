@@ -1089,8 +1089,13 @@ function ScanPage() {
           streamRef.current = null;
           return;
         }
-        setStatus("searching");
-        loop();
+        // Detekteringsloopen startas först när användaren trycker på
+        // "Starta skanning" (se startScanning). Kameran är dock live direkt
+        // så AF/AE hinner konvergera medan användaren riktar in sig.
+        if (scanStartedRef.current) {
+          setStatus("searching");
+          loop();
+        }
       } catch (e) {
         if (isStaleStart()) return;
         console.error(`[scan] camera error: ${(e as Error)?.name ?? "unknown"}`);
