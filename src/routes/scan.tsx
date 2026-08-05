@@ -36,6 +36,7 @@ import {
   estimateFoldProxy,
   LOCAL_ILLUM_DEFAULTS,
 } from "@/lib/localIllum";
+import { adaptiveInkEnhance, ADAPTIVE_INK_DEFAULTS } from "@/lib/adaptiveInk";
 
 /** Under detta värde (min/median i ljusfältet) anses sidan ha veck/skuggor. */
 const FOLD_PROXY_THRESHOLD = 0.93;
