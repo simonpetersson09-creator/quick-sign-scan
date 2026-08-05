@@ -3072,17 +3072,21 @@ function ScanPage() {
       const disableWhiten = rawWarpOnly || readFlag("noWhiten");
       const enableInkBoost = !readFlag("noInkBoost"); // default PÅ
       const disableInkBoost = rawWarpOnly || !enableInkBoost;
-      //   enableLocalIllum  → (default AV) lokal ljusutjämning mot veck/skuggor
+      //   localIllum        → default PÅ men ADAPTIV: körs bara när veckproxyn
+      //                        i proxybilden understiger FOLD_PROXY_THRESHOLD.
+      //   forceLocalIllum   → kör alltid (hoppa över pre-checken)
       //   noLocalIllum      → nödbroms, tvingar av steget
-      const enableLocalIllum =
-        !rawWarpOnly && !readFlag("noLocalIllum") && readFlag("enableLocalIllum");
+      const forceLocalIllum = readFlag("enableLocalIllum") || readFlag("forceLocalIllum");
+      const allowLocalIllum = !rawWarpOnly && !readFlag("noLocalIllum");
       logScanStage("post-warp-flags", {
         rawWarpOnly,
         disableWhiten,
         enableInkBoost,
         disableInkBoost,
-        enableLocalIllum,
+        allowLocalIllum,
+        forceLocalIllum,
       });
+
 
       // Mild flat-field whitening: shading correction + paper-level white
       // point (~250). Text strokes are mathematically protected via the
