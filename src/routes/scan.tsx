@@ -3181,6 +3181,30 @@ function ScanPage() {
           console.warn("[scan] whitenBackground failed; keeping warped frame", e);
           logScanStage("whiten-background", { applied: false, reason: "exception" });
         }
+        // Adaptive Ink Enhancement: mörkar pixlar som är relativt mörkare än
+        // den lokala pappersnivån (svag grå text, 1 px tabellinjer, blyerts,
+        // text nära veck) och lämnar bakgrunden helt orörd. Körs FÖRE
+        // sharpenInk, som fortsätter sköta kantskärpan på mörkt bläck.
+        if (!allowAdaptiveInk) {
+          logScanStage("adaptive-ink", {
+            applied: false,
+            reason: rawWarpOnly ? "raw-warp-only" : "feature-flag",
+          });
+        } else {
+          try {
+            const res = adaptiveInkEnhance(warped, ADAPTIVE_INK_DEFAULTS);
+            warped = res.canvas;
+            logScanCanvas("after-adaptive-ink", warped, debugEnabled);
+            logScanStage("adaptive-ink", {
+              applied: true,
+              params: ADAPTIVE_INK_DEFAULTS,
+              ...res.stats,
+            });
+          } catch (e) {
+            console.warn("[scan] adaptiveInkEnhance failed; continuing", e);
+            logScanStage("adaptive-ink", { applied: false, reason: "exception" });
+          }
+        }
         // Sammanslagen sharpening: ett enda pass (sharpenInk) som ersätter
         // tidigare unsharpMaskText + boostInkContrast. Samma 3x3 Gaussian
         // body men gated till bläckpixlar (L<=150) med amount ≈ 0.45. Undviker
