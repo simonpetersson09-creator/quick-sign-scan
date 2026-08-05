@@ -199,6 +199,10 @@ const STAGNATION_COOLDOWN_MS = 2500;
 // En fri kandidat adopteras bara om den är tydligt bättre än den fastnade.
 const FREE_PASS_ADOPT_AREA_GAIN = 1.06;
 const FREE_PASS_ADOPT_CONF_GAIN = 0.08;
+// …eller om kandidaten ligger på en tydligt ny position och är capture-klar:
+// då är den per definition en bättre beskrivning av scenen än den fastnade
+// quaden, även med likvärdig area/konfidens.
+const FREE_PASS_ADOPT_MOVE = 0.05; // normaliserad centroidförflyttning
 
 
 /** Yta för en quad (shoelace, absolutbelopp). */
