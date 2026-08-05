@@ -334,7 +334,7 @@ function PremiumSection() {
             type="button"
             onClick={restore}
             disabled={busy !== null || unsupported}
-            className="flex-1 rounded-xl bg-background text-foreground border border-border h-10 px-3 transition active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
+            className="flex-1 rounded-xl bg-primary text-primary-foreground h-10 px-3 transition active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {busy === "restore" ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -347,7 +347,7 @@ function PremiumSection() {
         <button
           type="button"
           onClick={openManageSubscriptions}
-          className="flex-1 rounded-xl bg-background text-foreground border border-border h-10 px-3 transition active:scale-[0.98] flex items-center justify-center gap-2"
+          className="flex-1 rounded-xl bg-primary text-primary-foreground h-10 px-3 transition active:scale-[0.98] flex items-center justify-center gap-2"
         >
           <ExternalLink className="h-4 w-4" />
           <span className="text-[13px] font-medium truncate">{t("premium_manage_apple")}</span>
