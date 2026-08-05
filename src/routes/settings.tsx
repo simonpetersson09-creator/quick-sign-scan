@@ -93,8 +93,8 @@ function SettingsPage() {
               value={s.defaultMessage}
               onChange={(e) => update("defaultMessage", e.target.value)}
               placeholder={t("defaultMessageInitial")}
-              rows={6}
-              className="row-input resize-y min-h-[7.5rem]"
+              rows={8}
+              className="row-input resize-y min-h-[10rem]"
             />
           </Row>
         </section>
