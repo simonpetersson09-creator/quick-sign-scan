@@ -1336,7 +1336,9 @@ function ScanPage() {
       detectInFlightRef.current = false;
       // Reclaim the (transferred) pixel buffer for the sharpness pass below.
       if (detectPixelsRef.current) data = detectPixelsRef.current;
-      else if (data.length === 0) data = ctx.getImageData(0, 0, dw, dh).data;
+      else if (data.length === 0)
+        data = ctx.getImageData(0, 0, dw, dh).data as Uint8ClampedArray;
+
       detectPixelsRef.current = null;
     }
 
