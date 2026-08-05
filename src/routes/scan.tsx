@@ -1729,7 +1729,12 @@ function ScanPage() {
 
     // Adaptive smoothing — gentler once locked, so the on-screen polygon
     // barely moves frame-to-frame.
-    const alpha = lockedRef.current ? ALPHA_POST_LOCK : ALPHA_PRE_LOCK;
+    // Tidskompenserad alpha: trösklarna är tunade mot NOMINAL_FRAME_MS, men den
+    // verkliga detect-cadencen är ofta 2–3x långsammare. Utan kompensation blir
+    // följningen en trappa. alpha_eff = 1 - (1 - alpha)^(dt / nominal).
+    const baseAlpha = lockedRef.current ? ALPHA_POST_LOCK : ALPHA_PRE_LOCK;
+    const alphaSteps = Math.min(4, Math.max(0.5, dtMs / NOMINAL_FRAME_MS));
+    const alpha = Math.min(0.85, 1 - Math.pow(1 - baseAlpha, alphaSteps));
     // C: ett fritt pass som INTE adopterades är ett neutralt sökpass — dess
     // kandidat får inte blandas in i EMA, annars drar återhämtningspasset
     // tillbaka spårningen mot den fastnade quaden.
