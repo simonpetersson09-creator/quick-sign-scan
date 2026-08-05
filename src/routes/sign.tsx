@@ -66,29 +66,61 @@ function SignPage() {
 
   function getPoint(e: React.PointerEvent) {
     const rect = canvasRef.current!.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top, t: e.timeStamp || performance.now() };
   }
 
   function start(e: React.PointerEvent) {
     (e.target as Element).setPointerCapture(e.pointerId);
     drawing.current = true;
-    last.current = getPoint(e);
+    const p = getPoint(e);
+    last.current = p;
+    lastMid.current = { x: p.x, y: p.y };
+    // Starta med en medelbred spets och en liten "nedsättningsprick" så att
+    // korta streck och punkter faktiskt syns.
+    lastWidth.current = (PEN_MIN_W + PEN_MAX_W) / 2;
+    const ctx = canvasRef.current!.getContext("2d")!;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, lastWidth.current / 2, 0, Math.PI * 2);
+    ctx.fillStyle = "#000000";
+    ctx.fill();
+    if (!hasInk) setHasInk(true);
   }
+
   function move(e: React.PointerEvent) {
-    if (!drawing.current) return;
+    if (!drawing.current || !last.current || !lastMid.current) return;
     const ctx = canvasRef.current!.getContext("2d")!;
     const p = getPoint(e);
+    const prev = last.current;
+
+    // Hastighet i px/ms → mål-bredd. Snabbt = tunt, långsamt = tjockt.
+    const dt = Math.max(1, p.t - prev.t);
+    const speed = Math.hypot(p.x - prev.x, p.y - prev.y) / dt;
+    const norm = Math.min(1, speed / PEN_VELOCITY_SCALE);
+    const target = PEN_MAX_W - (PEN_MAX_W - PEN_MIN_W) * norm;
+    // Lågpassfiltrera bredden så övergångarna blir mjuka, inte hackiga.
+    const width = lastWidth.current + (target - lastWidth.current) * PEN_SMOOTHING;
+
+    // Kvadratisk kurva via mittpunkter ger en jämn, handskriven linje
+    // istället för synliga raka segment mellan pointer-events.
+    const mid = { x: (prev.x + p.x) / 2, y: (prev.y + p.y) / 2 };
     ctx.beginPath();
-    ctx.moveTo(last.current!.x, last.current!.y);
-    ctx.lineTo(p.x, p.y);
+    ctx.moveTo(lastMid.current.x, lastMid.current.y);
+    ctx.quadraticCurveTo(prev.x, prev.y, mid.x, mid.y);
+    ctx.lineWidth = width;
     ctx.stroke();
+
+    lastMid.current = mid;
+    lastWidth.current = width;
     last.current = p;
     if (!hasInk) setHasInk(true);
   }
+
   function end() {
     drawing.current = false;
     last.current = null;
+    lastMid.current = null;
   }
+
 
   function clear() {
     const c = canvasRef.current!;
