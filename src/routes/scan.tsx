@@ -3152,6 +3152,7 @@ function ScanPage() {
       detectionMeta.current.confidence >= MIN_DOCUMENT_CONFIDENCE &&
       detectCount.current >= DETECT_FRAMES;
     if (hasGoodDetection && q) {
+      setProgress(1);
       setStatus("capturing");
       capture(q, true);
     } else {
