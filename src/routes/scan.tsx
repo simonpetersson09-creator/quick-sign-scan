@@ -2938,6 +2938,42 @@ function ScanPage() {
         });
       }
 
+      // ── Kantsäkerhetsmarginal (0,3 % av dokumentets kortsida) ───────────
+      // Även efter inner-crop kan hörnen ligga precis på papperskantens
+      // gradient, vilket ger en tunn mörk list längs sidan efter warp (den
+      // tolkas sedan som bläck av whitenBackground/adaptiveInk). Vi krymper
+      // därför quaden ytterligare med en fast andel av kortsidan — mätt i
+      // pixlar per hörn så att marginalen blir densamma runt om.
+      // Stäng av med ?edgesafety=0.
+      const EDGE_SAFETY_FRACTION = 0.003;
+      if (urlParams.get("edgesafety") !== "0" && EDGE_SAFETY_FRACTION > 0) {
+        const cx = (warpQuad[0].x + warpQuad[1].x + warpQuad[2].x + warpQuad[3].x) / 4;
+        const cy = (warpQuad[0].y + warpQuad[1].y + warpQuad[2].y + warpQuad[3].y) / 4;
+        const sideLen = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+          Math.hypot(a.x - b.x, a.y - b.y);
+        const shortSide = Math.min(
+          (sideLen(warpQuad[0], warpQuad[1]) + sideLen(warpQuad[3], warpQuad[2])) / 2,
+          (sideLen(warpQuad[0], warpQuad[3]) + sideLen(warpQuad[1], warpQuad[2])) / 2,
+        );
+        const shiftPx = shortSide * EDGE_SAFETY_FRACTION;
+        const before = warpQuad;
+        warpQuad = warpQuad.map((p) => {
+          const dist = Math.hypot(cx - p.x, cy - p.y);
+          if (dist < 1e-6) return p;
+          const k = Math.min(0.5, shiftPx / dist);
+          return { x: p.x + (cx - p.x) * k, y: p.y + (cy - p.y) * k };
+        }) as typeof warpQuad;
+        logScanStage("warp-trace/5c-edge-safety", {
+          fraction: EDGE_SAFETY_FRACTION,
+          shortSidePx: Number(shortSide.toFixed(1)),
+          shiftPx: Number(shiftPx.toFixed(2)),
+          beforePixels: formatQuad(before),
+          afterPixels: formatQuad(warpQuad),
+        });
+      }
+
+
+
 
       // ── Quad equality check ────────────────────────────────────────────
       // preview / capture / warp i samma pixelrymd. Om overlay-ramen låg
