@@ -285,7 +285,7 @@ function PremiumSection() {
             )}
           </div>
         ) : (
-          <div className="flex justify-center">
+          <div className="flex justify-start ml-0.5">
             <span className="inline-flex items-center gap-2 rounded-full bg-card border border-border text-foreground/75 shadow-[var(--shadow-soft)] text-[11px] font-medium pl-2.5 pr-3 py-1">
               <span className="flex items-center gap-[3px]" aria-hidden="true">
                 {Array.from({ length: limit }).map((_, i) => (
