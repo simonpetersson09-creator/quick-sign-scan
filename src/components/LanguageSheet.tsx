@@ -63,8 +63,8 @@ export function LanguageSheet() {
                       <span
                         className={
                           active
-                            ? "flex-1 text-[16px] font-semibold tracking-tight text-foreground"
-                            : "flex-1 text-[16px] font-normal tracking-tight text-foreground/80"
+                            ? "flex-1 text-[16px] font-semibold tracking-tight text-primary"
+                            : "flex-1 text-[16px] font-normal tracking-tight text-primary/80"
                         }
                       >
                         {l.nativeName}
