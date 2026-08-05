@@ -195,7 +195,7 @@ export const fi: Record<string, string> = {
   err_unauthorized: "Sähköpostipalvelua ei ole määritetty oikein. Ota yhteyttä ylläpitäjään.",
   err_unknown: "Sähköpostia ei voitu lähettää. Yritä uudelleen tai napauta ”Lataa PDF” ja lähetä se manuaalisesti.",
   defaultSubjectFallback: "Sign & Go – Skannattu asiakirja",
-  defaultSubjectInitial: "Sign & Go – Skannattu asiakirja",
+  defaultSubjectInitial: "Skannattu asiakirja (Sign & Go)",
   defaultMessageInitial: "Hei,\n\nohessa skannattu asiakirja.\n\nYstävällisin terveisin",
   largePdfWarning: "Huomio: PDF on {mb} Mt. Vastaanottajan palvelin voi estää suuret liitteet – jos lähetys epäonnistuu, käytä ”Lataa PDF” ja lähetä manuaalisesti.",
 

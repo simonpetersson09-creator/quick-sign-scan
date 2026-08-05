@@ -195,7 +195,7 @@ export const de: Record<string, string> = {
   err_unauthorized: "Der E-Mail-Dienst ist nicht korrekt konfiguriert. Wende dich an den Administrator.",
   err_unknown: 'Die E-Mail konnte nicht gesendet werden. Versuche es erneut oder tippe auf „PDF herunterladen“ und sende sie manuell.',
   defaultSubjectFallback: "Sign & Go – Gescanntes Dokument",
-  defaultSubjectInitial: "Sign & Go – Gescanntes Dokument",
+  defaultSubjectInitial: "Gescanntes Dokument (Sign & Go)",
   defaultMessageInitial: "Hallo,\n\nanbei das gescannte Dokument.\n\nFreundliche Grüße",
   largePdfWarning: "Achtung: Das PDF ist {mb} MB groß. Große Anhänge können vom Server des Empfängers blockiert werden – wenn der Versand fehlschlägt, nutze „PDF herunterladen“ und sende es manuell.",
 

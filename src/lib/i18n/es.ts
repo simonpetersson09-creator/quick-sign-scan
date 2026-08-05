@@ -195,7 +195,7 @@ export const es: Record<string, string> = {
   err_unauthorized: "El servicio de correo no está configurado correctamente. Contacta con el administrador.",
   err_unknown: "No se pudo enviar el correo. Inténtalo de nuevo o toca «Descargar PDF» y envíalo manualmente.",
   defaultSubjectFallback: "Sign & Go – Documento escaneado",
-  defaultSubjectInitial: "Sign & Go – Documento escaneado",
+  defaultSubjectInitial: "Documento escaneado (Sign & Go)",
   defaultMessageInitial: "Hola:\n\nAdjunto el documento escaneado.\n\nUn saludo",
   largePdfWarning: "Atención: el PDF ocupa {mb} MB. Los adjuntos grandes pueden ser bloqueados por el servidor del destinatario; si el envío falla, usa «Descargar PDF» y envíalo manualmente.",
 

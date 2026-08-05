@@ -86,6 +86,8 @@ function SendPage() {
         "Scanned document",
         "Sign & Go – Skannat dokument",
         "Sign & Go – Scanned document",
+        "Skannat dokument (Sign & Go)",
+        "Scanned document (Sign & Go)",
       ]),
     [],
   );

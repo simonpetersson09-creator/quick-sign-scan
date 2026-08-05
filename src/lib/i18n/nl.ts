@@ -195,7 +195,7 @@ export const nl: Record<string, string> = {
   err_unauthorized: "De e-maildienst is niet juist geconfigureerd. Neem contact op met de beheerder.",
   err_unknown: "De e-mail kon niet worden verstuurd. Probeer het opnieuw of tik op 'PDF downloaden' en verstuur hem handmatig.",
   defaultSubjectFallback: "Sign & Go – Gescand document",
-  defaultSubjectInitial: "Sign & Go – Gescand document",
+  defaultSubjectInitial: "Gescand document (Sign & Go)",
   defaultMessageInitial: "Hallo,\n\nbijgaand het gescande document.\n\nMet vriendelijke groet",
   largePdfWarning: "Let op: de PDF is {mb} MB. Grote bijlagen kunnen door de server van de ontvanger worden geblokkeerd – als het versturen mislukt, gebruik dan 'PDF downloaden' en verstuur handmatig.",
 

@@ -195,7 +195,7 @@ export const pl: Record<string, string> = {
   err_unauthorized: "Usługa e-mail nie jest poprawnie skonfigurowana. Skontaktuj się z administratorem.",
   err_unknown: "Nie udało się wysłać e-maila. Spróbuj ponownie lub dotknij „Pobierz PDF” i wyślij go ręcznie.",
   defaultSubjectFallback: "Sign & Go – Zeskanowany dokument",
-  defaultSubjectInitial: "Sign & Go – Zeskanowany dokument",
+  defaultSubjectInitial: "Zeskanowany dokument (Sign & Go)",
   defaultMessageInitial: "Dzień dobry,\n\nw załączeniu przesyłam zeskanowany dokument.\n\nZ poważaniem",
   largePdfWarning: "Uwaga: PDF ma {mb} MB. Duże załączniki mogą być blokowane przez serwer odbiorcy — jeśli wysyłka się nie powiedzie, użyj „Pobierz PDF” i wyślij ręcznie.",
 
