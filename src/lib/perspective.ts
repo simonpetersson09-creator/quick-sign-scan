@@ -3668,8 +3668,18 @@ export function whitenBackground(
   // with L <= T_NONE (clearly text) are left exactly as-is; in between we
   // blend smoothly. This is the safety net that guarantees no faint stroke
   // gets bleached.
-  const T_NONE = 128;
-  const T_FULL = 178;
+  //
+  // The thresholds are RELATIVE to the local background estimate (bgVal), not
+  // absolute. With fixed 128/178 a normally exposed indoor capture (paper at
+  // L~160) only received ~64% of the flat-field gain and never reached the
+  // desaturation branch, so the page stayed a warm ~221 grey. Scaling by the
+  // local paper level makes paper (L ~ bgVal) always fully whitened at any
+  // exposure, while ink keeps the same *relative* protection margin.
+  const T_NONE_RATIO = 0.7;
+  const T_FULL_RATIO = 0.9;
+  const clampT = (v: number, lo: number, hi: number) =>
+    v < lo ? lo : v > hi ? hi : v;
+
   for (let y = 0; y < h; y++) {
     const fy = Math.min(sh - 1, y / SCALE);
     const sy0 = Math.floor(fy);
@@ -3696,10 +3706,13 @@ export function whitenBackground(
       const bl = d[i + 2];
       const L = 0.299 * r + 0.587 * g + 0.114 * bl;
       // weight 0 (keep original) for dark pixels, 1 (full whiten) for bright
+      const T_NONE = clampT(bgVal * T_NONE_RATIO, 96, 190);
+      const T_FULL = clampT(bgVal * T_FULL_RATIO, T_NONE + 12, 232);
       let wt: number;
       if (L <= T_NONE) wt = 0;
       else if (L >= T_FULL) wt = 1;
       else wt = (L - T_NONE) / (T_FULL - T_NONE);
+
 
       let nr = r * k;
       let ng = g * k;
