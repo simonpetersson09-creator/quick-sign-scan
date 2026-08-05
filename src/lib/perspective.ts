@@ -3610,7 +3610,13 @@ export function whitenBackground(
   // täta textblock (svenska A4-brev): fönstret nådde aldrig vit marginal
   // och lämnade grå moln formade som styckena. 8% reach ≈ 128 px på en
   // 1654 px bred A4 → täcker ett helt stycke + lite till.
-  const R = Math.max(4, Math.round(Math.max(sw, sh) * 0.08));
+  // When localIllum has already flattened the slow field, a narrower window
+  // (5.5%) lets the flat-field follow the fold-scale residual instead of
+  // stepping over it; the wider bg smoothing below keeps text blocks safe.
+  const R = Math.max(
+    4,
+    Math.round(Math.max(sw, sh) * (options.illumCorrected ? 0.055 : 0.08)),
+  );
   const bgX = new Float32Array(sw * sh);
   for (let y = 0; y < sh; y++) {
     const row = y * sw;
