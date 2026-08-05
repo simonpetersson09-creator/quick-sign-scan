@@ -4,6 +4,8 @@ import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
 import { dataUrlToBlob } from "@/lib/pdf";
+import { signatureBoxFractions } from "@/lib/signature";
+
 import { useT } from "@/lib/i18n";
 import { requestMotionPermissionFromGesture } from "@/lib/motion-permission";
 import {
