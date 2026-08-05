@@ -36,6 +36,7 @@ import {
   estimateFoldProxy,
   LOCAL_ILLUM_DEFAULTS,
 } from "@/lib/localIllum";
+import { adaptiveInkEnhance, ADAPTIVE_INK_DEFAULTS } from "@/lib/adaptiveInk";
 
 /** Under detta värde (min/median i ljusfältet) anses sidan ha veck/skuggor. */
 const FOLD_PROXY_THRESHOLD = 0.93;
@@ -3085,6 +3086,10 @@ function ScanPage() {
       //   noLocalIllum      → nödbroms, tvingar av steget
       const forceLocalIllum = readFlag("enableLocalIllum") || readFlag("forceLocalIllum");
       const allowLocalIllum = !rawWarpOnly && !readFlag("noLocalIllum");
+      //   adaptiveInk       → default PÅ (mörkar sannolikt bläck relativt
+      //                        lokal pappersnivå, rör inte bakgrunden)
+      //   noAdaptiveInk     → nödbroms, tvingar av steget
+      const allowAdaptiveInk = !rawWarpOnly && !readFlag("noAdaptiveInk");
       logScanStage("post-warp-flags", {
         rawWarpOnly,
         disableWhiten,
@@ -3092,6 +3097,7 @@ function ScanPage() {
         disableInkBoost,
         allowLocalIllum,
         forceLocalIllum,
+        allowAdaptiveInk,
       });
 
 
@@ -3174,6 +3180,30 @@ function ScanPage() {
         } catch (e) {
           console.warn("[scan] whitenBackground failed; keeping warped frame", e);
           logScanStage("whiten-background", { applied: false, reason: "exception" });
+        }
+        // Adaptive Ink Enhancement: mörkar pixlar som är relativt mörkare än
+        // den lokala pappersnivån (svag grå text, 1 px tabellinjer, blyerts,
+        // text nära veck) och lämnar bakgrunden helt orörd. Körs FÖRE
+        // sharpenInk, som fortsätter sköta kantskärpan på mörkt bläck.
+        if (!allowAdaptiveInk) {
+          logScanStage("adaptive-ink", {
+            applied: false,
+            reason: rawWarpOnly ? "raw-warp-only" : "feature-flag",
+          });
+        } else {
+          try {
+            const res = adaptiveInkEnhance(warped, ADAPTIVE_INK_DEFAULTS);
+            warped = res.canvas;
+            logScanCanvas("after-adaptive-ink", warped, debugEnabled);
+            logScanStage("adaptive-ink", {
+              applied: true,
+              params: ADAPTIVE_INK_DEFAULTS,
+              ...res.stats,
+            });
+          } catch (e) {
+            console.warn("[scan] adaptiveInkEnhance failed; continuing", e);
+            logScanStage("adaptive-ink", { applied: false, reason: "exception" });
+          }
         }
         // Sammanslagen sharpening: ett enda pass (sharpenInk) som ersätter
         // tidigare unsharpMaskText + boostInkContrast. Samma 3x3 Gaussian
@@ -3341,6 +3371,11 @@ function ScanPage() {
       canvas = whitenBackground(canvas);
     } catch (e) {
       console.warn("[scan] manual fallback: whitenBackground failed", e);
+    }
+    try {
+      canvas = adaptiveInkEnhance(canvas, ADAPTIVE_INK_DEFAULTS).canvas;
+    } catch (e) {
+      console.warn("[scan] manual fallback: adaptiveInkEnhance failed", e);
     }
     try {
       canvas = sharpenInk(canvas, { amount: 0.45, threshold: 4, inkGate: 150 });
