@@ -3742,7 +3742,7 @@ function ScanPage() {
 
 
       {/* Top bar */}
-      <div className="relative pt-safe px-5 flex items-center justify-between">
+      <div className="relative pt-safe px-5 flex items-start justify-between">
         <button
           onClick={cancelScan}
           className="h-10 w-10 rounded-full bg-black/55 backdrop-blur flex items-center justify-center"
@@ -3753,7 +3753,7 @@ function ScanPage() {
         <div
           className={`px-4 py-2 rounded-full text-[13px] font-medium backdrop-blur transition tabular-nums ${
             statusActive ? "bg-success/90 text-success-foreground" : "bg-black/55 text-white"
-          }`}
+          } ${scanStarted ? "opacity-100" : "opacity-0 pointer-events-none"}`}
         >
           {statusText[status]}
           {progress > 0 &&
@@ -3764,22 +3764,49 @@ function ScanPage() {
             )}
         </div>
         {torchAvailable ? (
-          <button
-            onClick={toggleTorch}
-            className={`h-10 w-10 rounded-full backdrop-blur flex items-center justify-center transition ${
-              torchOn ? "bg-yellow-400 text-black" : "bg-black/55 text-white"
-            }`}
-            aria-label={t("aria_torch")}
-            aria-pressed={torchOn}
-          >
-            {torchOn ? <Zap className="h-5 w-5" /> : <ZapOff className="h-5 w-5" />}
-          </button>
+          <div className="relative flex flex-col items-end">
+            <button
+              onClick={toggleTorch}
+              className={`h-10 w-10 rounded-full backdrop-blur flex items-center justify-center transition ${
+                torchOn ? "bg-yellow-400 text-black" : "bg-black/55 text-white"
+              }`}
+              aria-label={t("aria_torch")}
+              aria-pressed={torchOn}
+            >
+              {torchOn ? <Zap className="h-5 w-5" /> : <ZapOff className="h-5 w-5" />}
+            </button>
+            {/* Blixt-tips — visas bara innan skanningen startats, och släcks
+                så snart användaren själv tänt lampan. */}
+            {!scanStarted && !torchOn && (
+              <div
+                className="absolute top-full right-0 mt-2 w-[172px] animate-fade-in"
+                role="note"
+              >
+                <div
+                  className="absolute -top-1 right-[15px] h-2.5 w-2.5 rotate-45 rounded-[2px] bg-black/70 backdrop-blur"
+                  aria-hidden="true"
+                />
+                <div className="relative rounded-xl bg-black/70 backdrop-blur px-3 py-2 shadow-lg ring-1 ring-white/10">
+                  <div className="flex items-center gap-1.5">
+                    <Zap className="h-3.5 w-3.5 text-yellow-400 shrink-0" />
+                    <span className="text-[12px] font-semibold leading-tight">
+                      {t("torchTipTitle")}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-[11px] leading-snug text-white/70">
+                    {t("torchTipBody")}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
         ) : (
           <div className="w-10" />
         )}
       </div>
 
       <div className="flex-1" />
+
 
       {/* Bottom hint / manual capture / page thumbnail */}
       <div className="relative pb-safe px-5 pt-4 flex flex-col items-center gap-3">
