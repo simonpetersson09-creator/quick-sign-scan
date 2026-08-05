@@ -75,20 +75,21 @@ export async function buildPdf(
     pdf.addImage(imageDataUrl, imgFormat, 0, 0, pageW, pageH, undefined, compression);
 
     if (signature && signature.dataUrl && idx === sigPageIndex) {
-      const sigW = 45; // mm
-      const sigH = 18;
+      const sigW = sigBox.w;
+      const sigH = sigBox.h;
       const cx = signature.x * pageW;
       const cy = signature.y * pageH;
       const sigFormat = detectImageFormat(signature.dataUrl);
       pdf.addImage(
         signature.dataUrl,
         sigFormat,
-        Math.max(0, cx - sigW / 2),
-        Math.max(0, cy - sigH / 2),
+        Math.min(pageW - sigW, Math.max(0, cx - sigW / 2)),
+        Math.min(pageH - sigH, Math.max(0, cy - sigH / 2)),
         sigW,
         sigH,
       );
     }
+
   });
 
   const out = pdf.output("datauristring");
