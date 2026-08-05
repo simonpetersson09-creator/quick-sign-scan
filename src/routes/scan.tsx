@@ -2217,29 +2217,29 @@ function ScanPage() {
       trace.setAttribute("points", pts);
     }
 
-    // Soft Genius Scan-style palette — always warm yellow, only intensity
-    // and glow change across phases. Searching = subtle hint, hold = clear
-    // yellow frame, ready = thicker glowing yellow with animated trace.
-    const YELLOW = "rgb(255,193,7)"; // amber — warm, soft
-    const YELLOW_SOFT = "rgb(255,214,90)";
+    // Soft Genius Scan-style palette — fresh green, only intensity and glow
+    // change across phases. Searching = subtle hint, hold = clear green frame,
+    // ready = brighter glowing green with animated trace.
+    const GREEN = "rgb(52,199,89)"; // iOS-grön — klar och lugn
+    const GREEN_SOFT = "rgb(120,222,142)";
 
-    const stroke = phase === "search" ? YELLOW_SOFT : YELLOW;
+    const stroke = phase === "search" ? GREEN_SOFT : GREEN;
     const fill =
       phase === "ready"
-        ? "color-mix(in oklab, rgb(255,193,7) 14%, transparent)"
+        ? "color-mix(in oklab, rgb(52,199,89) 14%, transparent)"
         : phase === "hold"
-          ? "color-mix(in oklab, rgb(255,193,7) 9%, transparent)"
-          : "color-mix(in oklab, rgb(255,214,90) 5%, transparent)";
+          ? "color-mix(in oklab, rgb(52,199,89) 9%, transparent)"
+          : "color-mix(in oklab, rgb(120,222,142) 5%, transparent)";
 
     poly.setAttribute("stroke", stroke);
     poly.setAttribute("fill", fill);
-    poly.setAttribute("stroke-width", phase === "ready" ? "2.25" : phase === "hold" ? "1.75" : "1.25");
+    poly.setAttribute("stroke-width", phase === "ready" ? "1.25" : phase === "hold" ? "0.9" : "0.6");
     poly.style.opacity = phase === "search" ? "0.85" : "1";
 
     if (glow) {
       // Outer halo that pulses softer in search, intensifies on hold/ready.
-      glow.setAttribute("stroke", YELLOW);
-      glow.setAttribute("stroke-width", phase === "ready" ? "7" : phase === "hold" ? "5" : "3");
+      glow.setAttribute("stroke", GREEN);
+      glow.setAttribute("stroke-width", phase === "ready" ? "6" : phase === "hold" ? "4" : "2.5");
       glow.style.opacity =
         phase === "ready" ? "0.45" : phase === "hold" ? "0.28" : "0.15";
     }
@@ -2247,10 +2247,11 @@ function ScanPage() {
     if (trace) {
       // Bright traveling segment along the perimeter when ready — gives the
       // "scanning sweep" feel of Genius Scan.
-      trace.setAttribute("stroke", "rgb(255,224,130)");
-      trace.setAttribute("stroke-width", "2.5");
+      trace.setAttribute("stroke", "rgb(160,255,190)");
+      trace.setAttribute("stroke-width", "1.5");
       trace.style.opacity = phase === "ready" ? "1" : "0";
     }
+
 
     // Hide corner dots entirely — Genius Scan-style frame is corner-free.
     cornerRefs.current.forEach((c) => c && (c.style.opacity = "0"));
