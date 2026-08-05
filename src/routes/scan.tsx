@@ -1638,11 +1638,21 @@ function ScanPage() {
             });
           }
         } else {
-          // mild outlier — keep current smooth, don't add to stability either
+          // Mild outlier. Frys inte ramen helt — det är just den frysningen som
+          // skapar de korta stoppen under inflygningen. Istället kryper den
+          // utjämnade quaden en liten bit mot rå-quaden, så rörelsen blir
+          // kontinuerlig utan att brus slår igenom.
           outlierRejectFramesRef.current++;
-          drawOverlay(previousSmooth, lockedRef.current ? "ready" : "hold");
+          const creepAlpha = Math.min(
+            0.5,
+            OUTLIER_CREEP_ALPHA * Math.max(1, dtMs / NOMINAL_FRAME_MS),
+          );
+          const crept = emaQuad(previousSmooth, norm, creepAlpha);
+          smoothQuad.current = crept;
+          drawOverlay(crept, lockedRef.current ? "ready" : "hold");
           return;
         }
+
       } else {
         outlierRejectFramesRef.current = 0;
       }
