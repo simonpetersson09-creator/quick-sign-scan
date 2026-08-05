@@ -3543,9 +3543,12 @@ function ScanPage() {
           }`}
         >
           {statusText[status]}
-          {progress > 0 && status !== "capturing" && (
-            <span className="ml-2 opacity-80">{Math.round(progress * 100)}%</span>
-          )}
+          {progress > 0 &&
+            (status !== "capturing" || (progress >= 1 && !captureStage)) && (
+              <span className="ml-2 opacity-80">
+                {progress >= 1 ? 100 : Math.min(99, Math.floor(progress * 100))}%
+              </span>
+            )}
         </div>
         {torchAvailable ? (
           <button
