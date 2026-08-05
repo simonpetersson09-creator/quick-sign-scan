@@ -195,7 +195,7 @@ export const fr: Record<string, string> = {
   err_unauthorized: "Le service e-mail n'est pas configuré correctement. Contactez l'administrateur.",
   err_unknown: "Impossible d'envoyer l'e-mail. Réessayez ou appuyez sur « Télécharger le PDF » et envoyez-le manuellement.",
   defaultSubjectFallback: "Sign & Go – Document scanné",
-  defaultSubjectInitial: "Sign & Go – Document scanné",
+  defaultSubjectInitial: "Document scanné (Sign & Go)",
   defaultMessageInitial: "Bonjour,\n\nVeuillez trouver ci-joint le document scanné.\n\nCordialement",
   largePdfWarning: "Attention : le PDF fait {mb} Mo. Les pièces jointes volumineuses peuvent être bloquées par le serveur du destinataire – si l'envoi échoue, utilisez « Télécharger le PDF » et envoyez-le manuellement.",
 

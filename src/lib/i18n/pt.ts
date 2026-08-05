@@ -195,7 +195,7 @@ export const pt: Record<string, string> = {
   err_unauthorized: "O serviço de e-mail não está configurado corretamente. Contacte o administrador.",
   err_unknown: "Não foi possível enviar o e-mail. Tente novamente ou toque em «Transferir PDF» e envie-o manualmente.",
   defaultSubjectFallback: "Sign & Go – Documento digitalizado",
-  defaultSubjectInitial: "Sign & Go – Documento digitalizado",
+  defaultSubjectInitial: "Documento digitalizado (Sign & Go)",
   defaultMessageInitial: "Olá,\n\nsegue em anexo o documento digitalizado.\n\nCom os melhores cumprimentos",
   largePdfWarning: "Atenção: o PDF tem {mb} MB. Anexos grandes podem ser bloqueados pelo servidor do destinatário — se o envio falhar, use «Transferir PDF» e envie manualmente.",
 

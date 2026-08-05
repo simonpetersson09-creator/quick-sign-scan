@@ -195,7 +195,7 @@ export const da: Record<string, string> = {
   err_unauthorized: "E-mailtjenesten er ikke konfigureret korrekt. Kontakt administratoren.",
   err_unknown: "E-mailen kunne ikke sendes. Prøv igen, eller tryk på \u201eDownload PDF\u201c og send den manuelt.",
   defaultSubjectFallback: "Sign & Go – Scannet dokument",
-  defaultSubjectInitial: "Sign & Go – Scannet dokument",
+  defaultSubjectInitial: "Scannet dokument (Sign & Go)",
   defaultMessageInitial: "Hej,\n\nvedhæftet finder du det scannede dokument.\n\nVenlig hilsen",
   largePdfWarning: "Bemærk: PDF'en fylder {mb} MB. Store vedhæftede filer kan blive blokeret af modtagerens server – hvis afsendelsen fejler, brug \u201eDownload PDF\u201c og send manuelt.",
 
