@@ -249,7 +249,7 @@ function PremiumSection() {
             <Crown className="h-4 w-4 text-primary" strokeWidth={1.75} />
           </div>
           <div className="flex flex-col">
-            <span className="text-[13px] font-semibold tracking-tight text-foreground">
+            <span className="text-[13px] font-semibold tracking-tight text-primary">
               {t("premium_status_title")}
             </span>
             <span className="text-[12px] text-muted-foreground">
