@@ -3131,9 +3131,12 @@ function ScanPage() {
           }
         }
         try {
-          warped = whitenBackground(warped);
+          warped = whitenBackground(warped, { illumCorrected: enableLocalIllum });
           logScanCanvas("after-whiten-background", warped, debugEnabled);
-          logScanStage("whiten-background", { applied: true, mode: "flat-field-text-safe" });
+          logScanStage("whiten-background", {
+            applied: true,
+            mode: enableLocalIllum ? "flat-field-illum-corrected" : "flat-field-text-safe",
+          });
         } catch (e) {
           console.warn("[scan] whitenBackground failed; keeping warped frame", e);
           logScanStage("whiten-background", { applied: false, reason: "exception" });

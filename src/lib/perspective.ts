@@ -3557,7 +3557,20 @@ export function snapQuadToPaperEdges(
  *   4. Pure desaturation only on already-bright pixels so paper turns truly
  *      white, while coloured ink/stamps keep their hue.
  */
-export function whitenBackground(canvas: HTMLCanvasElement): HTMLCanvasElement {
+export interface WhitenBackgroundOptions {
+  /**
+   * Set when correctLocalIllumination() already removed the slow illumination
+   * field (folds/shadows). The flat-field estimate is then narrowed so the
+   * remaining fold-scale residual is corrected instead of skipped over, and
+   * the max-filter is slightly gentler to avoid stacking two corrections.
+   */
+  illumCorrected?: boolean;
+}
+
+export function whitenBackground(
+  canvas: HTMLCanvasElement,
+  options: WhitenBackgroundOptions = {},
+): HTMLCanvasElement {
   const w = canvas.width;
   const h = canvas.height;
   const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
@@ -3597,7 +3610,13 @@ export function whitenBackground(canvas: HTMLCanvasElement): HTMLCanvasElement {
   // täta textblock (svenska A4-brev): fönstret nådde aldrig vit marginal
   // och lämnade grå moln formade som styckena. 8% reach ≈ 128 px på en
   // 1654 px bred A4 → täcker ett helt stycke + lite till.
-  const R = Math.max(4, Math.round(Math.max(sw, sh) * 0.08));
+  // When localIllum has already flattened the slow field, a narrower window
+  // (5.5%) lets the flat-field follow the fold-scale residual instead of
+  // stepping over it; the wider bg smoothing below keeps text blocks safe.
+  const R = Math.max(
+    4,
+    Math.round(Math.max(sw, sh) * (options.illumCorrected ? 0.055 : 0.08)),
+  );
   const bgX = new Float32Array(sw * sh);
   for (let y = 0; y < sh; y++) {
     const row = y * sw;
@@ -3625,14 +3644,17 @@ export function whitenBackground(canvas: HTMLCanvasElement): HTMLCanvasElement {
       bg[y * sw + x] = m;
     }
   }
-  // Light 3-tap smoothing on bg to avoid blocky artifacts on upsample.
+  // Light smoothing on bg to avoid blocky artifacts on upsample. With the
+  // narrower max-filter (illumCorrected) we widen the smoothing so dense text
+  // blocks can't imprint themselves as grey clouds in the background estimate.
+  const SM = options.illumCorrected ? 2 : 1;
   const bgS = new Float32Array(sw * sh);
   for (let y = 0; y < sh; y++) {
     for (let x = 0; x < sw; x++) {
       let s = 0;
       let c = 0;
-      for (let yy = Math.max(0, y - 1); yy <= Math.min(sh - 1, y + 1); yy++) {
-        for (let xx = Math.max(0, x - 1); xx <= Math.min(sw - 1, x + 1); xx++) {
+      for (let yy = Math.max(0, y - SM); yy <= Math.min(sh - 1, y + SM); yy++) {
+        for (let xx = Math.max(0, x - SM); xx <= Math.min(sw - 1, x + SM); xx++) {
           s += bg[yy * sw + xx];
           c++;
         }
