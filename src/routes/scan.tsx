@@ -848,6 +848,7 @@ function ScanPage() {
       freePassesLeftRef.current = 0;
       freePassRunRef.current = 0;
       freePassBaselineRef.current = null;
+      convergingFramesRef.current = 0;
 
       recentSmoothQuadsRef.current = [];
       candidateHistoryRef.current = [];
@@ -3342,6 +3343,7 @@ function ScanPage() {
     freePassesLeftRef.current = 0;
     freePassRunRef.current = 0;
     freePassBaselineRef.current = null;
+    convergingFramesRef.current = 0;
 
     blurFramesRef.current = 0;
     captureRetryRef.current = 0;
