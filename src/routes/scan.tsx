@@ -184,6 +184,9 @@ const EXPANSION_INWARD_SLACK = 0.004; // tillåt minimal inåtrörelse per hörn
 // Efter så här många raka förkastade frames släpper vi temporal bias helt så
 // detektorn kan söka fritt igen istället för att fastna i samma felaktiga quad.
 const OUTLIER_BIAS_DECAY_FRAMES = 6;
+// Hur snabbt den utjämnade quaden får "krypa" mot en förkastad rå-quad, så att
+// dödbandet inte fryser ramen helt (per nominell frame).
+const OUTLIER_CREEP_ALPHA = 0.06;
 
 // ===== Stagnationsdetektor =====
 // Läge: samma underkända quad fortsätter vinna utan verklig förbättring.
