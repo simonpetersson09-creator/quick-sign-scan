@@ -224,7 +224,7 @@ export const fi: Record<string, string> = {
 
   // welcome (first launch)
   welcome_title: "Tervetuloa Sign & Go -sovellukseen",
-  welcome_body: "5 ilmaista asiakirjaa sisältyy. Sen jälkeen Sign & Go Premium maksaa 99 SEK/vuosi.",
+  welcome_body: "3 ilmaista asiakirjaa sisältyy. Sen jälkeen Sign & Go Premium maksaa 99 SEK/vuosi.",
   welcome_continue: "Jatka",
 
   // premium / paywall
@@ -267,7 +267,7 @@ export const fi: Record<string, string> = {
   premium_manage_apple: "Hallitse tilausta",
 
   // home banner
-  home_free_remaining: "{remaining}/5 ilmaista asiakirjaa jäljellä",
+  home_free_remaining: "{remaining}/3 ilmaista asiakirjaa jäljellä",
   premium_badge_unlimited: "Rajattomat dokumentit",
   home_premium_badge: "Premium",
 

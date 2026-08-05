@@ -224,7 +224,7 @@ export const no: Record<string, string> = {
 
   // welcome (first launch)
   welcome_title: "Velkommen til Sign & Go",
-  welcome_body: "5 gratis dokumenter er inkludert. Deretter koster Sign & Go Premium 99 SEK/år.",
+  welcome_body: "3 gratis dokumenter er inkludert. Deretter koster Sign & Go Premium 99 SEK/år.",
   welcome_continue: "Fortsett",
 
   // premium / paywall
@@ -267,7 +267,7 @@ export const no: Record<string, string> = {
   premium_manage_apple: "Administrer abonnement",
 
   // home banner
-  home_free_remaining: "{remaining} av 5 gratis dokumenter igjen",
+  home_free_remaining: "{remaining} av 3 gratis dokumenter igjen",
   premium_badge_unlimited: "Ubegrensede dokumenter",
   home_premium_badge: "Premium",
 

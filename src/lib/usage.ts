@@ -14,7 +14,7 @@ import { SecureStoragePlugin } from "capacitor-secure-storage-plugin";
 
 const KEY = "signgo.usage.sent_count.v1";
 
-export const FREE_DOC_LIMIT = 5;
+export const FREE_DOC_LIMIT = 3;
 
 type Listener = (count: number) => void;
 const listeners = new Set<Listener>();

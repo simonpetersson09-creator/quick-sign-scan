@@ -268,7 +268,7 @@ const sv: Dict = {
 
   // welcome (first launch)
   welcome_title: "Välkommen till Sign & Go",
-  welcome_body: "5 kostnadsfria dokument ingår. Därefter kostar Sign & Go Premium 99 kr/år.",
+  welcome_body: "3 kostnadsfria dokument ingår. Därefter kostar Sign & Go Premium 99 kr/år.",
   welcome_continue: "Fortsätt",
 
   // premium / paywall
@@ -311,7 +311,7 @@ const sv: Dict = {
   premium_manage_apple: "Hantera abonnemang",
 
   // home banner
-  home_free_remaining: "{remaining} av 5 gratis dokument kvar",
+  home_free_remaining: "{remaining} av 3 gratis dokument kvar",
   premium_badge_unlimited: "Obegränsade dokument",
   home_premium_badge: "Premium",
 
@@ -564,7 +564,7 @@ const en: Dict = {
 
   // welcome (first launch)
   welcome_title: "Welcome to Sign & Go",
-  welcome_body: "5 free documents included. After that, Sign & Go Premium costs 99 SEK/year.",
+  welcome_body: "3 free documents included. After that, Sign & Go Premium costs 99 SEK/year.",
   welcome_continue: "Continue",
 
   // premium / paywall
@@ -607,7 +607,7 @@ const en: Dict = {
   premium_manage_apple: "Manage subscription",
 
   // home banner
-  home_free_remaining: "{remaining} of 5 free documents left",
+  home_free_remaining: "{remaining} of 3 free documents left",
   premium_badge_unlimited: "Unlimited documents",
   home_premium_badge: "Premium",
 
