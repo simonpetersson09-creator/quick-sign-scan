@@ -2026,6 +2026,7 @@ function ScanPage() {
         if (captureGateRef.current)
           captureGateRef.current.reason = `edge:${reasonNotReady ?? "unknown"}`;
       } else {
+        setProgress(1);
         setStatus("capturing");
         if (captureGateRef.current) captureGateRef.current.reason = null;
         capture(smoothed);
