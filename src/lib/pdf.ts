@@ -1,4 +1,6 @@
 import { jsPDF } from "jspdf";
+import { imageAspect, signatureBoxMm } from "@/lib/signature";
+
 
 function detectImageFormat(dataUrl: string): "PNG" | "JPEG" {
   // dataURL format: "data:image/<type>;base64,..."
