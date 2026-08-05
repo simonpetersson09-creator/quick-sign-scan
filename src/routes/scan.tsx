@@ -2026,6 +2026,7 @@ function ScanPage() {
         if (captureGateRef.current)
           captureGateRef.current.reason = `edge:${reasonNotReady ?? "unknown"}`;
       } else {
+        setProgress(1);
         setStatus("capturing");
         if (captureGateRef.current) captureGateRef.current.reason = null;
         capture(smoothed);
@@ -3151,6 +3152,7 @@ function ScanPage() {
       detectionMeta.current.confidence >= MIN_DOCUMENT_CONFIDENCE &&
       detectCount.current >= DETECT_FRAMES;
     if (hasGoodDetection && q) {
+      setProgress(1);
       setStatus("capturing");
       capture(q, true);
     } else {
@@ -3541,9 +3543,12 @@ function ScanPage() {
           }`}
         >
           {statusText[status]}
-          {progress > 0 && status !== "capturing" && (
-            <span className="ml-2 opacity-80">{Math.round(progress * 100)}%</span>
-          )}
+          {progress > 0 &&
+            (status !== "capturing" || (progress >= 1 && !captureStage)) && (
+              <span className="ml-2 opacity-80">
+                {progress >= 1 ? 100 : Math.min(99, Math.floor(progress * 100))}%
+              </span>
+            )}
         </div>
         {torchAvailable ? (
           <button
