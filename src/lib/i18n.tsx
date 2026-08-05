@@ -329,6 +329,13 @@ const sv: Dict = {
   aria_resetView: "Återställ vy",
   aria_torch: "Ficklampa",
 
+
+  // scan start gate
+  startScanCta: "Starta skanning",
+  startScanHint: "Rikta kameran mot dokumentet och tryck när du är redo.",
+  torchTipTitle: "Blixt rekommenderas",
+  torchTipBody: "Ger jämnare ljus och skarpare text.",
+
 };
 
 const en: Dict = {
@@ -617,6 +624,13 @@ const en: Dict = {
   aria_moveSignature: "Move signature",
   aria_resetView: "Reset view",
   aria_torch: "Flashlight",
+
+
+  // scan start gate
+  startScanCta: "Start scanning",
+  startScanHint: "Point the camera at the document and tap when you're ready.",
+  torchTipTitle: "Flash recommended",
+  torchTipBody: "Gives more even light and sharper text.",
 
 };
 

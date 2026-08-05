@@ -285,4 +285,11 @@ export const fi: Record<string, string> = {
   aria_resetView: "Palauta näkymä",
   aria_torch: "Taskulamppu",
 
+
+  // scan start gate
+  startScanCta: "Aloita skannaus",
+  startScanHint: "Suuntaa kamera asiakirjaan ja napauta, kun olet valmis.",
+  torchTipTitle: "Salamaa suositellaan",
+  torchTipBody: "Antaa tasaisemman valon ja terävämmän tekstin.",
+
 };

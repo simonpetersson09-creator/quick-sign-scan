@@ -285,4 +285,11 @@ export const pt: Record<string, string> = {
   aria_resetView: "Repor vista",
   aria_torch: "Lanterna",
 
+
+  // scan start gate
+  startScanCta: "Iniciar digitalização",
+  startScanHint: "Aponte a câmara para o documento e toque quando estiver pronto.",
+  torchTipTitle: "Flash recomendado",
+  torchTipBody: "Proporciona luz mais uniforme e texto mais nítido.",
+
 };
