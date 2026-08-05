@@ -199,6 +199,10 @@ const STAGNATION_COOLDOWN_MS = 2500;
 // En fri kandidat adopteras bara om den är tydligt bättre än den fastnade.
 const FREE_PASS_ADOPT_AREA_GAIN = 1.06;
 const FREE_PASS_ADOPT_CONF_GAIN = 0.08;
+// …eller om kandidaten ligger på en tydligt ny position och är capture-klar:
+// då är den per definition en bättre beskrivning av scenen än den fastnade
+// quaden, även med likvärdig area/konfidens.
+const FREE_PASS_ADOPT_MOVE = 0.05; // normaliserad centroidförflyttning
 
 
 /** Yta för en quad (shoelace, absolutbelopp). */
@@ -588,7 +592,12 @@ function ScanPage() {
   // Antal återstående helt unbiased detect-pass (0 = normal tracking).
   const freePassesLeftRef = useRef(0);
   const freePassRunRef = useRef(0);
-  const freePassBaselineRef = useRef<{ area: number; conf: number } | null>(null);
+  const freePassBaselineRef = useRef<{
+    area: number;
+    conf: number;
+    cx: number;
+    cy: number;
+  } | null>(null);
 
   const brightnessRef = useRef(255);
   const lowLightFramesRef = useRef(0);
@@ -1537,7 +1546,12 @@ function ScanPage() {
           stagnationSinceRef.current = now;
           freePassesLeftRef.current = STAGNATION_FREE_PASSES;
           freePassRunRef.current = 0;
-          freePassBaselineRef.current = { area: areaNow, conf: detection?.confidence ?? 0 };
+          freePassBaselineRef.current = {
+            area: areaNow,
+            conf: detection?.confidence ?? 0,
+            cx: cxNow,
+            cy: cyNow,
+          };
           // eslint-disable-next-line no-console
           console.log("[scan] stagnation-detected", {
             heldMs,
@@ -1647,17 +1661,24 @@ function ScanPage() {
       }
     }
 
-    // ===== Fritt pass: adoptera bara en tydligt bättre kandidat =====
+    // ===== Fritt pass: adoptera en tydligt bättre ELLER tydligt omplacerad kandidat =====
     let freePassAdopted = false;
+    let freePassReason = "";
     if (freePass) {
       freePassRunRef.current++;
       const baseline = freePassBaselineRef.current;
       const areaNew = quadArea(norm);
       const confNew = detection?.confidence ?? 0;
-      freePassAdopted =
-        !baseline ||
-        areaNew >= baseline.area * FREE_PASS_ADOPT_AREA_GAIN ||
-        confNew >= baseline.conf + FREE_PASS_ADOPT_CONF_GAIN;
+      const cxNew = (norm[0].x + norm[1].x + norm[2].x + norm[3].x) / 4;
+      const cyNew = (norm[0].y + norm[1].y + norm[2].y + norm[3].y) / 4;
+      const moved = baseline ? Math.hypot(cxNew - baseline.cx, cyNew - baseline.cy) : 0;
+      // B: ny position + capture-klar quad räcker, även utan area-/conf-vinst.
+      const relocated = !!baseline && moved >= FREE_PASS_ADOPT_MOVE && readyForCapture;
+      if (!baseline) freePassReason = "no-baseline";
+      else if (areaNew >= baseline.area * FREE_PASS_ADOPT_AREA_GAIN) freePassReason = "area-gain";
+      else if (confNew >= baseline.conf + FREE_PASS_ADOPT_CONF_GAIN) freePassReason = "conf-gain";
+      else if (relocated) freePassReason = "relocated-ready";
+      freePassAdopted = freePassReason !== "";
       const passesRun = freePassRunRef.current;
       const done = freePassesLeftRef.current === 0 || freePassAdopted;
       if (freePassAdopted) {
@@ -1673,6 +1694,9 @@ function ScanPage() {
         pass: passesRun,
         of: STAGNATION_FREE_PASSES,
         adopted: freePassAdopted,
+        adoptReason: freePassReason || null,
+        moved: +moved.toFixed(3),
+        ready: readyForCapture,
         area: +areaNew.toFixed(4),
         baselineArea: baseline ? +baseline.area.toFixed(4) : null,
         conf: +confNew.toFixed(2),
@@ -1693,7 +1717,14 @@ function ScanPage() {
     // Adaptive smoothing — gentler once locked, so the on-screen polygon
     // barely moves frame-to-frame.
     const alpha = lockedRef.current ? ALPHA_POST_LOCK : ALPHA_PRE_LOCK;
-    const smoothed = freePassAdopted ? norm : emaQuad(smoothQuad.current, norm, alpha);
+    // C: ett fritt pass som INTE adopterades är ett neutralt sökpass — dess
+    // kandidat får inte blandas in i EMA, annars drar återhämtningspasset
+    // tillbaka spårningen mot den fastnade quaden.
+    const smoothed = freePassAdopted
+      ? norm
+      : freePass
+        ? (smoothQuad.current ?? norm)
+        : emaQuad(smoothQuad.current, norm, alpha);
     smoothQuad.current = smoothed;
 
     // Push to the voting ring buffer (only the most recent frames count).
