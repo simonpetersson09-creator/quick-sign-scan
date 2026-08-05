@@ -3086,6 +3086,10 @@ function ScanPage() {
       //   noLocalIllum      → nödbroms, tvingar av steget
       const forceLocalIllum = readFlag("enableLocalIllum") || readFlag("forceLocalIllum");
       const allowLocalIllum = !rawWarpOnly && !readFlag("noLocalIllum");
+      //   adaptiveInk       → default PÅ (mörkar sannolikt bläck relativt
+      //                        lokal pappersnivå, rör inte bakgrunden)
+      //   noAdaptiveInk     → nödbroms, tvingar av steget
+      const allowAdaptiveInk = !rawWarpOnly && !readFlag("noAdaptiveInk");
       logScanStage("post-warp-flags", {
         rawWarpOnly,
         disableWhiten,
@@ -3093,6 +3097,7 @@ function ScanPage() {
         disableInkBoost,
         allowLocalIllum,
         forceLocalIllum,
+        allowAdaptiveInk,
       });
 
 
