@@ -31,7 +31,14 @@ import {
   cropToWhiteEdges,
   measureWarpQuadGeometry,
 } from "@/lib/perspective";
-import { correctLocalIllumination, LOCAL_ILLUM_DEFAULTS } from "@/lib/localIllum";
+import {
+  correctLocalIllumination,
+  estimateFoldProxy,
+  LOCAL_ILLUM_DEFAULTS,
+} from "@/lib/localIllum";
+
+/** Under detta värde (min/median i ljusfältet) anses sidan ha veck/skuggor. */
+const FOLD_PROXY_THRESHOLD = 0.93;
 import { useT } from "@/lib/i18n";
 import { Camera, CameraOff, X, RefreshCw, ArrowLeft, ArrowRight, Zap, ZapOff, Settings, Loader2 } from "lucide-react";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
@@ -3072,17 +3079,21 @@ function ScanPage() {
       const disableWhiten = rawWarpOnly || readFlag("noWhiten");
       const enableInkBoost = !readFlag("noInkBoost"); // default PÅ
       const disableInkBoost = rawWarpOnly || !enableInkBoost;
-      //   enableLocalIllum  → (default AV) lokal ljusutjämning mot veck/skuggor
+      //   localIllum        → default PÅ men ADAPTIV: körs bara när veckproxyn
+      //                        i proxybilden understiger FOLD_PROXY_THRESHOLD.
+      //   forceLocalIllum   → kör alltid (hoppa över pre-checken)
       //   noLocalIllum      → nödbroms, tvingar av steget
-      const enableLocalIllum =
-        !rawWarpOnly && !readFlag("noLocalIllum") && readFlag("enableLocalIllum");
+      const forceLocalIllum = readFlag("enableLocalIllum") || readFlag("forceLocalIllum");
+      const allowLocalIllum = !rawWarpOnly && !readFlag("noLocalIllum");
       logScanStage("post-warp-flags", {
         rawWarpOnly,
         disableWhiten,
         enableInkBoost,
         disableInkBoost,
-        enableLocalIllum,
+        allowLocalIllum,
+        forceLocalIllum,
       });
+
 
       // Mild flat-field whitening: shading correction + paper-level white
       // point (~250). Text strokes are mathematically protected via the
@@ -3106,37 +3117,60 @@ function ScanPage() {
           logScanStage("gray-world-wb", { applied: false, reason: "exception" });
         }
         // Lokal ljusutjämning (veck/bucklor) — ligger MELLAN white balance och
-        // whitenBackground och rör inga andra steg. Bakom feature flag.
-        if (!enableLocalIllum) {
+        // whitenBackground och rör inga andra steg. Adaptiv: en billig pre-check
+        // på proxybilden avgör om sidan faktiskt har veck/skuggor.
+        let localIllumApplied = false;
+        if (!allowLocalIllum) {
           logScanStage("local-illum", { applied: false, reason: "feature-flag" });
         } else {
           try {
-            const beforeContrast = canvasContrast(warped);
-            const beforeSharp = canvasLaplacianVariance(warped);
-            const res = correctLocalIllumination(warped, LOCAL_ILLUM_DEFAULTS);
-            warped = res.canvas;
-            logScanCanvas("after-local-illum", warped, debugEnabled);
-            logScanStage("local-illum", {
-              applied: true,
-              params: LOCAL_ILLUM_DEFAULTS,
-              ...res.stats,
-              contrastBefore: beforeContrast,
-              contrastAfter: canvasContrast(warped),
-              sharpnessBefore: beforeSharp,
-              sharpnessAfter: canvasLaplacianVariance(warped),
-            });
+            let runIt = true;
+            let pre: { foldProxy: number; ms: number } | null = null;
+            if (!forceLocalIllum) {
+              pre = estimateFoldProxy(warped, LOCAL_ILLUM_DEFAULTS);
+              runIt = (pre?.foldProxy ?? 0) < FOLD_PROXY_THRESHOLD;
+            }
+            if (!runIt) {
+              logScanStage("local-illum", {
+                applied: false,
+                reason: "flat-page",
+                foldProxy: pre?.foldProxy,
+                threshold: FOLD_PROXY_THRESHOLD,
+                precheckMs: pre?.ms,
+              });
+            } else {
+              const beforeContrast = canvasContrast(warped);
+              const beforeSharp = canvasLaplacianVariance(warped);
+              const res = correctLocalIllumination(warped, LOCAL_ILLUM_DEFAULTS);
+              warped = res.canvas;
+              localIllumApplied = true;
+              logScanCanvas("after-local-illum", warped, debugEnabled);
+              logScanStage("local-illum", {
+                applied: true,
+                forced: forceLocalIllum,
+                threshold: FOLD_PROXY_THRESHOLD,
+                precheckMs: pre?.ms,
+                params: LOCAL_ILLUM_DEFAULTS,
+                ...res.stats,
+                contrastBefore: beforeContrast,
+                contrastAfter: canvasContrast(warped),
+                sharpnessBefore: beforeSharp,
+                sharpnessAfter: canvasLaplacianVariance(warped),
+              });
+            }
           } catch (e) {
             console.warn("[scan] correctLocalIllumination failed; continuing", e);
             logScanStage("local-illum", { applied: false, reason: "exception" });
           }
         }
         try {
-          warped = whitenBackground(warped, { illumCorrected: enableLocalIllum });
+          warped = whitenBackground(warped, { illumCorrected: localIllumApplied });
           logScanCanvas("after-whiten-background", warped, debugEnabled);
           logScanStage("whiten-background", {
             applied: true,
-            mode: enableLocalIllum ? "flat-field-illum-corrected" : "flat-field-text-safe",
+            mode: localIllumApplied ? "flat-field-illum-corrected" : "flat-field-text-safe",
           });
+
         } catch (e) {
           console.warn("[scan] whitenBackground failed; keeping warped frame", e);
           logScanStage("whiten-background", { applied: false, reason: "exception" });

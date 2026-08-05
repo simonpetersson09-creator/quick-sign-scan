@@ -254,3 +254,52 @@ export function correctLocalIllumination(
     },
   };
 }
+
+/**
+ * Cheap pre-check: estimates the fold proxy (min/median of the illumination
+ * map, 1 = perfectly flat) WITHOUT doing any correction. Runs only on the
+ * small proxy, so it costs a fraction of a full correction pass and lets the
+ * caller skip localIllum entirely on flat, evenly lit pages.
+ */
+export function estimateFoldProxy(
+  canvas: HTMLCanvasElement,
+  options: LocalIllumOptions = {},
+): { foldProxy: number; ms: number } {
+  const o = { ...LOCAL_ILLUM_DEFAULTS, ...options };
+  const t0 =
+    typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
+
+  const w = canvas.width;
+  const h = canvas.height;
+  const scale = Math.min(1, o.proxyLongEdge / Math.max(w, h));
+  const pw = Math.max(8, Math.round(w * scale));
+  const ph = Math.max(8, Math.round(h * scale));
+  const proxy = document.createElement("canvas");
+  proxy.width = pw;
+  proxy.height = ph;
+  const pctx = proxy.getContext("2d", { willReadFrequently: true })!;
+  pctx.drawImage(canvas, 0, 0, pw, ph);
+  const pdata = pctx.getImageData(0, 0, pw, ph).data;
+
+  const lum = new Float32Array(pw * ph);
+  for (let i = 0, j = 0; i < pdata.length; i += 4, j++) {
+    lum[j] = 0.299 * pdata[i] + 0.587 * pdata[i + 1] + 0.114 * pdata[i + 2];
+  }
+
+  const paperMedian = medianOf(lum);
+  const inkCut = paperMedian * 0.82;
+  const coarse = boxBlurPlane(lum, pw, ph, Math.max(2, Math.round(Math.max(pw, ph) / 40)));
+  const bg = new Float32Array(pw * ph);
+  for (let i = 0; i < bg.length; i++) {
+    bg[i] = lum[i] < inkCut ? Math.max(lum[i], coarse[i]) : lum[i];
+  }
+
+  const sigma = Math.max(pw, ph) / o.sigmaDivisor;
+  const r = Math.max(1, Math.round(sigma * 0.6));
+  let illum = bg;
+  for (let pass = 0; pass < 3; pass++) illum = boxBlurPlane(illum, pw, ph, r) as typeof illum;
+
+  const t1 =
+    typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
+  return { foldProxy: foldProxy(illum), ms: t1 - t0 };
+}
