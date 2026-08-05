@@ -31,7 +31,14 @@ import {
   cropToWhiteEdges,
   measureWarpQuadGeometry,
 } from "@/lib/perspective";
-import { correctLocalIllumination, LOCAL_ILLUM_DEFAULTS } from "@/lib/localIllum";
+import {
+  correctLocalIllumination,
+  estimateFoldProxy,
+  LOCAL_ILLUM_DEFAULTS,
+} from "@/lib/localIllum";
+
+/** Under detta värde (min/median i ljusfältet) anses sidan ha veck/skuggor. */
+const FOLD_PROXY_THRESHOLD = 0.93;
 import { useT } from "@/lib/i18n";
 import { Camera, CameraOff, X, RefreshCw, ArrowLeft, ArrowRight, Zap, ZapOff, Settings, Loader2 } from "lucide-react";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
@@ -3121,7 +3128,7 @@ function ScanPage() {
             let pre: { foldProxy: number; ms: number } | null = null;
             if (!forceLocalIllum) {
               pre = estimateFoldProxy(warped, LOCAL_ILLUM_DEFAULTS);
-              runIt = pre.foldProxy < FOLD_PROXY_THRESHOLD;
+              runIt = (pre?.foldProxy ?? 0) < FOLD_PROXY_THRESHOLD;
             }
             if (!runIt) {
               logScanStage("local-illum", {
