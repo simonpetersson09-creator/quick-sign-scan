@@ -23,20 +23,13 @@ ctx.onmessage = (event: MessageEvent<DetectRequest>) => {
   const { id, width, height, pixels, prefer, allowOverlay } = event.data;
   try {
     const detection = detectDocumentQuad(pixels, width, height, { prefer, allowOverlay });
-    // Hand the pixel buffer back (zero-copy) so the main thread can reuse it
-    // for sharpness/luminance work instead of re-reading the canvas.
-    ctx.postMessage(
-      {
-        id,
-        ok: true,
-        detection,
-        diagnostics: getLastDetectDiagnostics(),
-        pixels,
-      },
-      [pixels.buffer],
-    );
+    ctx.postMessage({
+      id,
+      ok: true,
+      detection,
+      diagnostics: getLastDetectDiagnostics(),
+    });
   } catch (error) {
     ctx.postMessage({ id, ok: false, error: String(error) });
   }
 };
-

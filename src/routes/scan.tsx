@@ -380,34 +380,21 @@ function ScanPage() {
   // distance, but no photo is taken until quality is good.
   const ENABLE_GENEROUS_OVERLAY = true;
   const lastOverlayLogAtRef = useRef(0);
-  // Throttle detection to ~30 Hz. The heavy pipeline now runs in a worker,
-  // so the main thread can afford a tighter cadence; a single in-flight gate
-  // still guarantees one pass at a time, and a small pool of workers means a
-  // new pass never waits for the previous worker to finish tearing down.
-  const DETECT_INTERVAL_MS = 33;
+  // Throttle detection to ~22 Hz. The full pipeline (Canny + Sobel + snap)
+  // is too heavy to run at 60 fps on mid-range mobile — it starves the UI
+  // thread and the camera's continuous autofocus callback, which actually
+  // makes captures BLURRIER. ~45 ms cadence keeps the polygon feeling live
+  // while giving the GPU/ISP room to breathe.
+  const DETECT_INTERVAL_MS = 45;
   const lastDetectAtRef = useRef(0);
   // ===== Web Worker detection =====
-  const DETECT_WORKER_POOL_SIZE = 2;
-  const detectWorkerPoolRef = useRef<Worker[]>([]);
-  const detectWorkerCursorRef = useRef(0);
+  const detectWorkerRef = useRef<Worker | null>(null);
   const detectWorkerFailedRef = useRef(false);
   const detectInFlightRef = useRef(false);
   const detectReqIdRef = useRef(0);
-  // Pixel buffer handed back by the worker (zero-copy transfer).
-  const detectPixelsRef = useRef<Uint8ClampedArray | null>(null);
   const detectPendingRef = useRef(
-    new Map<
-      number,
-      (
-        value: {
-          detection: DocumentDetection | null;
-          diagnostics: unknown;
-          pixels?: Uint8ClampedArray;
-        } | null,
-      ) => void
-    >(),
+    new Map<number, (value: { detection: DocumentDetection | null; diagnostics: unknown } | null) => void>(),
   );
-
   // ===== Time-based stability =====
   const lastDetectTickAtRef = useRef(0);
   const urlFlagOff = (name: string) => {
@@ -421,64 +408,43 @@ function ScanPage() {
     ENABLE_DETECT_WORKER && typeof Worker !== "undefined" && !urlFlagOff("worker");
   const useTimeStability = ENABLE_TIME_BASED_STABILITY && !urlFlagOff("timestable");
 
-  function handleWorkerMessage(e: MessageEvent) {
-    const { id, ok, detection, diagnostics, pixels } = e.data ?? {};
-    const resolve = detectPendingRef.current.get(id);
-    if (!resolve) return;
-    detectPendingRef.current.delete(id);
-    resolve(ok ? { detection: detection ?? null, diagnostics, pixels } : null);
-  }
-
-  function failWorkerPool() {
-    detectWorkerFailedRef.current = true;
-    for (const resolve of detectPendingRef.current.values()) resolve(null);
-    detectPendingRef.current.clear();
-    for (const w of detectWorkerPoolRef.current) {
-      try {
-        w.terminate();
-      } catch {}
-    }
-    detectWorkerPoolRef.current = [];
-  }
-
-  /** Round-robin over a tiny worker pool so consecutive passes never queue
-   *  behind the same worker's message loop. */
   function getDetectWorker(): Worker | null {
     if (!useDetectWorker || detectWorkerFailedRef.current) return null;
-    const pool = detectWorkerPoolRef.current;
-    if (pool.length < DETECT_WORKER_POOL_SIZE) {
-      try {
-        const w = new Worker(new URL("@/lib/detect.worker.ts", import.meta.url), {
-          type: "module",
-        });
-        w.onmessage = handleWorkerMessage;
-        w.onerror = failWorkerPool;
-        pool.push(w);
-      } catch {
-        if (pool.length === 0) {
-          detectWorkerFailedRef.current = true;
-          return null;
-        }
-      }
+    if (detectWorkerRef.current) return detectWorkerRef.current;
+    try {
+      const w = new Worker(new URL("@/lib/detect.worker.ts", import.meta.url), {
+        type: "module",
+      });
+      w.onmessage = (e: MessageEvent) => {
+        const { id, ok, detection, diagnostics } = e.data ?? {};
+        const resolve = detectPendingRef.current.get(id);
+        if (!resolve) return;
+        detectPendingRef.current.delete(id);
+        resolve(ok ? { detection: detection ?? null, diagnostics } : null);
+      };
+      w.onerror = () => {
+        detectWorkerFailedRef.current = true;
+        for (const resolve of detectPendingRef.current.values()) resolve(null);
+        detectPendingRef.current.clear();
+        try {
+          w.terminate();
+        } catch {}
+        detectWorkerRef.current = null;
+      };
+      detectWorkerRef.current = w;
+      return w;
+    } catch {
+      detectWorkerFailedRef.current = true;
+      return null;
     }
-    if (pool.length === 0) return null;
-    const idx = detectWorkerCursorRef.current % pool.length;
-    detectWorkerCursorRef.current = (detectWorkerCursorRef.current + 1) % pool.length;
-    return pool[idx];
-  }
-
-  /** Spin the pool up ahead of the first frame so pass #1 isn't paying for
-   *  module compilation. */
-  function prewarmDetectWorkers() {
-    for (let i = 0; i < DETECT_WORKER_POOL_SIZE; i++) getDetectWorker();
   }
 
   function terminateDetectWorker() {
-    const pool = detectWorkerPoolRef.current;
-    detectWorkerPoolRef.current = [];
+    const w = detectWorkerRef.current;
+    detectWorkerRef.current = null;
     for (const resolve of detectPendingRef.current.values()) resolve(null);
     detectPendingRef.current.clear();
-    for (const w of pool) {
+    if (w) {
       try {
         w.terminate();
       } catch {}
@@ -486,27 +452,20 @@ function ScanPage() {
   }
 
   /** Run detectDocumentQuad — in the worker when available, otherwise inline
-   *  on the main thread (identical algorithm and result either way).
-   *  On the worker path the pixel buffer is transferred (zero-copy) and
-   *  handed back in `detectPixelsRef` for downstream sharpness work. */
+   *  on the main thread (identical algorithm and result either way). */
   async function runDetectPass(
     pixels: Uint8ClampedArray,
     w: number,
     h: number,
     options: { prefer?: [Point, Point, Point, Point]; allowOverlay?: boolean },
   ): Promise<DocumentDetection | null> {
-    detectPixelsRef.current = null;
     const worker = getDetectWorker();
-    if (!worker) {
-      detectPixelsRef.current = pixels;
-      return detectDocumentQuad(pixels, w, h, options);
-    }
+    if (!worker) return detectDocumentQuad(pixels, w, h, options);
     const id = ++detectReqIdRef.current;
     try {
       const result = await new Promise<{
         detection: DocumentDetection | null;
         diagnostics: unknown;
-        pixels?: Uint8ClampedArray;
       } | null>((resolve) => {
         const timer = window.setTimeout(() => {
           detectPendingRef.current.delete(id);
@@ -516,34 +475,28 @@ function ScanPage() {
           window.clearTimeout(timer);
           resolve(value);
         });
-        // Zero-copy transfer: the worker returns the same buffer when done.
-        worker.postMessage(
-          {
-            id,
-            width: w,
-            height: h,
-            pixels,
-            prefer: options.prefer,
-            allowOverlay: options.allowOverlay,
-          },
-          [pixels.buffer],
-        );
+        // Structured clone (not transfer) — the main thread keeps its own
+        // pixel buffer for sharpness/luminance measurements after the await.
+        worker.postMessage({
+          id,
+          width: w,
+          height: h,
+          pixels,
+          prefer: options.prefer,
+          allowOverlay: options.allowOverlay,
+        });
       });
       if (result) {
         // Mirror the worker's diagnostics into this thread so the existing
         // getLastDetectDiagnostics() consumers behave exactly as before.
         setLastDetectDiagnostics(result.diagnostics as never);
-        detectPixelsRef.current = result.pixels ?? null;
         return result.detection;
       }
     } catch {
-      /* fall through */
+      /* fall through to the synchronous path */
     }
-    // The buffer was transferred away and never came back — treat this pass
-    // as a miss rather than running the algorithm on a detached buffer.
-    return null;
+    return detectDocumentQuad(pixels, w, h, options);
   }
-
 
   const lastRejectLogAtRef = useRef(0);
   const lastAdaptiveLogAtRef = useRef(0);
@@ -1097,9 +1050,7 @@ function ScanPage() {
           return;
         }
         setStatus("searching");
-        prewarmDetectWorkers();
         loop();
-
       } catch (e) {
         if (isStaleStart()) return;
         console.error(`[scan] camera error: ${(e as Error)?.name ?? "unknown"}`);
@@ -1276,7 +1227,7 @@ function ScanPage() {
     }
     const ctx = dc.getContext("2d", { willReadFrequently: true })!;
     ctx.drawImage(video, 0, 0, dw, dh);
-    let data: Uint8ClampedArray = ctx.getImageData(0, 0, dw, dh).data as Uint8ClampedArray;
+    const { data } = ctx.getImageData(0, 0, dw, dh);
 
     // Cheap mean luminance over a center sample — drives the low-light gate.
     let lumSum = 0;
@@ -1336,14 +1287,7 @@ function ScanPage() {
       });
     } finally {
       detectInFlightRef.current = false;
-      // Reclaim the (transferred) pixel buffer for the sharpness pass below.
-      if (detectPixelsRef.current) data = detectPixelsRef.current;
-      else if (data.length === 0)
-        data = ctx.getImageData(0, 0, dw, dh).data as Uint8ClampedArray;
-
-      detectPixelsRef.current = null;
     }
-
 
     // The camera may have been torn down / captured while we awaited.
     if (capturedRef.current || cancelledRef.current) return;
