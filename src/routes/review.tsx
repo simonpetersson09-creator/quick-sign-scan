@@ -4,6 +4,8 @@ import { AppShell } from "@/components/AppShell";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { scanStore } from "@/lib/scanStore";
 import { dataUrlToBlob } from "@/lib/pdf";
+import { signatureBoxFractions } from "@/lib/signature";
+
 import { useT } from "@/lib/i18n";
 import { requestMotionPermissionFromGesture } from "@/lib/motion-permission";
 import {
@@ -68,7 +70,9 @@ function ReviewPage() {
   const [approved, setApproved] = useState(false);
   const [sigPos, setSigPos] = useState<{ x: number; y: number } | null>(null);
   const [sigDataUrl, setSigDataUrl] = useState<string | null>(null);
+  const [sigRatio, setSigRatio] = useState<number | null>(null);
   const [sigPageIndex, setSigPageIndex] = useState<number | null>(null);
+
   const containerRef = useRef<HTMLDivElement | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
 
@@ -413,16 +417,23 @@ function ReviewPage() {
                   style={{
                     left: `${sigPos.x * 100}%`,
                     top: `${sigPos.y * 100}%`,
-                    width: "28%",
+                    width: `${signatureBoxFractions(sigRatio).w * 100}%`,
                     transform: "translate(-50%, -50%)",
                   }}
                 >
                   <img
                     src={sigDataUrl}
                     alt=""
+                    onLoad={(e) => {
+                      const el = e.currentTarget;
+                      if (el.naturalWidth && el.naturalHeight) {
+                        setSigRatio(el.naturalWidth / el.naturalHeight);
+                      }
+                    }}
                     className="block w-full h-auto pointer-events-none"
                     draggable={false}
                   />
+
                 </div>
               )}
             </div>
