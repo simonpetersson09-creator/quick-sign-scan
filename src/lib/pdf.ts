@@ -46,9 +46,15 @@ export async function buildPdf(
       ? signature.pageIndex
       : pages.length - 1;
 
+  // Signaturens storlek räknas ut med bevarat bildförhållande och begränsas
+  // av både maxbredd och maxhöjd på sidan (se src/lib/signature.ts).
+  const sigAspect = signature?.dataUrl ? await imageAspect(signature.dataUrl) : null;
+  const sigBox = signatureBoxMm(sigAspect);
+
   let totalInputBytes = 0;
   pages.forEach((imageDataUrl, idx) => {
     if (idx > 0) pdf.addPage("a4", "portrait");
+
     const imgFormat = detectImageFormat(imageDataUrl);
     const bytes = approxBytes(imageDataUrl);
     totalInputBytes += bytes;
