@@ -678,6 +678,10 @@ function ScanPage() {
   const [error, setError] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<ErrorType | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
+  // Användaren startar skanningen själv — kameran visar live-preview direkt,
+  // men detektering/auto-capture väntar tills "Starta skanning" trycks.
+  const [scanStarted, setScanStarted] = useState(false);
+  const scanStartedRef = useRef(false);
 
   const [pageCount, setPageCount] = useState(() => scanStore.getPages().length);
   const [lastThumbnail, setLastThumbnail] = useState<string | null>(() => {
