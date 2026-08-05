@@ -28,7 +28,7 @@ function Home() {
   const [busy, setBusy] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const premium = usePremium();
-  const { remaining } = useUsage();
+  const { remaining, limit } = useUsage();
   const isPremium = premium.state === "active";
 
   // Play the shimmer once, the first time the badge is shown after purchase.
