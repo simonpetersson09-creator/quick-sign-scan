@@ -206,6 +206,16 @@ const FREE_PASS_ADOPT_CONF_GAIN = 0.08;
 // då är den per definition en bättre beskrivning av scenen än den fastnade
 // quaden, även med likvärdig area/konfidens.
 const FREE_PASS_ADOPT_MOVE = 0.05; // normaliserad centroidförflyttning
+// Ett fritt pass som inte adopteras ska inte frysa targeten helt — låt den
+// krypa en liten bit mot kandidaten så inflygningen förblir kontinuerlig.
+const FREE_PASS_CREEP_ALPHA = 0.1;
+// Under inflygning (quaden rör sig fortfarande tydligt mot dokumentkanten)
+// släpper vi prefer-bias, annars drar detektorn tillbaka mot förra positionen
+// och rörelsen blir stegvis.
+const CONVERGING_DELTA = 0.02;
+const CONVERGING_HOLD_FRAMES = 2;
+
+
 
 
 /** Yta för en quad (shoelace, absolutbelopp). */
