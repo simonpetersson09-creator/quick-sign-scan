@@ -1334,7 +1334,12 @@ function ScanPage() {
       });
     } finally {
       detectInFlightRef.current = false;
+      // Reclaim the (transferred) pixel buffer for the sharpness pass below.
+      if (detectPixelsRef.current) data = detectPixelsRef.current;
+      else if (data.length === 0) data = ctx.getImageData(0, 0, dw, dh).data;
+      detectPixelsRef.current = null;
     }
+
 
     // The camera may have been torn down / captured while we awaited.
     if (capturedRef.current || cancelledRef.current) return;
