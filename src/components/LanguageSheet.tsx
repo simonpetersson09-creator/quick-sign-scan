@@ -55,13 +55,16 @@ export function LanguageSheet() {
                       type="button"
                       onClick={() => pick(l.code)}
                       aria-current={active ? "true" : undefined}
-                      className="flex min-h-[46px] w-full items-center justify-between gap-3 rounded-[14px] px-3.5 text-left transition active:bg-muted/60"
+                      className="flex min-h-[46px] w-full items-center gap-3 rounded-[14px] px-3.5 text-left transition active:bg-muted/60"
                     >
+                      <span aria-hidden="true" className="w-[22px] shrink-0 text-[18px] leading-none">
+                        {l.flag}
+                      </span>
                       <span
                         className={
                           active
-                            ? "text-[16px] font-semibold tracking-tight text-foreground"
-                            : "text-[16px] font-normal tracking-tight text-foreground/80"
+                            ? "flex-1 text-[16px] font-semibold tracking-tight text-foreground"
+                            : "flex-1 text-[16px] font-normal tracking-tight text-foreground/80"
                         }
                       >
                         {l.nativeName}
