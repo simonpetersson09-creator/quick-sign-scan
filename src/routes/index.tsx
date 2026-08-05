@@ -28,7 +28,7 @@ function Home() {
   const [busy, setBusy] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const premium = usePremium();
-  const { remaining } = useUsage();
+  const { remaining, limit } = useUsage();
   const isPremium = premium.state === "active";
 
   // Play the shimmer once, the first time the badge is shown after purchase.
@@ -68,10 +68,10 @@ function Home() {
           </span>
           <Link
             to="/settings"
-            className={`mt-3 inline-flex items-center gap-1.5 rounded-full text-[11px] font-semibold ${
+            className={`mt-3 inline-flex items-center gap-2 rounded-full text-[11px] font-semibold ${
               isPremium
                 ? `badge-premium px-2.5 py-[5px] ${shimmer ? "badge-premium-shimmer" : ""}`
-                : "bg-card border border-border text-foreground/75 shadow-[var(--shadow-soft)] font-medium px-3 py-1"
+                : "bg-card border border-border text-foreground/75 shadow-[var(--shadow-soft)] font-medium pl-2.5 pr-3 py-1"
             }`}
           >
 
@@ -83,9 +83,24 @@ function Home() {
                 </span>
               </>
             ) : (
-              <span>{t("home_free_remaining", { remaining: String(remaining) })}</span>
+              <>
+                <span className="flex items-center gap-[3px]" aria-hidden="true">
+                  {Array.from({ length: limit }).map((_, i) => (
+                    <span
+                      key={i}
+                      className={`h-[6px] w-[6px] rounded-full transition-colors ${
+                        i < remaining ? "bg-primary" : "bg-border"
+                      }`}
+                    />
+                  ))}
+                </span>
+                <span className="text-muted-foreground">
+                  {t("home_free_remaining", { remaining: String(remaining) })}
+                </span>
+              </>
             )}
           </Link>
+
         </div>
 
 
