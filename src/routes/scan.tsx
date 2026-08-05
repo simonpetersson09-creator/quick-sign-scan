@@ -41,7 +41,7 @@ import { adaptiveInkEnhance, ADAPTIVE_INK_DEFAULTS } from "@/lib/adaptiveInk";
 /** Under detta värde (min/median i ljusfältet) anses sidan ha veck/skuggor. */
 const FOLD_PROXY_THRESHOLD = 0.93;
 import { useT } from "@/lib/i18n";
-import { Camera, CameraOff, X, RefreshCw, ArrowLeft, ArrowRight, Zap, ZapOff, Settings, Loader2 } from "lucide-react";
+import { Camera, CameraOff, X, RefreshCw, ArrowLeft, ArrowRight, Zap, ZapOff, Settings, Loader2, ScanLine } from "lucide-react";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { isNative, openNativeSettings } from "@/lib/native-init";
 import {
@@ -678,6 +678,10 @@ function ScanPage() {
   const [error, setError] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<ErrorType | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
+  // Användaren startar skanningen själv — kameran visar live-preview direkt,
+  // men detektering/auto-capture väntar tills "Starta skanning" trycks.
+  const [scanStarted, setScanStarted] = useState(false);
+  const scanStartedRef = useRef(false);
 
   const [pageCount, setPageCount] = useState(() => scanStore.getPages().length);
   const [lastThumbnail, setLastThumbnail] = useState<string | null>(() => {
@@ -1085,8 +1089,13 @@ function ScanPage() {
           streamRef.current = null;
           return;
         }
-        setStatus("searching");
-        loop();
+        // Detekteringsloopen startas först när användaren trycker på
+        // "Starta skanning" (se startScanning). Kameran är dock live direkt
+        // så AF/AE hinner konvergera medan användaren riktar in sig.
+        if (scanStartedRef.current) {
+          setStatus("searching");
+          loop();
+        }
       } catch (e) {
         if (isStaleStart()) return;
         console.error(`[scan] camera error: ${(e as Error)?.name ?? "unknown"}`);
@@ -1230,6 +1239,26 @@ function ScanPage() {
       }
     };
     rafRef.current = requestAnimationFrame(tick);
+  }
+
+  /** Användaren trycker "Starta skanning" — armera warm-up och kör igång
+   *  detekteringsloopen. Idempotent: upprepade tryck gör ingenting. */
+  function startScanning() {
+    if (scanStartedRef.current) return;
+    scanStartedRef.current = true;
+    setScanStarted(true);
+    // Ge AF/AE samma konvergensfönster som vid automatisk start så att
+    // auto-capture inte kan trigga på första suddiga framen.
+    armedAtRef.current = performance.now() + CAMERA_WARMUP_MS;
+    capturedRef.current = false;
+    stableCount.current = 0;
+    captureStableCount.current = 0;
+    lockedRef.current = false;
+    setProgress(0);
+    setStatus("searching");
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = null;
+    loop();
   }
 
   async function detect() {
@@ -3713,7 +3742,7 @@ function ScanPage() {
 
 
       {/* Top bar */}
-      <div className="relative pt-safe px-5 flex items-center justify-between">
+      <div className="relative pt-safe px-5 flex items-start justify-between">
         <button
           onClick={cancelScan}
           className="h-10 w-10 rounded-full bg-black/55 backdrop-blur flex items-center justify-center"
@@ -3724,7 +3753,7 @@ function ScanPage() {
         <div
           className={`px-4 py-2 rounded-full text-[13px] font-medium backdrop-blur transition tabular-nums ${
             statusActive ? "bg-success/90 text-success-foreground" : "bg-black/55 text-white"
-          }`}
+          } ${scanStarted ? "opacity-100" : "opacity-0 pointer-events-none"}`}
         >
           {statusText[status]}
           {progress > 0 &&
@@ -3735,16 +3764,42 @@ function ScanPage() {
             )}
         </div>
         {torchAvailable ? (
-          <button
-            onClick={toggleTorch}
-            className={`h-10 w-10 rounded-full backdrop-blur flex items-center justify-center transition ${
-              torchOn ? "bg-yellow-400 text-black" : "bg-black/55 text-white"
-            }`}
-            aria-label={t("aria_torch")}
-            aria-pressed={torchOn}
-          >
-            {torchOn ? <Zap className="h-5 w-5" /> : <ZapOff className="h-5 w-5" />}
-          </button>
+          <div className="relative flex flex-col items-end">
+            <button
+              onClick={toggleTorch}
+              className={`h-10 w-10 rounded-full backdrop-blur flex items-center justify-center transition ${
+                torchOn ? "bg-yellow-400 text-black" : "bg-black/55 text-white"
+              }`}
+              aria-label={t("aria_torch")}
+              aria-pressed={torchOn}
+            >
+              {torchOn ? <Zap className="h-5 w-5" /> : <ZapOff className="h-5 w-5" />}
+            </button>
+            {/* Blixt-tips — visas bara innan skanningen startats, och släcks
+                så snart användaren själv tänt lampan. */}
+            {!scanStarted && !torchOn && (
+              <div
+                className="absolute top-full right-0 mt-2 w-[172px] animate-fade-in"
+                role="note"
+              >
+                <div
+                  className="absolute -top-1 right-[15px] h-2.5 w-2.5 rotate-45 rounded-[2px] bg-black/70 backdrop-blur"
+                  aria-hidden="true"
+                />
+                <div className="relative rounded-xl bg-black/70 backdrop-blur px-3 py-2 shadow-lg ring-1 ring-white/10">
+                  <div className="flex items-center gap-1.5">
+                    <Zap className="h-3.5 w-3.5 text-yellow-400 shrink-0" />
+                    <span className="text-[12px] font-semibold leading-tight">
+                      {t("torchTipTitle")}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-[11px] leading-snug text-white/70">
+                    {t("torchTipBody")}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
         ) : (
           <div className="w-10" />
         )}
@@ -3752,8 +3807,31 @@ function ScanPage() {
 
       <div className="flex-1" />
 
+
+      {/* Start-läge: användaren väljer själv när skanningen ska börja. */}
+      {!scanStarted && (
+        <div className="relative pb-safe px-5 pt-4 flex flex-col items-center gap-3">
+          <button
+            type="button"
+            onClick={startScanning}
+            disabled={!cameraReady || status === "error"}
+            className="w-full max-w-[280px] rounded-full bg-primary text-primary-foreground h-14 px-6 text-[16px] font-semibold tracking-tight shadow-[0_10px_30px_-10px_rgba(0,0,0,0.7)] active:scale-[0.98] disabled:opacity-40 transition flex items-center justify-center gap-2"
+          >
+            <ScanLine className="h-5 w-5" />
+            {t("startScanCta")}
+          </button>
+          <p className="text-xs text-white/75 text-center max-w-[260px]">
+            {t("startScanHint")}
+          </p>
+        </div>
+      )}
+
       {/* Bottom hint / manual capture / page thumbnail */}
-      <div className="relative pb-safe px-5 pt-4 flex flex-col items-center gap-3">
+      <div
+        className={`relative pb-safe px-5 pt-4 flex flex-col items-center gap-3 ${
+          scanStarted ? "" : "hidden"
+        }`}
+      >
         {error && status !== "error" && (
           <p className="text-center text-sm text-red-200 max-w-xs">{error}</p>
         )}

@@ -285,4 +285,11 @@ export const nl: Record<string, string> = {
   aria_resetView: "Weergave herstellen",
   aria_torch: "Zaklamp",
 
+
+  // scan start gate
+  startScanCta: "Scannen starten",
+  startScanHint: "Richt de camera op het document en tik wanneer je klaar bent.",
+  torchTipTitle: "Flitser aanbevolen",
+  torchTipBody: "Zorgt voor gelijkmatiger licht en scherpere tekst.",
+
 };

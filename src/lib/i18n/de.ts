@@ -285,4 +285,11 @@ export const de: Record<string, string> = {
   aria_resetView: "Ansicht zurücksetzen",
   aria_torch: "Taschenlampe",
 
+
+  // scan start gate
+  startScanCta: "Scan starten",
+  startScanHint: "Richten Sie die Kamera auf das Dokument und tippen Sie, wenn Sie bereit sind.",
+  torchTipTitle: "Blitz empfohlen",
+  torchTipBody: "Sorgt für gleichmäßigeres Licht und schärferen Text.",
+
 };

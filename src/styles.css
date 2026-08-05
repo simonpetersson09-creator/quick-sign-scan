@@ -163,6 +163,16 @@
   to { stroke-dashoffset: -100; }
 }
 
+/* Mjuk inledning för tips-bubblor i kameravyn */
+@keyframes tip-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: tip-fade-in 260ms ease-out both;
+}
+
 /* Shared premium (gold) surfaces — used by every premium CTA/badge */
 .btn-premium {
   position: relative;

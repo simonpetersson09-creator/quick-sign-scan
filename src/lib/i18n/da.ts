@@ -285,4 +285,11 @@ export const da: Record<string, string> = {
   aria_resetView: "Nulstil visning",
   aria_torch: "Lommelygte",
 
+
+  // scan start gate
+  startScanCta: "Start scanning",
+  startScanHint: "Ret kameraet mod dokumentet, og tryk, når du er klar.",
+  torchTipTitle: "Blitz anbefales",
+  torchTipBody: "Giver mere ensartet lys og skarpere tekst.",
+
 };
