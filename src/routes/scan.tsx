@@ -602,6 +602,10 @@ function ScanPage() {
   } | null>(null);
   const stagnationSinceRef = useRef(0);
   const lastStagnationAtRef = useRef(0);
+  // Räknare för "inflygning": hur många raka pass rå-quaden fortfarande rört
+  // sig tydligt. > 0 ⇒ släpp prefer-bias.
+  const convergingFramesRef = useRef(0);
+
   // Antal återstående helt unbiased detect-pass (0 = normal tracking).
   const freePassesLeftRef = useRef(0);
   const freePassRunRef = useRef(0);
