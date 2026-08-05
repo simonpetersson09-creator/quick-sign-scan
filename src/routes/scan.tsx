@@ -1717,7 +1717,14 @@ function ScanPage() {
     // Adaptive smoothing — gentler once locked, so the on-screen polygon
     // barely moves frame-to-frame.
     const alpha = lockedRef.current ? ALPHA_POST_LOCK : ALPHA_PRE_LOCK;
-    const smoothed = freePassAdopted ? norm : emaQuad(smoothQuad.current, norm, alpha);
+    // C: ett fritt pass som INTE adopterades är ett neutralt sökpass — dess
+    // kandidat får inte blandas in i EMA, annars drar återhämtningspasset
+    // tillbaka spårningen mot den fastnade quaden.
+    const smoothed = freePassAdopted
+      ? norm
+      : freePass
+        ? (smoothQuad.current ?? norm)
+        : emaQuad(smoothQuad.current, norm, alpha);
     smoothQuad.current = smoothed;
 
     // Push to the voting ring buffer (only the most recent frames count).
