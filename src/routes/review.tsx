@@ -68,7 +68,9 @@ function ReviewPage() {
   const [approved, setApproved] = useState(false);
   const [sigPos, setSigPos] = useState<{ x: number; y: number } | null>(null);
   const [sigDataUrl, setSigDataUrl] = useState<string | null>(null);
+  const [sigRatio, setSigRatio] = useState<number | null>(null);
   const [sigPageIndex, setSigPageIndex] = useState<number | null>(null);
+
   const containerRef = useRef<HTMLDivElement | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
 
