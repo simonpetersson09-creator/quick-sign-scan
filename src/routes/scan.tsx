@@ -1274,7 +1274,7 @@ function ScanPage() {
     }
     const ctx = dc.getContext("2d", { willReadFrequently: true })!;
     ctx.drawImage(video, 0, 0, dw, dh);
-    const { data } = ctx.getImageData(0, 0, dw, dh);
+    let data = ctx.getImageData(0, 0, dw, dh).data;
 
     // Cheap mean luminance over a center sample — drives the low-light gate.
     let lumSum = 0;
