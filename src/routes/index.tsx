@@ -60,10 +60,10 @@ function Home() {
       <div className="flex-1 flex flex-col items-center justify-center gap-8">
         {/* Title */}
         <div className="flex flex-col items-center">
-          <h1 className="text-[32px] leading-none font-semibold tracking-tight text-center text-primary">
+          <h1 className="text-[42px] leading-none font-semibold tracking-tight text-center text-primary">
             Sign <span className="text-primary/50 font-light">&</span> Go
           </h1>
-          <span className="text-[13px] text-primary/50 font-light tracking-tight self-end mt-0.5">
+          <span className="text-[14px] text-primary/50 font-light tracking-tight self-end mt-1">
             By SSPP
           </span>
           <Link
