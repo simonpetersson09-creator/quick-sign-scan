@@ -59,7 +59,7 @@ export interface AdaptiveInkResult {
 }
 
 export const ADAPTIVE_INK_DEFAULTS: Required<AdaptiveInkOptions> = {
-  strength: 0.55,
+  strength: 0.40,
   relDark: 0.965,
   knee: 0.8,
   proxyLongEdge: 320,
