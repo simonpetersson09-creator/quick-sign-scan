@@ -206,6 +206,16 @@ const FREE_PASS_ADOPT_CONF_GAIN = 0.08;
 // då är den per definition en bättre beskrivning av scenen än den fastnade
 // quaden, även med likvärdig area/konfidens.
 const FREE_PASS_ADOPT_MOVE = 0.05; // normaliserad centroidförflyttning
+// Ett fritt pass som inte adopteras ska inte frysa targeten helt — låt den
+// krypa en liten bit mot kandidaten så inflygningen förblir kontinuerlig.
+const FREE_PASS_CREEP_ALPHA = 0.1;
+// Under inflygning (quaden rör sig fortfarande tydligt mot dokumentkanten)
+// släpper vi prefer-bias, annars drar detektorn tillbaka mot förra positionen
+// och rörelsen blir stegvis.
+const CONVERGING_DELTA = 0.02;
+const CONVERGING_HOLD_FRAMES = 2;
+
+
 
 
 /** Yta för en quad (shoelace, absolutbelopp). */
@@ -592,6 +602,10 @@ function ScanPage() {
   } | null>(null);
   const stagnationSinceRef = useRef(0);
   const lastStagnationAtRef = useRef(0);
+  // Räknare för "inflygning": hur många raka pass rå-quaden fortfarande rört
+  // sig tydligt. > 0 ⇒ släpp prefer-bias.
+  const convergingFramesRef = useRef(0);
+
   // Antal återstående helt unbiased detect-pass (0 = normal tracking).
   const freePassesLeftRef = useRef(0);
   const freePassRunRef = useRef(0);
@@ -834,6 +848,7 @@ function ScanPage() {
       freePassesLeftRef.current = 0;
       freePassRunRef.current = 0;
       freePassBaselineRef.current = null;
+      convergingFramesRef.current = 0;
 
       recentSmoothQuadsRef.current = [];
       candidateHistoryRef.current = [];
@@ -1286,10 +1301,14 @@ function ScanPage() {
     // en bättre kandidat än den som fastnat.
     const freePass = freePassesLeftRef.current > 0;
     if (freePass) freePassesLeftRef.current--;
+    // Under inflygning (ej låst och quaden rör sig fortfarande tydligt) körs
+    // detektorn utan prefer-bias, så den inte dras tillbaka mot förra läget.
+    const converging = !lockedRef.current && convergingFramesRef.current > 0;
     const preferQuad =
-      !freePass && prevSmooth && prevConfidentEnough && !biasDecayed
+      !freePass && !converging && prevSmooth && prevConfidentEnough && !biasDecayed
         ? (prevSmooth.map((p) => ({ x: p.x * dw, y: p.y * dh })) as [Point, Point, Point, Point])
         : undefined;
+
     let detection: DocumentDetection | null;
     detectInFlightRef.current = true;
     try {
@@ -1631,6 +1650,13 @@ function ScanPage() {
     // just den bättre kandidat som passet är till för att hitta.
     if (previousSmooth && !freePass) {
       rawDeltaFromSmooth = maxCornerDelta(norm, previousSmooth);
+      // Håll koll på inflygning: rör sig rå-quaden fortfarande tydligt mot
+      // dokumentkanten låter vi detektorn söka fritt några pass till.
+      convergingFramesRef.current =
+        rawDeltaFromSmooth >= CONVERGING_DELTA
+          ? CONVERGING_HOLD_FRAMES
+          : Math.max(0, convergingFramesRef.current - 1);
+
       if (rawDeltaFromSmooth > OUTLIER_DELTA && rawDeltaFromSmooth < LOCK_BREAK_DELTA) {
         if (isOutwardExpansion(norm, previousSmooth, detection?.confidence ?? 0)) {
           outlierRejectFramesRef.current = 0;
@@ -1736,13 +1762,18 @@ function ScanPage() {
     const alphaSteps = Math.min(4, Math.max(0.5, dtMs / NOMINAL_FRAME_MS));
     const alpha = Math.min(0.85, 1 - Math.pow(1 - baseAlpha, alphaSteps));
     // C: ett fritt pass som INTE adopterades är ett neutralt sökpass — dess
-    // kandidat får inte blandas in i EMA, annars drar återhämtningspasset
-    // tillbaka spårningen mot den fastnade quaden.
+    // kandidat får inte styra spårningen, men targeten fryses inte heller helt:
+    // den kryper en liten bit mot kandidaten så rörelsen förblir kontinuerlig.
+    const freePassCreepAlpha = Math.min(
+      0.4,
+      FREE_PASS_CREEP_ALPHA * Math.max(1, dtMs / NOMINAL_FRAME_MS),
+    );
     const smoothed = freePassAdopted
       ? norm
       : freePass
-        ? (smoothQuad.current ?? norm)
+        ? emaQuad(smoothQuad.current, norm, freePassCreepAlpha)
         : emaQuad(smoothQuad.current, norm, alpha);
+
     smoothQuad.current = smoothed;
 
     // Push to the voting ring buffer (only the most recent frames count).
@@ -3312,6 +3343,7 @@ function ScanPage() {
     freePassesLeftRef.current = 0;
     freePassRunRef.current = 0;
     freePassBaselineRef.current = null;
+    convergingFramesRef.current = 0;
 
     blurFramesRef.current = 0;
     captureRetryRef.current = 0;
