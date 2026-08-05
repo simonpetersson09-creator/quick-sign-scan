@@ -184,6 +184,9 @@ const EXPANSION_INWARD_SLACK = 0.004; // tillåt minimal inåtrörelse per hörn
 // Efter så här många raka förkastade frames släpper vi temporal bias helt så
 // detektorn kan söka fritt igen istället för att fastna i samma felaktiga quad.
 const OUTLIER_BIAS_DECAY_FRAMES = 6;
+// Hur snabbt den utjämnade quaden får "krypa" mot en förkastad rå-quad, så att
+// dödbandet inte fryser ramen helt (per nominell frame).
+const OUTLIER_CREEP_ALPHA = 0.06;
 
 // ===== Stagnationsdetektor =====
 // Läge: samma underkända quad fortsätter vinna utan verklig förbättring.
@@ -1638,11 +1641,21 @@ function ScanPage() {
             });
           }
         } else {
-          // mild outlier — keep current smooth, don't add to stability either
+          // Mild outlier. Frys inte ramen helt — det är just den frysningen som
+          // skapar de korta stoppen under inflygningen. Istället kryper den
+          // utjämnade quaden en liten bit mot rå-quaden, så rörelsen blir
+          // kontinuerlig utan att brus slår igenom.
           outlierRejectFramesRef.current++;
-          drawOverlay(previousSmooth, lockedRef.current ? "ready" : "hold");
+          const creepAlpha = Math.min(
+            0.5,
+            OUTLIER_CREEP_ALPHA * Math.max(1, dtMs / NOMINAL_FRAME_MS),
+          );
+          const crept = emaQuad(previousSmooth, norm, creepAlpha);
+          smoothQuad.current = crept;
+          drawOverlay(crept, lockedRef.current ? "ready" : "hold");
           return;
         }
+
       } else {
         outlierRejectFramesRef.current = 0;
       }
@@ -1716,7 +1729,12 @@ function ScanPage() {
 
     // Adaptive smoothing — gentler once locked, so the on-screen polygon
     // barely moves frame-to-frame.
-    const alpha = lockedRef.current ? ALPHA_POST_LOCK : ALPHA_PRE_LOCK;
+    // Tidskompenserad alpha: trösklarna är tunade mot NOMINAL_FRAME_MS, men den
+    // verkliga detect-cadencen är ofta 2–3x långsammare. Utan kompensation blir
+    // följningen en trappa. alpha_eff = 1 - (1 - alpha)^(dt / nominal).
+    const baseAlpha = lockedRef.current ? ALPHA_POST_LOCK : ALPHA_PRE_LOCK;
+    const alphaSteps = Math.min(4, Math.max(0.5, dtMs / NOMINAL_FRAME_MS));
+    const alpha = Math.min(0.85, 1 - Math.pow(1 - baseAlpha, alphaSteps));
     // C: ett fritt pass som INTE adopterades är ett neutralt sökpass — dess
     // kandidat får inte blandas in i EMA, annars drar återhämtningspasset
     // tillbaka spårningen mot den fastnade quaden.
