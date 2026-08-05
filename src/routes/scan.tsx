@@ -3617,7 +3617,7 @@ function ScanPage() {
                 cy="40"
                 r="36"
                 fill="none"
-                stroke="rgb(255,193,7)"
+                stroke="rgb(52,199,89)"
                 strokeWidth="3"
                 strokeLinecap="round"
                 strokeDasharray={2 * Math.PI * 36}
