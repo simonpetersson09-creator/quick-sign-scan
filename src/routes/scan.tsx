@@ -1097,7 +1097,9 @@ function ScanPage() {
           return;
         }
         setStatus("searching");
+        prewarmDetectWorkers();
         loop();
+
       } catch (e) {
         if (isStaleStart()) return;
         console.error(`[scan] camera error: ${(e as Error)?.name ?? "unknown"}`);
