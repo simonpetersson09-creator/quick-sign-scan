@@ -1170,6 +1170,11 @@ function ScanPage() {
       cancelledRef.current = true;
       capturedRef.current = true; // stop RAF loop
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (overlayRafRef.current) {
+        cancelAnimationFrame(overlayRafRef.current);
+        overlayRafRef.current = null;
+      }
+
       stopCamera("scan-unmount");
       terminateDetectWorker();
       window.removeEventListener("devicemotion", onMotion);
