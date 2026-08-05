@@ -1241,6 +1241,26 @@ function ScanPage() {
     rafRef.current = requestAnimationFrame(tick);
   }
 
+  /** Användaren trycker "Starta skanning" — armera warm-up och kör igång
+   *  detekteringsloopen. Idempotent: upprepade tryck gör ingenting. */
+  function startScanning() {
+    if (scanStartedRef.current) return;
+    scanStartedRef.current = true;
+    setScanStarted(true);
+    // Ge AF/AE samma konvergensfönster som vid automatisk start så att
+    // auto-capture inte kan trigga på första suddiga framen.
+    armedAtRef.current = performance.now() + CAMERA_WARMUP_MS;
+    capturedRef.current = false;
+    stableCount.current = 0;
+    captureStableCount.current = 0;
+    lockedRef.current = false;
+    setProgress(0);
+    setStatus("searching");
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = null;
+    loop();
+  }
+
   async function detect() {
     if (capturedRef.current) return;
     // A pass is already awaiting the worker — skip this tick instead of
