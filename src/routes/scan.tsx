@@ -1542,7 +1542,12 @@ function ScanPage() {
           stagnationSinceRef.current = now;
           freePassesLeftRef.current = STAGNATION_FREE_PASSES;
           freePassRunRef.current = 0;
-          freePassBaselineRef.current = { area: areaNow, conf: detection?.confidence ?? 0 };
+          freePassBaselineRef.current = {
+            area: areaNow,
+            conf: detection?.confidence ?? 0,
+            cx: cxNow,
+            cy: cyNow,
+          };
           // eslint-disable-next-line no-console
           console.log("[scan] stagnation-detected", {
             heldMs,
