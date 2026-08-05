@@ -161,7 +161,7 @@ export function correctLocalIllumination(
   const sigma = Math.max(pw, ph) / o.sigmaDivisor;
   const r = Math.max(1, Math.round(sigma * 0.6));
   let illum = bg;
-  for (let pass = 0; pass < 3; pass++) illum = boxBlurPlane(illum, pw, ph, r);
+  for (let pass = 0; pass < 3; pass++) illum = boxBlurPlane(illum, pw, ph, r) as typeof illum;
 
   const target = medianOf(illum);
   const foldProxyBefore = foldProxy(illum);
@@ -231,7 +231,7 @@ export function correctLocalIllumination(
     abg[i] = alum[i] < paperMedian * 0.82 ? Math.max(alum[i], acoarse[i]) : alum[i];
   }
   let aillum = abg;
-  for (let pass = 0; pass < 3; pass++) aillum = boxBlurPlane(aillum, pw, ph, r);
+  for (let pass = 0; pass < 3; pass++) aillum = boxBlurPlane(aillum, pw, ph, r) as typeof aillum;
   const foldProxyAfter = foldProxy(aillum);
 
   const t1 =
