@@ -249,7 +249,7 @@ function PremiumSection() {
             <Crown className="h-4 w-4 text-primary" strokeWidth={1.75} />
           </div>
           <div className="flex flex-col">
-            <span className="text-[13px] font-semibold tracking-tight text-foreground">
+            <span className="text-[13px] font-semibold tracking-tight text-primary">
               {t("premium_status_title")}
             </span>
             <span className="text-[12px] text-muted-foreground">
@@ -272,9 +272,9 @@ function PremiumSection() {
       </div>
 
 
-      <div className="text-[12px] text-muted-foreground ml-0.5">
+      <div className="text-[12px] text-muted-foreground">
         {isActive ? (
-          <>
+          <div className="ml-0.5">
             <div>{t("premium_unlimited")}</div>
             {status.state === "active" && status.expiryDate && (
               <div className="mt-0.5">
@@ -283,13 +283,24 @@ function PremiumSection() {
                   : t("premium_status_expires", { date: formatDate(status.expiryDate) })}
               </div>
             )}
-          </>
+          </div>
         ) : (
-          <div>
-            {t("premium_free_remaining", {
-              remaining: String(remaining),
-              limit: String(limit),
-            })}
+          <div className="flex justify-center">
+            <span className="inline-flex items-center gap-2 rounded-full bg-card border border-border text-foreground/75 shadow-[var(--shadow-soft)] text-[11px] font-medium pl-2.5 pr-3 py-1">
+              <span className="flex items-center gap-[3px]" aria-hidden="true">
+                {Array.from({ length: limit }).map((_, i) => (
+                  <span
+                    key={i}
+                    className={`h-[6px] w-[6px] rounded-full transition-colors ${
+                      i < remaining ? "bg-primary" : "bg-border"
+                    }`}
+                  />
+                ))}
+              </span>
+              <span className="text-muted-foreground">
+                {t("home_free_remaining", { remaining: String(remaining) })}
+              </span>
+            </span>
           </div>
         )}
       </div>
