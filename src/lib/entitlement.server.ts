@@ -8,7 +8,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { verifyAppleSignedTransaction } from "./apple-transaction.server";
 
 export const PREMIUM_PRODUCT_ID = "com.sspp.signandgo.premium.yearly";
-export const FREE_DOC_LIMIT = 5;
+export const FREE_DOC_LIMIT = 3;
 
 export type EntitlementRow = {
   device_id: string;
