@@ -380,21 +380,34 @@ function ScanPage() {
   // distance, but no photo is taken until quality is good.
   const ENABLE_GENEROUS_OVERLAY = true;
   const lastOverlayLogAtRef = useRef(0);
-  // Throttle detection to ~22 Hz. The full pipeline (Canny + Sobel + snap)
-  // is too heavy to run at 60 fps on mid-range mobile — it starves the UI
-  // thread and the camera's continuous autofocus callback, which actually
-  // makes captures BLURRIER. ~45 ms cadence keeps the polygon feeling live
-  // while giving the GPU/ISP room to breathe.
-  const DETECT_INTERVAL_MS = 45;
+  // Throttle detection to ~30 Hz. The heavy pipeline now runs in a worker,
+  // so the main thread can afford a tighter cadence; a single in-flight gate
+  // still guarantees one pass at a time, and a small pool of workers means a
+  // new pass never waits for the previous worker to finish tearing down.
+  const DETECT_INTERVAL_MS = 33;
   const lastDetectAtRef = useRef(0);
   // ===== Web Worker detection =====
-  const detectWorkerRef = useRef<Worker | null>(null);
+  const DETECT_WORKER_POOL_SIZE = 2;
+  const detectWorkerPoolRef = useRef<Worker[]>([]);
+  const detectWorkerCursorRef = useRef(0);
   const detectWorkerFailedRef = useRef(false);
   const detectInFlightRef = useRef(false);
   const detectReqIdRef = useRef(0);
+  // Pixel buffer handed back by the worker (zero-copy transfer).
+  const detectPixelsRef = useRef<Uint8ClampedArray | null>(null);
   const detectPendingRef = useRef(
-    new Map<number, (value: { detection: DocumentDetection | null; diagnostics: unknown } | null) => void>(),
+    new Map<
+      number,
+      (
+        value: {
+          detection: DocumentDetection | null;
+          diagnostics: unknown;
+          pixels?: Uint8ClampedArray;
+        } | null,
+      ) => void
+    >(),
   );
+
   // ===== Time-based stability =====
   const lastDetectTickAtRef = useRef(0);
   const urlFlagOff = (name: string) => {
