@@ -151,19 +151,19 @@ function SettingsPage() {
       </div>
 
       <style>{`
-        .input {
+        .row-input {
           width: 100%;
-          background: var(--card);
-          border: 1px solid var(--border);
-          border-radius: 14px;
-          padding: 14px 16px;
-          font-size: 16px;
+          background: transparent;
+          border: none;
+          padding: 0;
+          font-size: 15px;
+          line-height: 1.35;
           color: var(--foreground);
           outline: none;
-          transition: border-color 150ms;
         }
-        .input:focus { border-color: var(--primary); }
+        .row-input::placeholder { color: var(--muted-foreground); }
       `}</style>
+
     </AppShell>
   );
 }
