@@ -354,7 +354,7 @@ function PremiumSection() {
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block px-4 py-2.5 focus-within:bg-secondary/30 transition-colors">
-      <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+      <span className="text-[11px] font-medium text-primary uppercase tracking-wide">
         {label}
       </span>
       <div className="mt-1">{children}</div>
