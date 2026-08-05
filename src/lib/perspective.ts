@@ -3644,14 +3644,17 @@ export function whitenBackground(
       bg[y * sw + x] = m;
     }
   }
-  // Light 3-tap smoothing on bg to avoid blocky artifacts on upsample.
+  // Light smoothing on bg to avoid blocky artifacts on upsample. With the
+  // narrower max-filter (illumCorrected) we widen the smoothing so dense text
+  // blocks can't imprint themselves as grey clouds in the background estimate.
+  const SM = options.illumCorrected ? 2 : 1;
   const bgS = new Float32Array(sw * sh);
   for (let y = 0; y < sh; y++) {
     for (let x = 0; x < sw; x++) {
       let s = 0;
       let c = 0;
-      for (let yy = Math.max(0, y - 1); yy <= Math.min(sh - 1, y + 1); yy++) {
-        for (let xx = Math.max(0, x - 1); xx <= Math.min(sw - 1, x + 1); xx++) {
+      for (let yy = Math.max(0, y - SM); yy <= Math.min(sh - 1, y + SM); yy++) {
+        for (let xx = Math.max(0, x - SM); xx <= Math.min(sw - 1, x + SM); xx++) {
           s += bg[yy * sw + xx];
           c++;
         }
