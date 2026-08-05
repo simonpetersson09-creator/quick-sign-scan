@@ -359,7 +359,7 @@ function ReviewPage() {
               type="button"
               onClick={() => setPageIdx((i) => Math.max(0, i - 1))}
               disabled={pageIdx === 0}
-              aria-label="Föregående sida"
+              aria-label={t("aria_prevPage")}
               className="absolute left-0 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full bg-card/90 backdrop-blur border border-border shadow-[var(--shadow-soft)] text-foreground/80 hover:bg-secondary disabled:opacity-30 disabled:pointer-events-none transition"
             >
               <ChevronLeft className="h-5 w-5" />
@@ -406,7 +406,7 @@ function ReviewPage() {
                   onPointerUp={onSigUp}
                   onPointerCancel={onSigUp}
                   role="button"
-                  aria-label="Flytta signatur"
+                  aria-label={t("aria_moveSignature")}
                   className={`absolute touch-none select-none transition ${
                     isDraggingSig ? "cursor-grabbing" : "cursor-grab"
                   }`}
@@ -432,7 +432,7 @@ function ReviewPage() {
               type="button"
               onClick={() => setPageIdx((i) => Math.min(pages.length - 1, i + 1))}
               disabled={pageIdx === pages.length - 1}
-              aria-label="Nästa sida"
+              aria-label={t("aria_nextPage")}
               className="absolute right-0 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full bg-card/90 backdrop-blur border border-border shadow-[var(--shadow-soft)] text-foreground/80 hover:bg-secondary disabled:opacity-30 disabled:pointer-events-none transition"
             >
               <ChevronRight className="h-5 w-5" />

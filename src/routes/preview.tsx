@@ -505,7 +505,7 @@ function PreviewPage() {
             alt={debugZoom.name}
             className="max-w-full max-h-[80vh] object-contain bg-white"
           />
-          <div className="text-white/70 text-xs mt-2">Tryck för att stänga</div>
+          <div className="text-white/70 text-xs mt-2">{t("tapToClose")}</div>
         </div>
       )}
 

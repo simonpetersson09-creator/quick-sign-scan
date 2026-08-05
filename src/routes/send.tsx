@@ -405,12 +405,10 @@ function SendPage() {
     return (
       <AppShell title={t("sendTitle")} back="/review" className="h-dvh overflow-hidden">
         <div className="flex-1 flex flex-col items-center justify-center text-center px-6 gap-4">
-          <h2 className="text-lg font-semibold">Inget dokument hittades</h2>
-          <p className="text-sm text-muted-foreground">
-            Skanningen kunde inte återställas. Gå tillbaka och skanna dokumentet på nytt.
-          </p>
+          <h2 className="text-lg font-semibold">{t("recoveryTitle")}</h2>
+          <p className="text-sm text-muted-foreground">{t("recoveryBody")}</p>
           <PrimaryButton onClick={() => navigate({ to: "/scan" })} className="mt-2">
-            Tillbaka till skanning
+            {t("recoveryCta")}
           </PrimaryButton>
         </div>
       </AppShell>
