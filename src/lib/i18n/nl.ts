@@ -270,4 +270,19 @@ export const nl: Record<string, string> = {
   home_free_remaining: "{remaining} van 5 gratis documenten over",
   premium_badge_unlimited: "Onbeperkte documenten",
   home_premium_badge: "Premium",
+
+  // not found / recovery / a11y
+  notFoundTitle: "Pagina niet gevonden",
+  notFoundBody: "De pagina die je zoekt bestaat niet of is verplaatst.",
+  notFoundHome: "Naar startpagina",
+  recoveryTitle: "Geen document gevonden",
+  recoveryBody: "De scan kon niet worden hersteld. Ga terug en scan het document opnieuw.",
+  recoveryCta: "Terug naar scannen",
+  tapToClose: "Tik om te sluiten",
+  aria_prevPage: "Vorige pagina",
+  aria_nextPage: "Volgende pagina",
+  aria_moveSignature: "Handtekening verplaatsen",
+  aria_resetView: "Weergave herstellen",
+  aria_torch: "Zaklamp",
+
 };

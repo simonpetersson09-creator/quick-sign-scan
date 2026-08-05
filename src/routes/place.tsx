@@ -348,7 +348,7 @@ function PlacePage() {
           >
             <Plus className="h-4 w-4" />
           </ZoomButton>
-          <ZoomButton onClick={resetView} disabled={zoom === 1 && pan.x === 0 && pan.y === 0} aria-label="Reset">
+          <ZoomButton onClick={resetView} disabled={zoom === 1 && pan.x === 0 && pan.y === 0} aria-label={t("aria_resetView")}>
             <Maximize2 className="h-4 w-4" />
           </ZoomButton>
         </div>

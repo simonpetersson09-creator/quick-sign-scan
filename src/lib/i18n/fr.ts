@@ -270,4 +270,19 @@ export const fr: Record<string, string> = {
   home_free_remaining: "{remaining} document(s) gratuit(s) sur 5",
   premium_badge_unlimited: "Documents illimités",
   home_premium_badge: "Premium",
+
+  // not found / recovery / a11y
+  notFoundTitle: "Page introuvable",
+  notFoundBody: "La page que vous recherchez n'existe pas ou a été déplacée.",
+  notFoundHome: "Retour à l'accueil",
+  recoveryTitle: "Aucun document trouvé",
+  recoveryBody: "La numérisation n'a pas pu être restaurée. Revenez en arrière et numérisez à nouveau le document.",
+  recoveryCta: "Retour à la numérisation",
+  tapToClose: "Appuyez pour fermer",
+  aria_prevPage: "Page précédente",
+  aria_nextPage: "Page suivante",
+  aria_moveSignature: "Déplacer la signature",
+  aria_resetView: "Réinitialiser la vue",
+  aria_torch: "Lampe torche",
+
 };

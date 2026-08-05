@@ -270,4 +270,19 @@ export const fi: Record<string, string> = {
   home_free_remaining: "{remaining}/5 ilmaista asiakirjaa jäljellä",
   premium_badge_unlimited: "Rajattomat dokumentit",
   home_premium_badge: "Premium",
+
+  // not found / recovery / a11y
+  notFoundTitle: "Sivua ei löytynyt",
+  notFoundBody: "Etsimääsi sivua ei ole olemassa tai se on siirretty.",
+  notFoundHome: "Etusivulle",
+  recoveryTitle: "Asiakirjaa ei löytynyt",
+  recoveryBody: "Skannausta ei voitu palauttaa. Palaa takaisin ja skannaa asiakirja uudelleen.",
+  recoveryCta: "Takaisin skannaukseen",
+  tapToClose: "Napauta sulkeaksesi",
+  aria_prevPage: "Edellinen sivu",
+  aria_nextPage: "Seuraava sivu",
+  aria_moveSignature: "Siirrä allekirjoitusta",
+  aria_resetView: "Palauta näkymä",
+  aria_torch: "Taskulamppu",
+
 };

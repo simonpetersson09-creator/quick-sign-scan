@@ -3740,7 +3740,7 @@ function ScanPage() {
             className={`h-10 w-10 rounded-full backdrop-blur flex items-center justify-center transition ${
               torchOn ? "bg-yellow-400 text-black" : "bg-black/55 text-white"
             }`}
-            aria-label="Torch"
+            aria-label={t("aria_torch")}
             aria-pressed={torchOn}
           >
             {torchOn ? <Zap className="h-5 w-5" /> : <ZapOff className="h-5 w-5" />}
