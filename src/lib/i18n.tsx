@@ -25,19 +25,19 @@ export type Lang =
   | "fi";
 
 /** Language list — add new entries here, the UI scales automatically. */
-export const LANGUAGES: { code: Lang; nativeName: string; locale: string }[] = [
-  { code: "sv", nativeName: "Svenska", locale: "sv-SE" },
-  { code: "en", nativeName: "English", locale: "en-US" },
-  { code: "de", nativeName: "Deutsch", locale: "de-DE" },
-  { code: "fr", nativeName: "Français", locale: "fr-FR" },
-  { code: "es", nativeName: "Español", locale: "es-ES" },
-  { code: "it", nativeName: "Italiano", locale: "it-IT" },
-  { code: "pt", nativeName: "Português", locale: "pt-PT" },
-  { code: "nl", nativeName: "Nederlands", locale: "nl-NL" },
-  { code: "pl", nativeName: "Polski", locale: "pl-PL" },
-  { code: "da", nativeName: "Dansk", locale: "da-DK" },
-  { code: "no", nativeName: "Norsk", locale: "nb-NO" },
-  { code: "fi", nativeName: "Suomi", locale: "fi-FI" },
+export const LANGUAGES: { code: Lang; nativeName: string; locale: string; flag: string }[] = [
+  { code: "sv", nativeName: "Svenska", locale: "sv-SE", flag: "🇸🇪" },
+  { code: "en", nativeName: "English", locale: "en-US", flag: "🇬🇧" },
+  { code: "de", nativeName: "Deutsch", locale: "de-DE", flag: "🇩🇪" },
+  { code: "fr", nativeName: "Français", locale: "fr-FR", flag: "🇫🇷" },
+  { code: "es", nativeName: "Español", locale: "es-ES", flag: "🇪🇸" },
+  { code: "it", nativeName: "Italiano", locale: "it-IT", flag: "🇮🇹" },
+  { code: "pt", nativeName: "Português", locale: "pt-PT", flag: "🇵🇹" },
+  { code: "nl", nativeName: "Nederlands", locale: "nl-NL", flag: "🇳🇱" },
+  { code: "pl", nativeName: "Polski", locale: "pl-PL", flag: "🇵🇱" },
+  { code: "da", nativeName: "Dansk", locale: "da-DK", flag: "🇩🇰" },
+  { code: "no", nativeName: "Norsk", locale: "nb-NO", flag: "🇳🇴" },
+  { code: "fi", nativeName: "Suomi", locale: "fi-FI", flag: "🇫🇮" },
 ];
 
 type Dict = Record<string, string>;
