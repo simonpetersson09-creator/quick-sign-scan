@@ -1300,10 +1300,14 @@ function ScanPage() {
     // en bättre kandidat än den som fastnat.
     const freePass = freePassesLeftRef.current > 0;
     if (freePass) freePassesLeftRef.current--;
+    // Under inflygning (ej låst och quaden rör sig fortfarande tydligt) körs
+    // detektorn utan prefer-bias, så den inte dras tillbaka mot förra läget.
+    const converging = !lockedRef.current && convergingFramesRef.current > 0;
     const preferQuad =
-      !freePass && prevSmooth && prevConfidentEnough && !biasDecayed
+      !freePass && !converging && prevSmooth && prevConfidentEnough && !biasDecayed
         ? (prevSmooth.map((p) => ({ x: p.x * dw, y: p.y * dh })) as [Point, Point, Point, Point])
         : undefined;
+
     let detection: DocumentDetection | null;
     detectInFlightRef.current = true;
     try {
