@@ -3557,7 +3557,20 @@ export function snapQuadToPaperEdges(
  *   4. Pure desaturation only on already-bright pixels so paper turns truly
  *      white, while coloured ink/stamps keep their hue.
  */
-export function whitenBackground(canvas: HTMLCanvasElement): HTMLCanvasElement {
+export interface WhitenBackgroundOptions {
+  /**
+   * Set when correctLocalIllumination() already removed the slow illumination
+   * field (folds/shadows). The flat-field estimate is then narrowed so the
+   * remaining fold-scale residual is corrected instead of skipped over, and
+   * the max-filter is slightly gentler to avoid stacking two corrections.
+   */
+  illumCorrected?: boolean;
+}
+
+export function whitenBackground(
+  canvas: HTMLCanvasElement,
+  options: WhitenBackgroundOptions = {},
+): HTMLCanvasElement {
   const w = canvas.width;
   const h = canvas.height;
   const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
