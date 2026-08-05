@@ -1649,6 +1649,13 @@ function ScanPage() {
     // just den bättre kandidat som passet är till för att hitta.
     if (previousSmooth && !freePass) {
       rawDeltaFromSmooth = maxCornerDelta(norm, previousSmooth);
+      // Håll koll på inflygning: rör sig rå-quaden fortfarande tydligt mot
+      // dokumentkanten låter vi detektorn söka fritt några pass till.
+      convergingFramesRef.current =
+        rawDeltaFromSmooth >= CONVERGING_DELTA
+          ? CONVERGING_HOLD_FRAMES
+          : Math.max(0, convergingFramesRef.current - 1);
+
       if (rawDeltaFromSmooth > OUTLIER_DELTA && rawDeltaFromSmooth < LOCK_BREAK_DELTA) {
         if (isOutwardExpansion(norm, previousSmooth, detection?.confidence ?? 0)) {
           outlierRejectFramesRef.current = 0;
