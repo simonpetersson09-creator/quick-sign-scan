@@ -1761,13 +1761,18 @@ function ScanPage() {
     const alphaSteps = Math.min(4, Math.max(0.5, dtMs / NOMINAL_FRAME_MS));
     const alpha = Math.min(0.85, 1 - Math.pow(1 - baseAlpha, alphaSteps));
     // C: ett fritt pass som INTE adopterades är ett neutralt sökpass — dess
-    // kandidat får inte blandas in i EMA, annars drar återhämtningspasset
-    // tillbaka spårningen mot den fastnade quaden.
+    // kandidat får inte styra spårningen, men targeten fryses inte heller helt:
+    // den kryper en liten bit mot kandidaten så rörelsen förblir kontinuerlig.
+    const freePassCreepAlpha = Math.min(
+      0.4,
+      FREE_PASS_CREEP_ALPHA * Math.max(1, dtMs / NOMINAL_FRAME_MS),
+    );
     const smoothed = freePassAdopted
       ? norm
       : freePass
-        ? (smoothQuad.current ?? norm)
+        ? emaQuad(smoothQuad.current, norm, freePassCreepAlpha)
         : emaQuad(smoothQuad.current, norm, alpha);
+
     smoothQuad.current = smoothed;
 
     // Push to the voting ring buffer (only the most recent frames count).
