@@ -3505,7 +3505,7 @@ function ScanPage() {
               opacity: 0,
               transition: "opacity 240ms ease",
               animation: "scan-trace 1.6s linear infinite",
-              filter: "drop-shadow(0 0 6px rgba(255,200,60,0.85))",
+              filter: "drop-shadow(0 0 6px rgba(60,220,110,0.85))",
             }}
           />
           {[0, 1, 2, 3].map((i) => (
