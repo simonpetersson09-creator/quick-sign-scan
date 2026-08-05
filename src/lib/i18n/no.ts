@@ -270,4 +270,19 @@ export const no: Record<string, string> = {
   home_free_remaining: "{remaining} av 5 gratis dokumenter igjen",
   premium_badge_unlimited: "Ubegrensede dokumenter",
   home_premium_badge: "Premium",
+
+  // not found / recovery / a11y
+  notFoundTitle: "Siden ble ikke funnet",
+  notFoundBody: "Siden du leter etter, finnes ikke eller er flyttet.",
+  notFoundHome: "Til forsiden",
+  recoveryTitle: "Fant ingen dokumenter",
+  recoveryBody: "Skanningen kunne ikke gjenopprettes. Gå tilbake og skann dokumentet på nytt.",
+  recoveryCta: "Tilbake til skanning",
+  tapToClose: "Trykk for å lukke",
+  aria_prevPage: "Forrige side",
+  aria_nextPage: "Neste side",
+  aria_moveSignature: "Flytt signatur",
+  aria_resetView: "Tilbakestill visning",
+  aria_torch: "Lommelykt",
+
 };

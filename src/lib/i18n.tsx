@@ -314,6 +314,21 @@ const sv: Dict = {
   home_free_remaining: "{remaining} av 5 gratis dokument kvar",
   premium_badge_unlimited: "Obegränsade dokument",
   home_premium_badge: "Premium",
+
+  // not found / recovery / a11y
+  notFoundTitle: "Sidan hittades inte",
+  notFoundBody: "Sidan du letar efter finns inte eller har flyttats.",
+  notFoundHome: "Till startsidan",
+  recoveryTitle: "Inget dokument hittades",
+  recoveryBody: "Skanningen kunde inte återställas. Gå tillbaka och skanna dokumentet på nytt.",
+  recoveryCta: "Tillbaka till skanning",
+  tapToClose: "Tryck för att stänga",
+  aria_prevPage: "Föregående sida",
+  aria_nextPage: "Nästa sida",
+  aria_moveSignature: "Flytta signatur",
+  aria_resetView: "Återställ vy",
+  aria_torch: "Ficklampa",
+
 };
 
 const en: Dict = {
@@ -588,6 +603,21 @@ const en: Dict = {
   home_free_remaining: "{remaining} of 5 free documents left",
   premium_badge_unlimited: "Unlimited documents",
   home_premium_badge: "Premium",
+
+  // not found / recovery / a11y
+  notFoundTitle: "Page not found",
+  notFoundBody: "The page you're looking for doesn't exist or has been moved.",
+  notFoundHome: "Go home",
+  recoveryTitle: "No document found",
+  recoveryBody: "The scan could not be restored. Go back and scan the document again.",
+  recoveryCta: "Back to scanning",
+  tapToClose: "Tap to close",
+  aria_prevPage: "Previous page",
+  aria_nextPage: "Next page",
+  aria_moveSignature: "Move signature",
+  aria_resetView: "Reset view",
+  aria_torch: "Flashlight",
+
 };
 
 const dicts: Partial<Record<Lang, Dict>> = { sv, en, de, fr, es, it, pt, nl, pl, da, no, fi };

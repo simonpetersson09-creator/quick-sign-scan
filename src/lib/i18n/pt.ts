@@ -270,4 +270,19 @@ export const pt: Record<string, string> = {
   home_free_remaining: "{remaining} de 5 documentos gratuitos",
   premium_badge_unlimited: "Documentos ilimitados",
   home_premium_badge: "Premium",
+
+  // not found / recovery / a11y
+  notFoundTitle: "Página não encontrada",
+  notFoundBody: "A página que procura não existe ou foi movida.",
+  notFoundHome: "Ir para o início",
+  recoveryTitle: "Nenhum documento encontrado",
+  recoveryBody: "Não foi possível restaurar a digitalização. Volte atrás e digitalize o documento novamente.",
+  recoveryCta: "Voltar à digitalização",
+  tapToClose: "Toque para fechar",
+  aria_prevPage: "Página anterior",
+  aria_nextPage: "Página seguinte",
+  aria_moveSignature: "Mover a assinatura",
+  aria_resetView: "Repor vista",
+  aria_torch: "Lanterna",
+
 };

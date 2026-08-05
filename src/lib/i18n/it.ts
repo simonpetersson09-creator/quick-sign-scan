@@ -270,4 +270,19 @@ export const it: Record<string, string> = {
   home_free_remaining: "{remaining} di 5 documenti gratuiti",
   premium_badge_unlimited: "Documenti illimitati",
   home_premium_badge: "Premium",
+
+  // not found / recovery / a11y
+  notFoundTitle: "Pagina non trovata",
+  notFoundBody: "La pagina che cerchi non esiste o è stata spostata.",
+  notFoundHome: "Torna alla home",
+  recoveryTitle: "Nessun documento trovato",
+  recoveryBody: "Non è stato possibile ripristinare la scansione. Torna indietro e scansiona di nuovo il documento.",
+  recoveryCta: "Torna alla scansione",
+  tapToClose: "Tocca per chiudere",
+  aria_prevPage: "Pagina precedente",
+  aria_nextPage: "Pagina successiva",
+  aria_moveSignature: "Sposta la firma",
+  aria_resetView: "Reimposta vista",
+  aria_torch: "Torcia",
+
 };
