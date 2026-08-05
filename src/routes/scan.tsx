@@ -41,7 +41,7 @@ import { adaptiveInkEnhance, ADAPTIVE_INK_DEFAULTS } from "@/lib/adaptiveInk";
 /** Under detta värde (min/median i ljusfältet) anses sidan ha veck/skuggor. */
 const FOLD_PROXY_THRESHOLD = 0.93;
 import { useT } from "@/lib/i18n";
-import { Camera, CameraOff, X, RefreshCw, ArrowLeft, ArrowRight, Zap, ZapOff, Settings, Loader2 } from "lucide-react";
+import { Camera, CameraOff, X, RefreshCw, ArrowLeft, ArrowRight, Zap, ZapOff, Settings, Loader2, ScanLine } from "lucide-react";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { isNative, openNativeSettings } from "@/lib/native-init";
 import {
