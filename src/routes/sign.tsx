@@ -17,8 +17,20 @@ function SignPage() {
   const navigate = useNavigate();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawing = useRef(false);
-  const last = useRef<{ x: number; y: number } | null>(null);
+  const last = useRef<{ x: number; y: number; t: number } | null>(null);
+  // Mittpunkt för kvadratisk utjämning + senaste pennbredd, så att strecket
+  // varierar mjukt med hastigheten istället för att vara en jämntjock linje.
+  const lastMid = useRef<{ x: number; y: number } | null>(null);
+  const lastWidth = useRef(2.2);
   const [hasInk, setHasInk] = useState(false);
+
+  // Pennkarakteristik: snabba drag ger tunnare streck, långsamma ger tjockare
+  // — samma beteende som en riktig kulspets/reservoarpenna.
+  const PEN_MIN_W = 0.9;
+  const PEN_MAX_W = 3.4;
+  const PEN_VELOCITY_SCALE = 1.6; // px/ms där pennan når sin tunnaste bredd
+  const PEN_SMOOTHING = 0.35; // 0 = trögt, 1 = hoppigt
+
 
 
   useEffect(() => {
