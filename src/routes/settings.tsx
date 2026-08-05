@@ -64,76 +64,80 @@ function SettingsPage() {
       className="h-dvh overflow-hidden"
       mainClassName="overflow-y-auto overscroll-contain"
     >
-      <div className="flex flex-col gap-5 mt-2">
+      <div className="flex flex-col gap-4 mt-2">
 
         <PremiumSection />
 
+        <section className="rounded-2xl bg-card border border-border divide-y divide-border overflow-hidden">
+          <Row label={t("defaultRecipientLabel")}>
+            <input
+              type="email"
+              value={s.defaultRecipient}
+              onChange={(e) => update("defaultRecipient", e.target.value)}
+              placeholder={t("placeholderTo")}
+              className="row-input"
+            />
+          </Row>
 
+          <Row label={t("defaultSubjectLabel")}>
+            <input
+              value={s.defaultSubject}
+              onChange={(e) => update("defaultSubject", e.target.value)}
+              placeholder={t("defaultSubjectInitial")}
+              className="row-input"
+            />
+          </Row>
 
-        <Field label={t("defaultRecipientLabel")}>
-          <input
-            type="email"
-            value={s.defaultRecipient}
-            onChange={(e) => update("defaultRecipient", e.target.value)}
-            placeholder={t("placeholderTo")}
-            className="input"
-          />
-        </Field>
-
-        <Field label={t("defaultSubjectLabel")}>
-          <input
-            value={s.defaultSubject}
-            onChange={(e) => update("defaultSubject", e.target.value)}
-            placeholder={t("defaultSubjectInitial")}
-            className="input"
-          />
-        </Field>
-
-        <Field label={t("defaultMessageLabel")}>
-          <textarea
-            value={s.defaultMessage}
-            onChange={(e) => update("defaultMessage", e.target.value)}
-            placeholder={t("defaultMessageInitial")}
-            rows={5}
-            className="input resize-none"
-          />
-        </Field>
+          <Row label={t("defaultMessageLabel")}>
+            <textarea
+              value={s.defaultMessage}
+              onChange={(e) => update("defaultMessage", e.target.value)}
+              placeholder={t("defaultMessageInitial")}
+              rows={3}
+              className="row-input resize-none"
+            />
+          </Row>
+        </section>
 
         {hydrated && s.recipients.length > 0 && (
-          <Field label={t("recentRecipients")}>
-            <div className="flex flex-wrap gap-2">
+          <section className="rounded-2xl bg-card border border-border px-4 py-3">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                {t("recentRecipients")}
+              </span>
+              <button
+                type="button"
+                onClick={clearAllRecipients}
+                className="text-[11px] font-medium text-destructive hover:underline shrink-0"
+              >
+                {t("clearRecipients")}
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
               {s.recipients.map((r) => (
                 <span
                   key={r.email}
-                  className="inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1 rounded-full bg-secondary text-secondary-foreground text-xs font-medium"
+                  className="inline-flex items-center gap-1 pl-2.5 pr-1 py-[3px] rounded-full bg-secondary text-secondary-foreground text-[11px] font-medium"
                 >
                   {r.email}
                   <button
                     type="button"
                     onClick={() => removeRecipient(r.email)}
                     aria-label={t("removeRecipient")}
-                    className="h-5 w-5 inline-flex items-center justify-center rounded-full hover:bg-foreground/10 transition-colors"
+                    className="h-4 w-4 inline-flex items-center justify-center rounded-full hover:bg-foreground/10 transition-colors"
                   >
-                    <X className="h-3 w-3" />
+                    <X className="h-2.5 w-2.5" />
                   </button>
                 </span>
               ))}
             </div>
-            <div className="mt-3 flex flex-col gap-1.5">
-              <button
-                type="button"
-                onClick={clearAllRecipients}
-                className="self-start text-xs font-medium text-destructive hover:underline"
-              >
-                {t("clearRecipients")}
-              </button>
-              <p className="text-[11px] text-muted-foreground ml-1">
-                {t("recipientsFootnote")}
-              </p>
-            </div>
-          </Field>
+            <p className="text-[11px] text-muted-foreground mt-2">
+              {t("recipientsFootnote")}
+            </p>
+          </section>
         )}
       </div>
+
 
       <div className="flex-1" />
 
@@ -147,19 +151,19 @@ function SettingsPage() {
       </div>
 
       <style>{`
-        .input {
+        .row-input {
           width: 100%;
-          background: var(--card);
-          border: 1px solid var(--border);
-          border-radius: 14px;
-          padding: 14px 16px;
-          font-size: 16px;
+          background: transparent;
+          border: none;
+          padding: 0;
+          font-size: 15px;
+          line-height: 1.35;
           color: var(--foreground);
           outline: none;
-          transition: border-color 150ms;
         }
-        .input:focus { border-color: var(--primary); }
+        .row-input::placeholder { color: var(--muted-foreground); }
       `}</style>
+
     </AppShell>
   );
 }
@@ -347,11 +351,14 @@ function PremiumSection() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block">
-      <span className="text-xs font-medium text-muted-foreground ml-1">{label}</span>
-      <div className="mt-1.5">{children}</div>
+    <label className="block px-4 py-2.5 focus-within:bg-secondary/30 transition-colors">
+      <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+        {label}
+      </span>
+      <div className="mt-1">{children}</div>
     </label>
   );
+
 }
