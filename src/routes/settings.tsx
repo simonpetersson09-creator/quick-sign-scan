@@ -351,11 +351,14 @@ function PremiumSection() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block">
-      <span className="text-xs font-medium text-muted-foreground ml-1">{label}</span>
-      <div className="mt-1.5">{children}</div>
+    <label className="block px-4 py-2.5 focus-within:bg-secondary/30 transition-colors">
+      <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+        {label}
+      </span>
+      <div className="mt-1">{children}</div>
     </label>
   );
+
 }
