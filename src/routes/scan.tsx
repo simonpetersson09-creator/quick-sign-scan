@@ -288,6 +288,17 @@ function ScanPage() {
   const polyRef = useRef<SVGPolygonElement | null>(null);
   const glowRef = useRef<SVGPolygonElement | null>(null);
   const tracePolyRef = useRef<SVGPolygonElement | null>(null);
+  // Överlagringens egna 60 Hz-loop (interpolering + extrapolering).
+  const overlayRafRef = useRef<number | null>(null);
+  const overlayTargetRef = useRef<{
+    quad: [Point, Point, Point, Point];
+    phase: "search" | "hold" | "ready";
+    t: number;
+  } | null>(null);
+  const overlayPrevTargetRef = useRef<{ vel: Point[] } | null>(null);
+  const overlayCurrentRef = useRef<[Point, Point, Point, Point] | null>(null);
+  const overlayLastFrameRef = useRef(0);
+
   const cornerRefs = useRef<SVGCircleElement[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -2057,7 +2068,98 @@ function ScanPage() {
   }
 
 
+  // ===== Överlagringens 60 Hz-interpolering =====
+  // Detekteringen levererar quads i ~8-14 Hz vilket ser ryckigt ut. Här hålls
+  // en separat renderingsloop på rAF (60 Hz) som mjukt lerpar mot senaste
+  // detekterade quad, med kort linjär extrapolering mellan pass så ramen
+  // följer med när dokumentet/telefonen rör sig. Ändrar ingen detekterings-,
+  // stabilitets- eller capture-logik — bara vad som ritas.
+  const OVERLAY_SMOOTH_MS = 70; // tidskonstant för lerp
+  const OVERLAY_MAX_EXTRAP_MS = 90; // hur långt fram vi vågar prediktera
+  const OVERLAY_SNAP_DIST = 0.25; // stort hopp ⇒ snappa istället för att glida
+
   function drawOverlay(
+    quad: [Point, Point, Point, Point] | null,
+    phase: "search" | "hold" | "ready",
+  ) {
+    if (!quad) {
+      if (overlayRafRef.current) {
+        cancelAnimationFrame(overlayRafRef.current);
+        overlayRafRef.current = null;
+      }
+      overlayTargetRef.current = null;
+      overlayPrevTargetRef.current = null;
+      overlayCurrentRef.current = null;
+      renderOverlay(null, phase);
+      return;
+    }
+
+    const now = performance.now();
+    const prevTarget = overlayTargetRef.current;
+    if (prevTarget) {
+      const dt = Math.max(1, now - prevTarget.t);
+      // Hastighet per ms i normaliserade enheter (per hörn).
+      overlayPrevTargetRef.current = {
+        vel: quad.map((p, i) => ({
+          x: (p.x - prevTarget.quad[i].x) / dt,
+          y: (p.y - prevTarget.quad[i].y) / dt,
+        })) as Point[],
+      };
+    } else {
+      overlayPrevTargetRef.current = null;
+      overlayCurrentRef.current = quad.map((p) => ({ ...p })) as [
+        Point,
+        Point,
+        Point,
+        Point,
+      ];
+    }
+    overlayTargetRef.current = { quad, phase, t: now };
+
+    if (!overlayRafRef.current) {
+      overlayLastFrameRef.current = now;
+      overlayRafRef.current = requestAnimationFrame(overlayFrame);
+    }
+  }
+
+  function overlayFrame() {
+    overlayRafRef.current = null;
+    const target = overlayTargetRef.current;
+    if (!target) return;
+
+    const now = performance.now();
+    const frameDt = Math.min(50, Math.max(1, now - overlayLastFrameRef.current));
+    overlayLastFrameRef.current = now;
+
+    // Extrapolera målet en bit framåt baserat på senaste uppmätta hastighet.
+    const vel = overlayPrevTargetRef.current?.vel;
+    const ahead = Math.min(OVERLAY_MAX_EXTRAP_MS, now - target.t);
+    const predicted = target.quad.map((p, i) =>
+      vel ? { x: p.x + vel[i].x * ahead, y: p.y + vel[i].y * ahead } : { ...p },
+    ) as [Point, Point, Point, Point];
+
+    let cur = overlayCurrentRef.current;
+    if (!cur) {
+      cur = predicted.map((p) => ({ ...p })) as [Point, Point, Point, Point];
+    } else {
+      // Exponentiell utjämning oberoende av bildfrekvens.
+      const alpha = 1 - Math.exp(-frameDt / OVERLAY_SMOOTH_MS);
+      cur = cur.map((p, i) => {
+        const d = Math.hypot(predicted[i].x - p.x, predicted[i].y - p.y);
+        if (d > OVERLAY_SNAP_DIST) return { ...predicted[i] };
+        return {
+          x: p.x + (predicted[i].x - p.x) * alpha,
+          y: p.y + (predicted[i].y - p.y) * alpha,
+        };
+      }) as [Point, Point, Point, Point];
+    }
+    overlayCurrentRef.current = cur;
+
+    renderOverlay(cur, target.phase);
+    overlayRafRef.current = requestAnimationFrame(overlayFrame);
+  }
+
+  function renderOverlay(
     quad: [Point, Point, Point, Point] | null,
     phase: "search" | "hold" | "ready",
   ) {
@@ -2081,6 +2183,7 @@ function ScanPage() {
       cornerRefs.current.forEach((c) => c && (c.style.opacity = "0"));
       return;
     }
+
 
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
