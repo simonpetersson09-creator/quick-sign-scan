@@ -3808,8 +3808,30 @@ function ScanPage() {
       <div className="flex-1" />
 
 
+      {/* Start-läge: användaren väljer själv när skanningen ska börja. */}
+      {!scanStarted && (
+        <div className="relative pb-safe px-5 pt-4 flex flex-col items-center gap-3">
+          <button
+            type="button"
+            onClick={startScanning}
+            disabled={!cameraReady || status === "error"}
+            className="w-full max-w-[280px] rounded-full bg-primary text-primary-foreground h-14 px-6 text-[16px] font-semibold tracking-tight shadow-[0_10px_30px_-10px_rgba(0,0,0,0.7)] active:scale-[0.98] disabled:opacity-40 transition flex items-center justify-center gap-2"
+          >
+            <ScanLine className="h-5 w-5" />
+            {t("startScanCta")}
+          </button>
+          <p className="text-xs text-white/75 text-center max-w-[260px]">
+            {t("startScanHint")}
+          </p>
+        </div>
+      )}
+
       {/* Bottom hint / manual capture / page thumbnail */}
-      <div className="relative pb-safe px-5 pt-4 flex flex-col items-center gap-3">
+      <div
+        className={`relative pb-safe px-5 pt-4 flex flex-col items-center gap-3 ${
+          scanStarted ? "" : "hidden"
+        }`}
+      >
         {error && status !== "error" && (
           <p className="text-center text-sm text-red-200 max-w-xs">{error}</p>
         )}
