@@ -1,5 +1,5 @@
 // Tracks the number of PDF documents the user has sent on this install.
-// Used together with src/lib/premium.ts to gate the free tier (5 docs).
+// Used together with src/lib/premium.ts to gate the free tier (3 docs).
 //
 // Storage strategy:
 // - On native iOS, the authoritative count lives in the iOS Keychain
