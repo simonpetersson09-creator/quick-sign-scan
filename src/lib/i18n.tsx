@@ -706,6 +706,8 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     setLangState(l);
     try {
       localStorage.setItem(STORAGE_KEY, l);
+      localStorage.setItem(STORAGE_KEY_EXPLICIT, "1");
+
     } catch {}
     if (typeof document !== "undefined") {
       document.documentElement.lang = l;
