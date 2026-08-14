@@ -646,6 +646,35 @@ interface Ctx {
 const LangContext = createContext<Ctx | null>(null);
 
 const STORAGE_KEY = "signgo.lang";
+/** "1" = the user picked the language manually in Settings. */
+const STORAGE_KEY_EXPLICIT = "signgo.lang.explicit";
+
+const SUPPORTED = new Set<string>(LANGUAGES.map((l) => l.code));
+
+/** Map a BCP-47 tag (sv-SE, nb-NO, en_GB…) to a supported app language. */
+export function resolveLangTag(tag: string): Lang | null {
+  const base = tag.toLowerCase().replace("_", "-").split("-")[0];
+  if (!base) return null;
+  // Norwegian variants: nb / nn / no
+  if (base === "nb" || base === "nn" || base === "no") return "no";
+  if (SUPPORTED.has(base)) return base as Lang;
+  return null;
+}
+
+/** Read the device's preferred languages and pick the first supported one. */
+export function detectDeviceLang(): Lang {
+  try {
+    const tags: string[] = [
+      ...(Array.isArray(navigator.languages) ? navigator.languages : []),
+      navigator.language,
+    ].filter(Boolean) as string[];
+    for (const tag of tags) {
+      const hit = resolveLangTag(tag);
+      if (hit) return hit;
+    }
+  } catch {}
+  return "en";
+}
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>("sv");
@@ -653,9 +682,19 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored && LANGUAGES.some((l) => l.code === stored)) setLangState(stored as Lang);
+      const explicit = localStorage.getItem(STORAGE_KEY_EXPLICIT) === "1";
+      if (stored && SUPPORTED.has(stored)) {
+        // Existing users: a stored value counts as a manual choice.
+        if (!explicit) localStorage.setItem(STORAGE_KEY_EXPLICIT, "1");
+        setLangState(stored as Lang);
+        return;
+      }
+      const detected = detectDeviceLang();
+      setLangState(detected);
+      localStorage.setItem(STORAGE_KEY, detected);
     } catch {}
   }, []);
+
 
   useEffect(() => {
     if (typeof document !== "undefined") {
