@@ -6,6 +6,10 @@
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Sign &amp; Go behöver kameran för att skanna dokument.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Sign &amp; Go behöver åtkomst till fotobiblioteket för att välja dokumentbilder.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
