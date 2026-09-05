@@ -41,16 +41,9 @@ I Xcode:
 1. Välj projektet i sidopanelen → **Signing & Capabilities** → välj ditt **Team** (Apple Developer-kontot)
 2. Sätt en unik **Bundle Identifier** (t.ex. `com.dittforetag.scansign`)
 
-### Lägg till kamerabehörighet (OBLIGATORISKT — annars kraschar appen + App Store reject)
+### Behörigheter (redan inlagda i Info.plist)
 
-Öppna `ios/App/App/Info.plist` (i Xcode eller valfri editor) och lägg till **innan** `</dict>` i slutet:
-
-```xml
-<key>NSCameraUsageDescription</key>
-<string>Appen behöver tillgång till kameran för att skanna dokument.</string>
-<key>NSPhotoLibraryUsageDescription</key>
-<string>Tillåt åtkomst för att välja dokumentbilder från fotobiblioteket.</string>
-```
+Kamera- och fotobiblioteksbehörigheter (`NSCameraUsageDescription`, `NSPhotoLibraryUsageDescription`) samt exportkrypteringsdeklarationen (`ITSAppUsesNonExemptEncryption`) ligger redan i `ios/App/App/Info.plist`. De följer med automatiskt vid `npx cap sync ios`.
 
 ## Steg 5: Testa på iPhone
 - Anslut iPhone via USB → välj enheten i Xcode → tryck **Play (▶)**
@@ -82,7 +75,7 @@ I Xcode:
 
 ## Steg 7: In-App Purchase (Sign & Go Premium)
 
-Appen har en fri tier på 5 dokument per installation och ett årsabonnemang
+Appen har en fri tier på 3 dokument per installation och ett årsabonnemang
 `com.sspp.signandgo.premium.yearly` (99 kr/år) via App Store.
 
 ### 1. Skapa abonnemanget i App Store Connect
