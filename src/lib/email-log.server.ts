@@ -24,11 +24,20 @@ export async function logEmailEvent(opts: {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const recipient_hash = opts.recipient ? await hashRecipient(opts.recipient) : null;
-    await supabaseAdmin.from("email_send_events").insert({
+    const { error } = await supabaseAdmin.from("email_send_events").insert({
       status: opts.status,
       error_code: opts.errorCode ?? null,
       recipient_hash,
     });
+    if (error) {
+      // supabase-js never throws on query errors — they are returned, so we
+      // must check explicitly or failures are silently swallowed.
+      console.error(
+        `[emailLog] insert_failed code=${error.code ?? "?"} msg=${error.message} hint=${error.hint ?? "-"}`,
+      );
+    } else {
+      console.log(`[emailLog] recorded status=${opts.status}`);
+    }
   } catch (e) {
     // Logging must never break sending.
     console.error(`[emailLog] failed err=${e instanceof Error ? e.name : "unknown"}`);
