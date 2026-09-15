@@ -71,9 +71,9 @@ export const adminLogout = createServerFn({ method: "POST" }).handler(async () =
 
 export const adminEmailStats = createServerFn({ method: "GET" }).handler(
   async (): Promise<AdminStats> => {
-    const { getAdminSession, loadMonthlyStats } = await import("./admin.server");
+    const { getAdminSession, loadMonthlyStats, isAdminOpen } = await import("./admin.server");
     const session = await getAdminSession();
-    if (!session.data?.admin) return { ok: false };
+    if (!session.data?.admin && !isAdminOpen()) return { ok: false };
     return loadMonthlyStats();
   },
 );
