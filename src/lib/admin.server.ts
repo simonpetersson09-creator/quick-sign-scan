@@ -20,7 +20,17 @@ function timingSafeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
+// TEMPORARY: admin page is open without a password until this moment passes
+// (2026-09-17 23:59 Stockholm = 21:59 UTC). After that the password is required
+// again automatically. Remove this block once no longer needed.
+const ADMIN_OPEN_UNTIL = Date.UTC(2026, 8, 17, 21, 59, 0);
+
+export function isAdminOpen(): boolean {
+  return Date.now() < ADMIN_OPEN_UNTIL;
+}
+
 export function checkAdminPassword(input: string): boolean {
+  if (isAdminOpen()) return true;
   const expected = process.env.ADMIN_PASSWORD?.trim();
   if (!expected) return false;
   return timingSafeEqual(input, expected);
