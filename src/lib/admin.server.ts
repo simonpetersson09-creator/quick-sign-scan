@@ -7,7 +7,8 @@ export function getAdminSession() {
   return useSession<AdminSessionData>({
     password: process.env.SESSION_SECRET!,
     name: "signgo-admin",
-    maxAge: 60 * 60 * 8,
+    // Keep the admin signed in for 30 days so the code isn't re-entered constantly.
+    maxAge: 60 * 60 * 24 * 30,
     cookie: { httpOnly: true, secure: true, sameSite: "none" as const, path: "/" },
   });
 }
