@@ -452,14 +452,7 @@ export const sendScanEmail = createServerFn({ method: "POST" })
             await incrementServerSentCount(quotaDeviceId);
           } catch { /* best effort */ }
         }
-        try {
-          const { logEmailEvent } = await import("./email-log.server");
-          await logEmailEvent({ status: "sent", recipient: data.to });
-        } catch (e) {
-          console.error(
-            `[sendScanEmail] ${ts} ${requestId} emailLog_import_failed err=${e instanceof Error ? `${e.name}: ${e.message}` : "unknown"}`,
-          );
-        }
+        await recordSendEvent({ status: "sent", recipient: data.to, requestId, ts });
         console.log(
           `[sendScanEmail] ${ts} ${requestId} ip=${ipHash} status=sent`,
         );
