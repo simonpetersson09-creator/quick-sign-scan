@@ -539,17 +539,12 @@ export const sendScanEmail = createServerFn({ method: "POST" })
       lastStatus === undefined
         ? fail("network_error")
         : fail(classifyResendError(lastStatus, lastBody), lastStatus);
-    try {
-      const { logEmailEvent } = await import("./email-log.server");
-      await logEmailEvent({
-        status: "failed",
-        errorCode: failure.ok === false ? failure.code : null,
-        recipient: data.to,
-      });
-    } catch (e) {
-      console.error(
-        `[sendScanEmail] ${ts} ${requestId} emailLog_import_failed err=${e instanceof Error ? `${e.name}: ${e.message}` : "unknown"}`,
-      );
-    }
+    await recordSendEvent({
+      status: "failed",
+      errorCode: failure.ok === false ? failure.code : null,
+      recipient: data.to,
+      requestId,
+      ts,
+    });
     return failure;
   });
