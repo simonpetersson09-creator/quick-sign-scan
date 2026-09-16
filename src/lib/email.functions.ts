@@ -455,7 +455,11 @@ export const sendScanEmail = createServerFn({ method: "POST" })
         try {
           const { logEmailEvent } = await import("./email-log.server");
           await logEmailEvent({ status: "sent", recipient: data.to });
-        } catch { /* ignore */ }
+        } catch (e) {
+          console.error(
+            `[sendScanEmail] ${ts} ${requestId} emailLog_import_failed err=${e instanceof Error ? `${e.name}: ${e.message}` : "unknown"}`,
+          );
+        }
         console.log(
           `[sendScanEmail] ${ts} ${requestId} ip=${ipHash} status=sent`,
         );
