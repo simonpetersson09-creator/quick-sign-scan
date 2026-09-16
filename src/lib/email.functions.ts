@@ -245,6 +245,66 @@ function extractIp(req: Request | undefined): string {
   return "unknown";
 }
 
+// Records one row per send attempt directly via the Supabase REST API.
+// Deliberately inline (no dynamic import of a *.server module) so bundling
+// quirks can never silently drop the statistics write.
+async function recordSendEvent(opts: {
+  status: "sent" | "failed";
+  recipient: string;
+  requestId: string;
+  ts: string;
+  errorCode?: string | null;
+}): Promise<void> {
+  try {
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !key) {
+      console.error(`[emailLog] ${opts.ts} ${opts.requestId} missing_supabase_env`);
+      return;
+    }
+    let recipient_hash: string | null = null;
+    try {
+      const salt = process.env.EMAIL_HASH_SALT ?? "sendScanEmail:recipient:v1";
+      const digest = await crypto.subtle.digest(
+        "SHA-256",
+        new TextEncoder().encode(`${salt}|${opts.recipient.trim().toLowerCase()}`),
+      );
+      const bytes = new Uint8Array(digest);
+      let hex = "";
+      for (let i = 0; i < 12; i++) hex += bytes[i].toString(16).padStart(2, "0");
+      recipient_hash = hex;
+    } catch {
+      recipient_hash = null;
+    }
+    const res = await fetch(`${url}/rest/v1/email_send_events`, {
+      method: "POST",
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({
+        status: opts.status,
+        error_code: opts.errorCode ?? null,
+        recipient_hash,
+      }),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      console.error(
+        `[emailLog] ${opts.ts} ${opts.requestId} insert_failed http=${res.status} body=${text.slice(0, 300)}`,
+      );
+    } else {
+      console.log(`[emailLog] ${opts.ts} ${opts.requestId} recorded status=${opts.status}`);
+    }
+  } catch (e) {
+    console.error(
+      `[emailLog] ${opts.ts} ${opts.requestId} threw err=${e instanceof Error ? `${e.name}: ${e.message}` : "unknown"}`,
+    );
+  }
+}
+
 export const sendScanEmail = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => {
     const r = inputSchema.safeParse(data);
