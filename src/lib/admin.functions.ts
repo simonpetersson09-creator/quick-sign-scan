@@ -62,7 +62,22 @@ export const adminLogin = createServerFn({ method: "POST" })
   });
 
 
+// Reject cross-site requests: the admin cookie is SameSite=None, so require
+// the browser-sent Origin (or Referer) to match this site's own host.
+function isSameOrigin(req: Request | undefined): boolean {
+  if (!req) return false;
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  const src = req.headers.get("origin") ?? req.headers.get("referer");
+  if (!host || !src) return false;
+  try {
+    return new URL(src).host === host;
+  } catch {
+    return false;
+  }
+}
+
 export const adminLogout = createServerFn({ method: "POST" }).handler(async () => {
+  if (!isSameOrigin(getRequest())) return { ok: false as const };
   const { getAdminSession } = await import("./admin.server");
   const session = await getAdminSession();
   await session.clear();
