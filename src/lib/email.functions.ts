@@ -370,7 +370,9 @@ export const sendScanEmail = createServerFn({ method: "POST" })
     // rejected before doing any work — and the failure is still counted
     // toward the rate limiter below so repeated guessing gets throttled.
     // Dev / preview builds bypass this check so development stays friction-free.
-    if (!isDevOrPreviewRequest(req) && !isNativeRequest(req)) {
+    // Native (Capacitor) requests are NOT exempt: the Origin header is
+    // trivially spoofable, so the iOS app must send the code too.
+    if (!isDevOrPreviewRequest(req)) {
       const expectedAccessCode = process.env.APP_ACCESS_CODE;
       if (!expectedAccessCode) {
         console.error(
