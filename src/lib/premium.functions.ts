@@ -1,13 +1,18 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+// Device ids are 128-bit random values generated on-device and act as an
+// unguessable per-device secret; reject anything else so callers cannot probe
+// short or chosen ids.
+const deviceIdSchema = z.string().trim().regex(/^[a-f0-9]{32}$/);
+
 const schema = z.object({
-  deviceId: z.string().trim().min(8).max(128).regex(/^[A-Za-z0-9_-]+$/),
+  deviceId: deviceIdSchema,
   signedTransaction: z.string().min(50).max(20000),
 });
 
 const statusSchema = z.object({
-  deviceId: z.string().trim().min(8).max(128).regex(/^[A-Za-z0-9_-]+$/),
+  deviceId: deviceIdSchema,
 });
 
 /**
