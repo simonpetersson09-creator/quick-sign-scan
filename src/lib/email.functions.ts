@@ -420,7 +420,7 @@ export const sendScanEmail = createServerFn({ method: "POST" })
       console.error(
         `[sendScanEmail] ${ts} ${requestId} status=quota_check_failed err=${e instanceof Error ? e.name : "unknown"}`,
       );
-      return fail("server_error", 500);
+      return fail("unknown", 500);
     }
 
     // Credentials.
