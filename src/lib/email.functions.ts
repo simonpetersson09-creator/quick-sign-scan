@@ -51,11 +51,6 @@ function isNativeOrigin(origin: string): boolean {
   }
 }
 
-function isNativeRequest(req: Request | undefined): boolean {
-  if (!req) return false;
-  const origin = req.headers.get("origin") ?? "";
-  return origin ? isNativeOrigin(origin) : false;
-}
 
 function isDev(): boolean {
   return typeof import.meta.env !== "undefined" && !!import.meta.env.DEV;
